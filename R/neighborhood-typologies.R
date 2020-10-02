@@ -33,7 +33,6 @@ nt <- function(
 	NeighType = "NeighType",
 	nt_conc = "nt_conc"
 	){
-
 	df %>%
 	dplyr::group_by(GEOID) %>%
 			# create neighborhood typology
