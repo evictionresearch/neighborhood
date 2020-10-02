@@ -94,7 +94,6 @@ nt <- function(
 			totraceE == 0 ~ "Unpopulated Tract")) %>%
 		dplyr::ungroup() %>% 
 		dplyr::mutate(nt_conc = 
-			factor(
 				dplyr::case_when(
 					NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
 					NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
@@ -123,7 +122,8 @@ nt <- function(
 					NeighType == "Latinx-Shared" ~ "Mostly Latinx",
 					NeighType == "Other-Shared" ~ "Mostly Other", 
 					TRUE ~ NeighType
-				), 
+				) %>% 
+		dplyr::mutate(nt_conc = factor(nt_conc, 
 			levels = c(
 				"Mostly White",
 				"Mostly Asian",
