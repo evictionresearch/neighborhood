@@ -1,0 +1,14 @@
+Package: neighborhood
+Type: Package
+Title: Create neighborhood racial typologies
+Version: 0.1
+Author: tim thomas
+Maintainer: The package maintainer <timthomas@berkeley.edu>
+Description: This package features several neighborhood research functions in 
+    relation to racial segregation, housing market trends, and residential mobility. 
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    tidycensus, 
+    dplyr
