@@ -21,21 +21,9 @@
 # NT Formula
 # ==========================================================================
 
-nt <- function(
-	df, 
-	GEOID = "GEOID", 
-	totraceE = "toteraceE", 
-	pWhite = "pWhite", 
-	pBlack = "pBlack", 
-	pAsian = "pAsian", 
-	pLatinx = "pLatinx", 
-	pOther = "pOther", 
-	NeighType = "NeighType",
-	nt_conc = "nt_conc"
-	){
+nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", pBlack = "pBlack", pAsian = "pAsian", pLatinx = "pLatinx", pOther = "pOther", NeighType = "NeighType", nt_conc = "nt_conc"){
 	df %>%
 	dplyr::group_by(GEOID) %>%
-			# create neighborhood typology
 	dplyr::mutate(NeighType =
 		dplyr::case_when(
 			pWhite >=.9 ~ "All White",
@@ -43,38 +31,25 @@ nt <- function(
 			pAsian >=.9 ~ "All Asian",
 			pLatinx >=.9 ~ "All Latinx",
 			pOther >=.9 ~ "All Other",
-
-			# pBlack >=.7 ~ "Mostly Black",
-			# pAsian >=.7 ~ "Mostly Asian",
-			# pLatinx >=.7 ~ "Mostly Latinx",
-			# pOther >=.7 ~ "Mostly Other",
-
 			pWhite < .9 & pBlack < .1 & pAsian < .1 & pLatinx < .1 & pOther < .1 ~ "White-Shared",
 			pBlack < .9 & pWhite < .1 & pAsian < .1 & pLatinx < .1 & pOther < .1 ~ "Black-Shared",
 			pAsian < .9 & pBlack < .1 & pWhite < .1 & pLatinx < .1 & pOther < .1 ~ "Asian-Shared",
 			pLatinx < .9 & pBlack < .1 & pAsian < .1 & pWhite < .1 & pOther < .1 ~ "Latinx-Shared",
 			pOther < .9 & pBlack < .1 & pAsian < .1 & pLatinx < .1 & pWhite < .1 ~ "Other-Shared",
-
 			pWhite >=.1 & pWhite < .9 & pBlack >=.1 & pBlack < .9 & pAsian < .1 & pLatinx < .1 & pOther < .1 ~ "Black-White",
 			pWhite >=.1 & pWhite < .9 & pLatinx >=.1 & pLatinx < .9 & pAsian < .1 & pBlack < .1 & pOther < .1 ~ "Latinx-White",
 			pWhite >=.1 & pWhite < .9 & pAsian >=.1 & pAsian < .9 & pBlack < .1 & pLatinx < .1 & pOther < .1 ~ "Asian-White",
 			pWhite >= .1 & pWhite < .9 & pOther >=.1 & pOther < .9 & pBlack < .1 & pLatinx < .1 & pAsian < .1 ~ "Other-White",
-
 			pBlack >=.1 & pBlack < .9 & pOther >=.1 & pOther < .9 & pWhite < .1 & pLatinx < .1 & pAsian < .1 ~ "Black-Other",
 			pBlack >=.1 & pBlack < .9 & pLatinx >=.1 & pLatinx < .9 & pWhite < .1 & pAsian < .1 & pOther < .1 ~ "Black-Latinx",
-
 			pAsian >=.1 & pAsian < .9 & pBlack >=.1 & pBlack < .9 & pWhite < .1 & pLatinx < .1 & pOther < .1 ~ "Asian-Black",
 			pAsian >=.1 & pAsian < .9 & pLatinx >=.1 & pLatinx < .9 & pWhite < .1 & pBlack < .1 & pOther < .1 ~ "Asian-Latinx",
 			pAsian >= .1 & pAsian < .9 & pOther >=.1 & pOther < .9 & pWhite < .1 & pLatinx < .1 & pBlack < .1 ~ "Asian-Other",
-
 			pLatinx >= .1 & pLatinx < .9 & pOther >=.1 & pOther < .9 & pWhite < .1 & pAsian < .1 & pBlack < .1 ~ "Latinx-Other",
-
 			pBlack >=.1 & pAsian >=.1 & pLatinx >=.1 & pWhite < .1 & pOther < .1 ~ "Black-Asian-Latinx",
 			pBlack >=.1 & pAsian >=.1 & pOther >=.1 & pWhite < .1 & pLatinx < .1 ~ "Black-Asian-Other",
 			pBlack >=.1 & pLatinx >=.1 & pOther >=.1 & pWhite < .1 & pAsian < .1 ~ "Black-Latinx-Other",
-
 			pAsian >=.1 & pLatinx >=.1 & pOther >=.1 & pWhite < .1 & pBlack < .1 ~ "Asian-Latinx-Other",
-
 			pWhite >=.1 & pBlack >=.1 & pAsian >=.1 & pLatinx < .1 & pOther < .1 ~ "Black-Asian-White",
 			pWhite >=.1 & pBlack >=.1 & pLatinx >=.1 & pAsian < .1 & pOther < .1 ~ "Black-Latinx-White",
 			pWhite >=.1 & pBlack >=.1 & pOther >=.1 & pLatinx < .1 & pAsian < .1 ~ "Black-Other-White",
@@ -82,47 +57,49 @@ nt <- function(
 			pWhite >=.1 & pAsian >=.1 & pOther >=.1 & pLatinx < .1 & pBlack < .1 ~ "Asian-Other-White",
 			pWhite >=.1 & pLatinx >=.1 & pOther >=.1 & pAsian < .1 & pBlack < .1 ~ "Latinx-Other-White",
 			pWhite >=.1 & pLatinx >=.1 & pOther >=.1 & pAsian < .1 & pBlack < .1 ~ "Latinx-Other-White",
-
 			pBlack >=.1 & pAsian >=.1 & pLatinx >=.1 & pOther >=.1 & pWhite < .1 ~ "Black-Asian-Latinx-Other",
 			pWhite >=.1 & pAsian >=.1 & pLatinx >=.1 & pOther >=.1 & pBlack < .1 ~ "Asian-Latinx-Other-White",
 			pWhite >=.1 & pBlack >=.1 & pLatinx >=.1 & pOther >=.1 & pAsian < .1 ~ "Black-Latinx-Other-White",
 			pWhite >=.1 & pBlack >=.1 & pAsian >=.1 & pOther >=.1 & pLatinx < .1 ~ "Black-Asian-Other-White",
 			pWhite >=.1 & pBlack >=.1 & pAsian >=.1 & pLatinx >=.1 & pOther < .1 ~ "Black-Asian-Latinx-White",
-
 			pWhite >=.1 & pWhite <=.7 & pBlack >=.1 & pAsian >=.1 & pLatinx >=.1 & pOther >=.1 ~ "Diverse",
-			totraceE == 0 ~ "Unpopulated Tract")) %>%
-		dplyr::ungroup() %>% 
-		dplyr::mutate(nt_conc = 
-				dplyr::case_when(
-					NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
-					NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
-					NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed", 
-					NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed", 
-					NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed", 
-					NeighType == "Black-Asian-Latinx" ~ "3 Group Mixed",
-					NeighType == "Black-Asian-Other" ~ "3 Group Mixed",
-					NeighType == "Black-Latinx-Other" ~ "3 Group Mixed",
-					NeighType == "Asian-Latinx-Other" ~ "3 Group Mixed",
-					NeighType == "Black-Asian-White" ~ "3 Group Mixed",
-					NeighType == "Black-Latinx-White" ~ "3 Group Mixed",
-					NeighType == "Black-Other-White" ~ "3 Group Mixed",
-					NeighType == "Asian-Latinx-White" ~ "3 Group Mixed",
-					NeighType == "Asian-Other-White" ~ "3 Group Mixed",
-					NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
-					NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
-					NeighType == "All White" ~ "Mostly White",
-					NeighType == "All Black" ~ "Mostly Black",
-					NeighType == "All Asian" ~ "Mostly Asian",
-					NeighType == "All Latinx" ~ "Mostly Latinx",
-					NeighType == "All Other" ~ "Mostly Other",
-					NeighType == "White-Shared" ~ "Mostly White",
-					NeighType == "Black-Shared" ~ "Mostly Black",
-					NeighType == "Asian-Shared" ~ "Mostly Asian",
-					NeighType == "Latinx-Shared" ~ "Mostly Latinx",
-					NeighType == "Other-Shared" ~ "Mostly Other", 
-					TRUE ~ NeighType
-				) %>% 
-		dplyr::mutate(nt_conc = factor(nt_conc, 
+			totraceE == 0 ~ "Unpopulated Tract"
+			)
+	) %>%
+	dplyr::ungroup() %>% 
+	dplyr::mutate(nt_conc = 
+		dplyr::case_when(
+			NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
+			NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Latinx" ~ "3 Group Mixed",
+			NeighType == "Black-Asian-Other" ~ "3 Group Mixed",
+			NeighType == "Black-Latinx-Other" ~ "3 Group Mixed",
+			NeighType == "Asian-Latinx-Other" ~ "3 Group Mixed",
+			NeighType == "Black-Asian-White" ~ "3 Group Mixed",
+			NeighType == "Black-Latinx-White" ~ "3 Group Mixed",
+			NeighType == "Black-Other-White" ~ "3 Group Mixed",
+			NeighType == "Asian-Latinx-White" ~ "3 Group Mixed",
+			NeighType == "Asian-Other-White" ~ "3 Group Mixed",
+			NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
+			NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
+			NeighType == "All White" ~ "Mostly White",
+			NeighType == "All Black" ~ "Mostly Black",
+			NeighType == "All Asian" ~ "Mostly Asian",
+			NeighType == "All Latinx" ~ "Mostly Latinx",
+			NeighType == "All Other" ~ "Mostly Other",
+			NeighType == "White-Shared" ~ "Mostly White",
+			NeighType == "Black-Shared" ~ "Mostly Black",
+			NeighType == "Asian-Shared" ~ "Mostly Asian",
+			NeighType == "Latinx-Shared" ~ "Mostly Latinx",
+			NeighType == "Other-Shared" ~ "Mostly Other", 
+			TRUE ~ NeighType
+		)
+	) %>% 
+	dplyr::mutate(nt_conc = 
+		factor(nt_conc, 
 			levels = c(
 				"Mostly White",
 				"Mostly Asian",
@@ -144,9 +121,9 @@ nt <- function(
 				"Diverse", 
 				"Unpopulated Tract"
 				)
-			)
 		)
-	}
+	)
+}
 
 # ==========================================================================
 # Create data frame
