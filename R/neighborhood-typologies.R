@@ -66,65 +66,64 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 			totraceE == 0 ~ "Unpopulated Tract"
 			)
 	) %>%
-	dplyr::ungroup()
+	dplyr::ungroup() %>% 
+	dplyr::mutate(nt_conc = 
+		dplyr::case_when(
+			NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
+			NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Latinx" ~ "3 Group Mixed",
+			NeighType == "Black-Asian-Other" ~ "3 Group Mixed",
+			NeighType == "Black-Latinx-Other" ~ "3 Group Mixed",
+			NeighType == "Asian-Latinx-Other" ~ "3 Group Mixed",
+			NeighType == "Black-Asian-White" ~ "3 Group Mixed",
+			NeighType == "Black-Latinx-White" ~ "3 Group Mixed",
+			NeighType == "Black-Other-White" ~ "3 Group Mixed",
+			NeighType == "Asian-Latinx-White" ~ "3 Group Mixed",
+			NeighType == "Asian-Other-White" ~ "3 Group Mixed",
+			NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
+			NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
+			NeighType == "All White" ~ "Mostly White",
+			NeighType == "All Black" ~ "Mostly Black",
+			NeighType == "All Asian" ~ "Mostly Asian",
+			NeighType == "All Latinx" ~ "Mostly Latinx",
+			NeighType == "All Other" ~ "Mostly Other",
+			NeighType == "White-Shared" ~ "Mostly White",
+			NeighType == "Black-Shared" ~ "Mostly Black",
+			NeighType == "Asian-Shared" ~ "Mostly Asian",
+			NeighType == "Latinx-Shared" ~ "Mostly Latinx",
+			NeighType == "Other-Shared" ~ "Mostly Other", 
+			TRUE ~ NeighType
+		)
+	) %>% 
+	dplyr::mutate(nt_conc = 
+		factor(nt_conc, 
+			levels = c(
+				"Mostly White",
+				"Mostly Asian",
+				"Mostly Latinx",								
+				"Mostly Black",
+				"Mostly Other",
+				"Asian-White",				
+				"Latinx-White",
+				"Black-White",				
+				"Other-White",
+				"Asian-Black",
+				"Asian-Latinx",
+				"Asian-Other",
+				"Latinx-Other",
+				"Black-Other",
+				"Black-Latinx",
+				"3 Group Mixed", 
+				"4 Group Mixed", 
+				"Diverse", 
+				"Unpopulated Tract"
+				)
+		)
+	)
 }
-	# dplyr::mutate(nt_conc = 
-	# 	dplyr::case_when(
-	# 		NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
-	# 		NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
-	# 		NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed", 
-	# 		NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed", 
-	# 		NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed", 
-	# 		NeighType == "Black-Asian-Latinx" ~ "3 Group Mixed",
-	# 		NeighType == "Black-Asian-Other" ~ "3 Group Mixed",
-	# 		NeighType == "Black-Latinx-Other" ~ "3 Group Mixed",
-	# 		NeighType == "Asian-Latinx-Other" ~ "3 Group Mixed",
-	# 		NeighType == "Black-Asian-White" ~ "3 Group Mixed",
-	# 		NeighType == "Black-Latinx-White" ~ "3 Group Mixed",
-	# 		NeighType == "Black-Other-White" ~ "3 Group Mixed",
-	# 		NeighType == "Asian-Latinx-White" ~ "3 Group Mixed",
-	# 		NeighType == "Asian-Other-White" ~ "3 Group Mixed",
-	# 		NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
-	# 		NeighType == "Latinx-Other-White" ~ "3 Group Mixed",
-	# 		NeighType == "All White" ~ "Mostly White",
-	# 		NeighType == "All Black" ~ "Mostly Black",
-	# 		NeighType == "All Asian" ~ "Mostly Asian",
-	# 		NeighType == "All Latinx" ~ "Mostly Latinx",
-	# 		NeighType == "All Other" ~ "Mostly Other",
-	# 		NeighType == "White-Shared" ~ "Mostly White",
-	# 		NeighType == "Black-Shared" ~ "Mostly Black",
-	# 		NeighType == "Asian-Shared" ~ "Mostly Asian",
-	# 		NeighType == "Latinx-Shared" ~ "Mostly Latinx",
-	# 		NeighType == "Other-Shared" ~ "Mostly Other", 
-	# 		TRUE ~ NeighType
-	# 	)
-	# ) %>% 
-	# dplyr::mutate(nt_conc = 
-	# 	factor(nt_conc, 
-	# 		levels = c(
-	# 			"Mostly White",
-	# 			"Mostly Asian",
-	# 			"Mostly Latinx",								
-	# 			"Mostly Black",
-	# 			"Mostly Other",
-	# 			"Asian-White",				
-	# 			"Latinx-White",
-	# 			"Black-White",				
-	# 			"Other-White",
-	# 			"Asian-Black",
-	# 			"Asian-Latinx",
-	# 			"Asian-Other",
-	# 			"Latinx-Other",
-	# 			"Black-Other",
-	# 			"Black-Latinx",
-	# 			"3 Group Mixed", 
-	# 			"4 Group Mixed", 
-	# 			"Diverse", 
-	# 			"Unpopulated Tract"
-	# 			)
-	# 	)
-	# )
-# }
 
 # ==========================================================================
 # Create data frame
