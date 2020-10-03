@@ -66,7 +66,8 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 			totraceE == 0 ~ "Unpopulated Tract"
 			)
 	) %>%
-	dplyr::ungroup() %>% 
+	dplyr::ungroup()
+}
 	# dplyr::mutate(nt_conc = 
 	# 	dplyr::case_when(
 	# 		NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
@@ -123,7 +124,7 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 	# 			)
 	# 	)
 	# )
-}
+# }
 
 # ==========================================================================
 # Create data frame
