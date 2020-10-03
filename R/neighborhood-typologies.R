@@ -97,32 +97,32 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 			NeighType == "Other-Shared" ~ "Mostly Other", 
 			TRUE ~ NeighType
 		)
-	) # %>% 
-	# dplyr::mutate(nt_conc = 
-	# 	factor(nt_conc, 
-	# 		levels = c(
-	# 			"Mostly White",
-	# 			"Mostly Asian",
-	# 			"Mostly Latinx",								
-	# 			"Mostly Black",
-	# 			"Mostly Other",
-	# 			"Asian-White",				
-	# 			"Latinx-White",
-	# 			"Black-White",				
-	# 			"Other-White",
-	# 			"Asian-Black",
-	# 			"Asian-Latinx",
-	# 			"Asian-Other",
-	# 			"Latinx-Other",
-	# 			"Black-Other",
-	# 			"Black-Latinx",
-	# 			"3 Group Mixed", 
-	# 			"4 Group Mixed", 
-	# 			"Diverse", 
-	# 			"Unpopulated Tract"
-	# 			)
-	# 	)
-	# )
+	) %>% 
+	dplyr::mutate(nt_conc = 
+		factor(nt_conc, 
+			levels = c(
+				"Mostly White",
+				"Mostly Asian",
+				"Mostly Latinx",								
+				"Mostly Black",
+				"Mostly Other",
+				"Asian-White",				
+				"Latinx-White",
+				"Black-White",				
+				"Other-White",
+				"Asian-Black",
+				"Asian-Latinx",
+				"Asian-Other",
+				"Latinx-Other",
+				"Black-Other",
+				"Black-Latinx",
+				"3 Group Mixed", 
+				"4 Group Mixed", 
+				"Diverse", 
+				"Unpopulated Tract"
+				)
+		)
+	)
 }
 
 # ==========================================================================
