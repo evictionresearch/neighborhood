@@ -5,7 +5,7 @@ An R package with various functions to study neighborhood dynamics.
 ## Install
 
 ```
-devtools::install_github("NeighborhoodResearch/neighborhood")
+devtools::install_github("timathomas/neighborhood", ref = "main")
 ```
 
 ## Neighborhood Racial Typologies Function
