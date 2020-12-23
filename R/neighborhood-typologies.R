@@ -66,14 +66,14 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 			totraceE == 0 ~ "Unpopulated Tract"
 			)
 	) %>%
-	dplyr::ungroup() %>% 
-	dplyr::mutate(nt_conc = 
+	dplyr::ungroup() %>%
+	dplyr::mutate(nt_conc =
 		dplyr::case_when(
-			NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed", 
-			NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed", 
-			NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed", 
-			NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed", 
-			NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed", 
+			NeighType == "Black-Asian-Latinx-Other" ~ "4 Group Mixed",
+			NeighType == "Asian-Latinx-Other-White" ~ "4 Group Mixed",
+			NeighType == "Black-Latinx-Other-White" ~ "4 Group Mixed",
+			NeighType == "Black-Asian-Other-White" ~ "4 Group Mixed",
+			NeighType == "Black-Asian-Latinx-White" ~ "4 Group Mixed",
 			NeighType == "Black-Asian-Latinx" ~ "3 Group Mixed",
 			NeighType == "Black-Asian-Other" ~ "3 Group Mixed",
 			NeighType == "Black-Latinx-Other" ~ "3 Group Mixed",
@@ -94,31 +94,35 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 			NeighType == "Black-Shared" ~ "Mostly Black",
 			NeighType == "Asian-Shared" ~ "Mostly Asian",
 			NeighType == "Latinx-Shared" ~ "Mostly Latinx",
-			NeighType == "Other-Shared" ~ "Mostly Other", 
+			NeighType == "Other-Shared" ~ "Mostly Other",
 			TRUE ~ NeighType
 		)
-	) %>% 
-	dplyr::mutate(nt_conc = 
-		factor(nt_conc, 
+	) %>%
+	dplyr::mutate(nt_conc =
+		factor(nt_conc,
 			levels = c(
-				"Mostly White",
 				"Mostly Asian",
-				"Mostly Latinx",								
 				"Mostly Black",
+				"Mostly Latinx",
 				"Mostly Other",
-				"Asian-White",				
-				"Latinx-White",
-				"Black-White",				
-				"Other-White",
+				"Mostly White",
+
 				"Asian-Black",
 				"Asian-Latinx",
 				"Asian-Other",
-				"Latinx-Other",
-				"Black-Other",
+				"Asian-White",
+
 				"Black-Latinx",
-				"3 Group Mixed", 
-				"4 Group Mixed", 
-				"Diverse", 
+				"Black-Other",
+				"Black-White",
+
+				"Latinx-Other",
+				"Latinx-White",
+
+				"Other-White",
+				"3 Group Mixed",
+				"4 Group Mixed",
+				"Diverse",
 				"Unpopulated Tract"
 				)
 		)
@@ -130,13 +134,13 @@ nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", p
 # ==========================================================================
 
 ntdf <- function(
-	state, 
-	geography = "tract", 
-	county = NULL, 
-	geometry = FALSE, 
-	cache_table = TRUE, 
-	output = "wide", 
-	year = 2018, 
+	state,
+	geography = "tract",
+	county = NULL,
+	geometry = FALSE,
+	cache_table = TRUE,
+	output = "wide",
+	year = 2018,
 	GEOID = "GEOID",
 	WhiteE = "WhiteE",
 	AsianE = "AsianE",
@@ -182,3 +186,31 @@ acs_data <-
 
 ntcheck <- function(df, NeighType = "NeighType", n = "n")
 	df %>% dplyr::group_by(NeighType) %>% dplyr::count() %>% dplyr::arrange(dplyr::desc(n)) %>% data.frame()
+
+###
+# Suggest Pal
+###
+# nt_pal <-
+#     colorFactor(c(
+#         '#33a02c', # 'Mostly Asian', green
+#         '#1f78b4', # 'Mostly Black', blue
+#         '#e31a1c', # 'Mostly Latinx', red
+#         '#9b66b0', # 'Mostly Other', purple
+#         '#C95123', # 'Mostly White',
+#         '#1fc2ba', # 'Asian-Black',
+#         '#d6ae5c', # 'Asian-Latinx',
+#         '#91c7b9', # 'Asian-Other',
+#         '#b2df8a', # 'Asian-White',
+#         '#de4e4b', # 'Black-Latinx',
+#         '#71a1f5', # 'Black-Other',
+#         '#a6cee3', # 'Black-White',
+#         '#f0739b', # 'Latinx-Other',
+#         '#fb9a99', # 'Latinx-White',
+#         '#c28a86', # 'Other-White',
+#         '#fdbf6f', # '3 Group Mixed',
+#         '#cab2d6', # '4 Group Mixed',
+#         '#1d5fd1', # 'Diverse',
+#         '#FFFFFF'),  # 'Unpopulated Tract'
+#       domain = df$nt_conc,
+#       na.color = '#C0C0C0'
+#         )
