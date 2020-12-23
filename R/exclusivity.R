@@ -9,7 +9,7 @@
 # --------------------------------------------------------------------------
 
 if(!require(pacman)) install.packages("pacman")
-p_load(tidyr, tigris, tidycensus, yaml, tidyverse)
+pacman::p_load(sf, RColorBrewer, tigris, tidycensus, yaml, tidyverse)
 options(tigris_class = "sf",
         tigris_use_cache = TRUE)
 
@@ -172,15 +172,15 @@ exclusivity_measure <- function(state, counties, ami_limit, year = 2018) {
   tract_counts <- bind_rows(price_counts, value_counts) %>%
     group_by(GEOID) %>% summarize_all(~sum(.)) %>%
     mutate(tr_own_supply = tr_own_accessible/tr_own_total,
-           tr_own_ratio = tr_own_supply/class_prop) %>%
+           tr_own_ratio = tr_own_supply/class_prop, 
+           tr_own_rate = (tr_own_accessible/class_pop)*100000) %>%
     left_join(rent_counts %>%
                 mutate(tr_rent_supply = tr_rent_accessible/tr_rent_total,
-                       tr_rent_ratio = tr_rent_supply/class_prop), by = "GEOID") %>%
+                       tr_rent_ratio = tr_rent_supply/class_prop, 
+                       tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
+                       by = "GEOID") %>%
     mutate(reg_total_pop = total_pop,
-           reg_class_pop = class_pop) %>%
-    select(GEOID, reg_total_pop, reg_class_pop, 
-           tr_own_total, tr_own_accessible, tr_own_ratio,
-           tr_rent_total, tr_rent_accessible, tr_rent_ratio)
+           reg_class_pop = class_pop) 
   
   tracts(state, counties) %>% left_join(tract_counts)
 }
@@ -189,7 +189,7 @@ exclusivity_measure <- function(state, counties, ami_limit, year = 2018) {
 # Create measure
 # --------------------------------------------------------------------------
 
-#king <- exclusivity_measure("53", "033")
+king <- exclusivity_measure("53", "033", 0.8, 2018)
 puget <- exclusivity_measure("53", c("033", "053", "061"), 0.8, 2018)
 bay5 <- exclusivity_measure("06", c("001", "013", "041", "075", "081"), 0.8, 2018)
 bay9 <- exclusivity_measure("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), 0.8, 2018)
@@ -199,10 +199,10 @@ bay21 <- exclusivity_measure("06", c("001", "013", "017", "041", "047", "053", "
 # Plot measures
 # --------------------------------------------------------------------------
 
-plot_exclusivity_ratio <- function(data, variable = c("tr_rent_ratio", "tr_own_ratio")){
+plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
   if(!(FALSE %in% (variable %in% names(data)))){
     plot(data[variable], 
-         breaks = c(0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
+         breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
          pal = brewer.pal(8, "RdBu"), lwd = 0.01)                     
   } else {
     stop("Incorrect variable name.")
