@@ -1,7 +1,7 @@
 Package: neighborhood
 Type: Package
-Title: Create neighborhood racial typologies
-Version: 0.1
+Title: Neighborhood analysis
+Version: 0.2
 Author: tim thomas
 Maintainer: The package maintainer <timthomas@berkeley.edu>
 Description: This package features several neighborhood research functions in 
@@ -11,4 +11,7 @@ Encoding: UTF-8
 LazyData: true
 Imports: 
     tidycensus, 
-    dplyr
+    tidyverse,
+    dplyr,
+    sf, 
+    tigris
