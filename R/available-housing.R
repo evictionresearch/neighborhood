@@ -9,7 +9,7 @@
 # --------------------------------------------------------------------------
 
 if(!require(pacman)) install.packages("pacman")
-pacman::p_load(sf, RColorBrewer, tigris, tidycensus, yaml, tidyverse)
+pacman::p_load(sf, RColorBrewer, tigris, tidycensus, tidyverse, leaflet, htmlwidgets, htmltools)
 options(tigris_class = "sf",
         tigris_use_cache = TRUE)
 
@@ -182,18 +182,18 @@ exclusivity_measure <- function(state, counties, ami_limit, year = 2018) {
     mutate(reg_total_pop = total_pop,
            reg_class_pop = class_pop) 
   
-  tracts(state, counties) %>% left_join(tract_counts)
+  tracts(state, counties) %>% left_join(tract_counts) %>% st_transform(crs = 4326)
 }
 
 #
 # Create measure
 # --------------------------------------------------------------------------
 
-king <- exclusivity_measure("53", "033", 0.8, 2018)
-puget <- exclusivity_measure("53", c("033", "053", "061"), 0.8, 2018)
-bay5 <- exclusivity_measure("06", c("001", "013", "041", "075", "081"), 0.8, 2018)
-bay9 <- exclusivity_measure("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), 0.8, 2018)
-bay21 <- exclusivity_measure("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), 0.8, 2018)
+king <- exclusivity_measure("53", "033", .8, 2018)
+puget <- exclusivity_measure("53", c("033", "053", "061"), .3, 2018)
+bay5 <- exclusivity_measure("06", c("001", "013", "041", "075", "081"), .3, 2018)
+bay9 <- exclusivity_measure("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .3, 2018)
+bay21 <- exclusivity_measure("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), .3, 2018)
 
 #
 # Plot measures
@@ -203,13 +203,77 @@ plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_ra
   if(!(FALSE %in% (variable %in% names(data)))){
     plot(data[variable], 
          breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-         pal = brewer.pal(8, "RdBu"), lwd = 0.01)                     
+         pal = brewer.pal(6, "RdBu"), lwd = 0.01)                     
   } else {
     stop("Incorrect variable name.")
   }
 }
 
-plot_exclusivity_ratio(bay5)
+plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
 plot_exclusivity_ratio(bay9)
 plot_exclusivity_ratio(bay21)
-plot_exclusivity_ratio(puget)
+plot_exclusivity_ratio(king)
+
+# ==========================================================================
+# Leaflet
+# ==========================================================================
+
+rentpal <- colorNumeric(
+  palette = "Blues",
+  domain = king$tr_rent_rate)
+
+ownpal <- colorNumeric(
+  palette = "Blues",
+  domain = king$tr_own_rate)
+
+map_it <- function(data){
+
+
+  leaflet(data = king) %>% 
+    addMapPane(name = "polygons", zIndex = 410) %>% 
+    addMapPane(name = "maplabels", zIndex = 420) %>% # higher zIndex rendered on top
+    addProviderTiles("CartoDB.PositronNoLabels") %>%
+    addProviderTiles("CartoDB.PositronOnlyLabels", 
+                   options = leafletOptions(pane = "maplabels"),
+                   group = "map labels") %>% 
+    addPolygons(
+      group = 'Accessible Rental Market',
+      label = ~tr_rent_rate, 
+      labelOptions = labelOptions(textsize = '12px'), 
+      # fillOpacity. = .5, 
+      color = ~rentpal(tr_rent_rate),
+      stroke = TRUE, 
+      weight = .7, 
+      # opacity = .6, 
+      highlightOptions = 
+        highlightOptions(
+          color = "#ff4a4a",
+          weight = 5,
+          bringToFront = TRUE
+          ), 
+      ) %>% 
+    addPolygons(
+      group = 'Accessible Housing Market',
+      label = ~tr_own_rate, 
+      labelOptions = labelOptions(textsize = '12px'), 
+      # fillOpacity. = .5, 
+      color = ~colorQuantile("Blues", king$tr_own_rate, n = 5),
+      stroke = TRUE, 
+      weight = .7, 
+      opacity = .6, 
+      highlightOptions = 
+        highlightOptions(
+          color = "#ff4a4a",
+          weight = 5,
+          bringToFront = TRUE
+          ), 
+      ) %>% 
+  addLayersControl(
+    baseGroups = c(
+      'Accessible Rental Market', 
+      'Accessible Housing Market'), 
+    options = layersControlOptions(collapsed = FALSE))
+
+  }
+
+  map_it(king)
