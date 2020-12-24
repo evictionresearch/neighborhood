@@ -7,19 +7,41 @@ Formula to determine the rate of affordable housing for different AMI groups
 }
 \usage{
 afford(
-  state = "state",
-  counties = "counties",
-  ami_limit = "ami_limit",
-  year = 2018
+   state = "state",
+   counties = "counties",
+   ami_limit = "ami_limit",
+   year = 2018,
+   GEOID = "GEOID",
+   acs2018 = "acs2018",
+   variable = "variable",
+   estimate = "estimate",
+   limit = "limit",
+   tr_own_accessible = "tr_own_accessible",
+   tr_own_total = "tr_own_total",
+   tr_own_supply = "tr_own_supply",
+   tr_rent_accessible = "tr_rent_accessible",
+   tr_rent_total = "tr_rent_total",
+   tr_rent_supply = "tr_rent_supply"
   )
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-    \item{state}{ = "state"}
-    \item{counties}{ = "counties"}
-    \item{ami_limit}{ = "ami_limit"}
-    \item{year}{ = 2018 }
-  }
+   \item{state}{ = "state",}
+   \item{counties}{ = "counties",}
+   \item{ami_limit}{ = "ami_limit",}
+   \item{year}{ = 2018  }
+   \item{GEOID}{ = "GEOID",}
+   \item{acs2018}{ = "acs2018",}
+   \item{variable}{ = "variable",}
+   \item{estimate}{ = "estimate",}
+   \item{limit}{ = "limit",}
+   \item{tr_own_accessible}{ = "tr_own_accessible",}
+   \item{tr_own_total}{ = "tr_own_total",}
+   \item{tr_own_supply}{ = "tr_own_supply",}
+   \item{tr_rent_accessible}{ = "tr_rent_accessible",}
+   \item{tr_rent_total}{ = "tr_rent_total",}
+   \item{tr_rent_supply}{ = "tr_rent_supply",}
+}
 % \details{
 % %%  ~~ If necessary, more details than the description above ~~
 % }
@@ -31,6 +53,7 @@ afford(
 %% ...
 % }
 \references{
+none
 }
 \author{
 Alex Ramiller and tim thomas

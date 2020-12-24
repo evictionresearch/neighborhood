@@ -1,50 +1,58 @@
 # ==========================================================================
-# Available Housing Index 
+# Available Housing Index
 # Developed by Alex Ramiller and Tim Thomas
 # 2020.09.18
-# This pulls the appropriate data to determine the tract rate of homes that are 
-# available to various income groups. 
+# This pulls the appropriate data to determine the tract rate of homes that are
+# available to various income groups.
 # ==========================================================================
 
-#
-# Load packages
-# --------------------------------------------------------------------------
-
-# if(!require(pacman)) install.packages("pacman")
-# pacman::p_load(sf, RColorBrewer, tigris, tidycensus, tidyverse)
-# options(tigris_class = "sf",
-#         tigris_use_cache = TRUE)
-
 # # census_api_key(read_yaml("/Users/ajramiller/census.yaml"))
-# census_api_key('4c26aa6ebbaef54a55d3903212eabbb506ade381')
+# census_api_key('4c26aa6ebbaef54a55d3903212eabbb506ade381', install = TRUE)
 
 #
 # Function dev.
 # --------------------------------------------------------------------------
-closest <- function(x, limits) {
+closest <- function(x = "x", limits = "limits") {
   limits[which.min(abs(limits - x))]
 }
 
-afford <- function(state = "state", counties = "counties", ami_limit = "ami_limit", year = 2018) {
-  income <- 
-    get_acs(geography = "county",
+afford <- function(
+   state = "state",
+   counties = "counties",
+   ami_limit = "ami_limit",
+   year = 2018,
+   GEOID = "GEOID",
+   acsvars = "acsvars",
+   variable = "variable",
+   estimate = "estimate",
+   limit = "limit",
+   tr_own_accessible = "tr_own_accessible",
+   tr_own_total = "tr_own_total",
+   tr_own_supply = "tr_own_supply",
+   tr_rent_accessible = "tr_rent_accessible",
+   tr_rent_total = "tr_rent_total",
+   tr_rent_supply = "tr_rent_supply") {
+  income <-
+    tidycensus::get_acs(geography = "county",
             table = "B19001",
             state = state,
             year = year,
-            cache_table = TRUE) %>% 
-    filter(GEOID %in% paste0(state, counties)) %>%
-    left_join(load_variables(year, "acs5", cache = TRUE), by = c("variable" = "name"))
-  
+            cache_table = TRUE) %>%
+    dplyr::filter(GEOID %in% paste0(state, counties)) %>%
+    dplyr::left_join(tidycensus::load_variables(year, "acs5", cache = TRUE), by = c("variable" = "name"))
+
   med_inc <-
-    get_acs(geography = "tract",
+    tidycensus::get_acs(geography = "tract",
             variables = "B19013_001",
             state = state,
             county = counties,
             year = year,
             cache_table = TRUE)
-  
-  price <- bind_rows(
-    get_acs(geography = "tract",
+
+  acsvars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
+
+  price <- dplyr::bind_rows(
+    tidycensus::get_acs(geography = "tract",
             variables = c("B25085_001", "B25085_002", "B25085_003", "B25085_004", "B25085_005",
                           "B25085_006", "B25085_007", "B25085_008", "B25085_009", "B25085_010",
                           "B25085_011", "B25085_012", "B25085_013", "B25085_014", "B25085_015",
@@ -54,17 +62,17 @@ afford <- function(state = "state", counties = "counties", ami_limit = "ami_limi
             county = counties,
             year = year,
             cache_table = TRUE),
-    get_acs(geography = "tract",
+    tidycensus::get_acs(geography = "tract",
             variables = c("B25085_025", "B25085_026", "B25085_027"),
             state = state,
             county = counties,
             year = year,
             cache_table = TRUE)) %>%
-    left_join(acs2018, by = c("variable" = "name")) %>%
-    arrange(GEOID, variable)
-  
-  value <- bind_rows(
-    get_acs(geography = "tract",
+    dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
+    dplyr::arrange(GEOID, variable)
+
+  value <- dplyr::bind_rows(
+    tidycensus::get_acs(geography = "tract",
             variables = c("B25075_001", "B25075_002", "B25075_003", "B25075_004", "B25075_005",
                           "B25075_006", "B25075_007", "B25075_008", "B25075_009", "B25075_010",
                           "B25075_011", "B25075_012", "B25075_013", "B25075_014", "B25075_015",
@@ -74,17 +82,17 @@ afford <- function(state = "state", counties = "counties", ami_limit = "ami_limi
             county = counties,
             year = year,
             cache_table = TRUE),
-    get_acs(geography = "tract",
+    tidycensus::get_acs(geography = "tract",
             variables = c("B25075_025", "B25075_026", "B25075_027"),
             state = state,
             county = counties,
             year = year,
             cache_table = TRUE)) %>%
-    left_join(acs2018, by = c("variable" = "name")) %>%
-    arrange(GEOID, variable)
-  
-  rent <- bind_rows(
-    get_acs(geography = "tract",
+    dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
+    dplyr::arrange(GEOID, variable)
+
+  rent <- dplyr::bind_rows(
+    tidycensus::get_acs(geography = "tract",
             variables = c("B25063_002", "B25063_003", "B25063_004", "B25063_005",
                           "B25063_006", "B25063_007", "B25063_008", "B25063_009", "B25063_010",
                           "B25063_011", "B25063_012", "B25063_013", "B25063_014", "B25063_015",
@@ -94,94 +102,94 @@ afford <- function(state = "state", counties = "counties", ami_limit = "ami_limi
             county = counties,
             year = year,
             cache_table = TRUE),
-    get_acs(geography = "tract",
+    tidycensus::get_acs(geography = "tract",
             variables = "B25063_026",
             state = state,
             county = counties,
             year = year,
             cache_table = TRUE)) %>%
-    left_join(acs2018, by = c("variable" = "name")) %>%
-    arrange(GEOID, variable)
-  
-  income_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 
+    dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
+    dplyr::arrange(GEOID, variable)
+
+  income_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000,
                     50000, 60000, 75000, 100000, 125000, 150000, 200000, Inf)
   income$limit <- rep(income_limit, times = nrow(income)/17)
-  price_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 
-                   50000, 60000, 70000, 80000, 90000, 100000, 125000, 150000, 175000, 200000, 
+  price_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000,
+                   50000, 60000, 70000, 80000, 90000, 100000, 125000, 150000, 175000, 200000,
                    250000, 300000, 400000, 500000, 750000, 1000000, 1500000, 2000000, Inf)
   price$limit <- rep(price_limit, times = nrow(price)/27)
   value$limit <- rep(price_limit, times = nrow(price)/27)
   rent_limit <- c(0, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800,
                   900, 1000, 1250, 1500, 2000, 2500, 3000, 3500, Inf)
   rent$limit <- rep(rent_limit, time = nrow(rent)/25)
-  
-  #ami <- closest(median(med_inc$estimate, na.rm = TRUE), income$income_limit)
-  ami <- median(med_inc$estimate, na.rm = TRUE)
-  
+
+  #ami <- closest(stats::median(med_inc$estimate, na.rm = TRUE), income$income_limit)
+  ami <- stats::median(med_inc$estimate, na.rm = TRUE)
+
   price$income_limit <- price$limit*0.188
   value$income_limit <- value$limit*0.188
   rent$income_limit <- (rent$limit/0.3)*12
-  
-  price_counts <- 
-    price %>% 
-    filter(income_limit <= closest(ami_limit*ami, income_limit) &
+
+  price_counts <-
+    price %>%
+    dplyr::filter(income_limit <= closest(ami_limit*ami, income_limit) &
              income_limit > 0) %>%
-    group_by(GEOID) %>%
-    summarize(tr_own_accessible = sum(estimate)) %>%
-    left_join(
+    dplyr::group_by(GEOID) %>%
+    dplyr::summarize(tr_own_accessible = sum(estimate)) %>%
+    dplyr::left_join(
       price %>%
-        filter(income_limit == 0) %>%
-        select(GEOID, tr_own_total = estimate)
+        dplyr::filter(income_limit == 0) %>%
+        dplyr::select(GEOID, tr_own_total = estimate)
     )
-  
-  value_counts <- 
-    value %>% 
-    filter(income_limit <= closest(ami_limit*ami, income_limit) &
+
+  value_counts <-
+    value %>%
+    dplyr::filter(income_limit <= closest(ami_limit*ami, income_limit) &
              income_limit > 0) %>%
-    group_by(GEOID) %>%
-    summarize(tr_own_accessible = sum(estimate)) %>%
-    left_join(
+    dplyr::group_by(GEOID) %>%
+    dplyr::summarize(tr_own_accessible = sum(estimate)) %>%
+    dplyr::left_join(
       value %>%
-        filter(income_limit == 0) %>%
-        select(GEOID, tr_own_total = estimate)
+        dplyr::filter(income_limit == 0) %>%
+        dplyr::select(GEOID, tr_own_total = estimate)
     )
-  
-  rent_counts <- 
-    rent %>% 
-    filter(income_limit <= closest(ami_limit*ami, income_limit) &
+
+  rent_counts <-
+    rent %>%
+    dplyr::filter(income_limit <= closest(ami_limit*ami, income_limit) &
              income_limit > 0) %>%
-    group_by(GEOID) %>%
-    summarize(tr_rent_accessible = sum(estimate)) %>%
-    left_join(
+    dplyr::group_by(GEOID) %>%
+    dplyr::summarize(tr_rent_accessible = sum(estimate)) %>%
+    dplyr::left_join(
       rent %>%
-        filter(income_limit == 0) %>%
-        select(GEOID, tr_rent_total = estimate)
+        dplyr::filter(income_limit == 0) %>%
+        dplyr::select(GEOID, tr_rent_total = estimate)
     )
-  
-  total_pop <- sum(income %>% 
-                  filter(limit == 0) %>% 
-                    select(estimate))
-  
-  class_pop <- sum(income %>% 
-                     filter(limit > closest(ami_limit*ami, income_limit)) %>%
-                     select(estimate))
-  
+
+  total_pop <- sum(income %>%
+                  dplyr::filter(limit == 0) %>%
+                    dplyr::select(estimate))
+
+  class_pop <- sum(income %>%
+                     dplyr::filter(limit > closest(ami_limit*ami, income_limit)) %>%
+                     dplyr::select(estimate))
+
   class_prop <- class_pop/total_pop
-  
-  tract_counts <- bind_rows(price_counts, value_counts) %>%
-    group_by(GEOID) %>% summarize_all(~sum(.)) %>%
-    mutate(tr_own_supply = tr_own_accessible/tr_own_total,
-           tr_own_ratio = tr_own_supply/class_prop, 
+
+  tract_counts <- dplyr::bind_rows(price_counts, value_counts) %>%
+    dplyr::group_by(GEOID) %>% dplyr::summarize_all(~sum(.)) %>%
+    dplyr::mutate(tr_own_supply = tr_own_accessible/tr_own_total,
+           tr_own_ratio = tr_own_supply/class_prop,
            tr_own_rate = (tr_own_accessible/class_pop)*100000) %>%
-    left_join(rent_counts %>%
-                mutate(tr_rent_supply = tr_rent_accessible/tr_rent_total,
-                       tr_rent_ratio = tr_rent_supply/class_prop, 
+    dplyr::left_join(rent_counts %>%
+                dplyr::mutate(tr_rent_supply = tr_rent_accessible/tr_rent_total,
+                       tr_rent_ratio = tr_rent_supply/class_prop,
                        tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
                        by = "GEOID") %>%
-    mutate(reg_total_pop = total_pop,
-           reg_class_pop = class_pop) 
-  
-  tracts(state, counties) %>% left_join(tract_counts) %>% st_transform(crs = 4326)
+    dplyr::mutate(reg_total_pop = total_pop,
+           reg_class_pop = class_pop)
+
+  tigris::tracts(state, counties) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
 }
 
 #
@@ -200,9 +208,9 @@ afford <- function(state = "state", counties = "counties", ami_limit = "ami_limi
 
 # plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
 #   if(!(FALSE %in% (variable %in% names(data)))){
-#     plot(data[variable], 
+#     plot(data[variable],
 #          breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-#          pal = brewer.pal(6, "RdBu"), lwd = 0.01)                     
+#          pal = brewer.pal(6, "RdBu"), lwd = 0.01)
 #   } else {
 #     stop("Incorrect variable name.")
 #   }
@@ -228,49 +236,49 @@ afford <- function(state = "state", counties = "counties", ami_limit = "ami_limi
 # map_it <- function(data){
 
 
-#   leaflet(data = king) %>% 
-#     addMapPane(name = "polygons", zIndex = 410) %>% 
+#   leaflet(data = king) %>%
+#     addMapPane(name = "polygons", zIndex = 410) %>%
 #     addMapPane(name = "maplabels", zIndex = 420) %>% # higher zIndex rendered on top
 #     addProviderTiles("CartoDB.PositronNoLabels") %>%
-#     addProviderTiles("CartoDB.PositronOnlyLabels", 
+#     addProviderTiles("CartoDB.PositronOnlyLabels",
 #                    options = leafletOptions(pane = "maplabels"),
-#                    group = "map labels") %>% 
+#                    group = "map labels") %>%
 #     addPolygons(
 #       group = 'Accessible Rental Market',
-#       label = ~tr_rent_rate, 
-#       labelOptions = labelOptions(textsize = '12px'), 
-#       # fillOpacity. = .5, 
+#       label = ~tr_rent_rate,
+#       labelOptions = labelOptions(textsize = '12px'),
+#       # fillOpacity. = .5,
 #       color = ~rentpal(tr_rent_rate),
-#       stroke = TRUE, 
-#       weight = .7, 
-#       # opacity = .6, 
-#       highlightOptions = 
+#       stroke = TRUE,
+#       weight = .7,
+#       # opacity = .6,
+#       highlightOptions =
 #         highlightOptions(
 #           color = "#ff4a4a",
 #           weight = 5,
 #           bringToFront = TRUE
-#           ), 
-#       ) %>% 
+#           ),
+#       ) %>%
 #     addPolygons(
 #       group = 'Accessible Housing Market',
-#       label = ~tr_own_rate, 
-#       labelOptions = labelOptions(textsize = '12px'), 
-#       # fillOpacity. = .5, 
+#       label = ~tr_own_rate,
+#       labelOptions = labelOptions(textsize = '12px'),
+#       # fillOpacity. = .5,
 #       color = ~colorQuantile("Blues", king$tr_own_rate, n = 5),
-#       stroke = TRUE, 
-#       weight = .7, 
-#       opacity = .6, 
-#       highlightOptions = 
+#       stroke = TRUE,
+#       weight = .7,
+#       opacity = .6,
+#       highlightOptions =
 #         highlightOptions(
 #           color = "#ff4a4a",
 #           weight = 5,
 #           bringToFront = TRUE
-#           ), 
-#       ) %>% 
+#           ),
+#       ) %>%
 #   addLayersControl(
 #     baseGroups = c(
-#       'Accessible Rental Market', 
-#       'Accessible Housing Market'), 
+#       'Accessible Rental Market',
+#       'Accessible Housing Market'),
 #     options = layersControlOptions(collapsed = FALSE))
 
 #   }
