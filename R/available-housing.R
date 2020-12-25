@@ -187,7 +187,8 @@ afford <- function(
                        tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
                        by = "GEOID") %>%
     dplyr::mutate(reg_total_pop = total_pop,
-           reg_class_pop = class_pop)
+           reg_class_pop = class_pop, 
+           ami_limit = ami_limit)
 
   tigris::tracts(state, counties) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
 }
