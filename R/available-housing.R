@@ -171,7 +171,7 @@ afford <- function(
                     dplyr::select(estimate))
 
   class_pop <- sum(income %>%
-                     dplyr::filter(limit <= closest(ami_limit*ami, income_limit)) %>%
+                     dplyr::filter(limit <= closest(ami_limit*ami, income_limit) & income_limit > 0) %>%
                      dplyr::select(estimate))
 
   class_prop <- class_pop/total_pop
