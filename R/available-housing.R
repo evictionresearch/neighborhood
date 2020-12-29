@@ -164,14 +164,14 @@ afford <- function(
       rent %>%
         dplyr::filter(income_limit == 0) %>%
         dplyr::select(GEOID, tr_rent_total = estimate)
-    )
+      )
 
   total_pop <- sum(income %>%
                   dplyr::filter(limit == 0) %>%
                     dplyr::select(estimate))
 
   class_pop <- sum(income %>%
-                     dplyr::filter(limit > closest(ami_limit*ami, income_limit)) %>%
+                     dplyr::filter(limit <= closest(ami_limit*ami, income_limit)) %>%
                      dplyr::select(estimate))
 
   class_prop <- class_pop/total_pop

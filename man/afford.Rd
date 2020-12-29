@@ -12,7 +12,7 @@ afford(
    ami_limit = "ami_limit",
    year = 2018,
    GEOID = "GEOID",
-   acs2018 = "acs2018",
+   acsvars = "acsvars",
    variable = "variable",
    estimate = "estimate",
    limit = "limit",
@@ -31,7 +31,7 @@ afford(
    \item{ami_limit}{ = "ami_limit",}
    \item{year}{ = 2018  }
    \item{GEOID}{ = "GEOID",}
-   \item{acs2018}{ = "acs2018",}
+   \item{acsvars}{ = "acs2018",}
    \item{variable}{ = "variable",}
    \item{estimate}{ = "estimate",}
    \item{limit}{ = "limit",}
