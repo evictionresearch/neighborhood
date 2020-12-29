@@ -19,7 +19,7 @@ closest <- function(x = "x", limits = "limits") {
 afford <- function(
    state = "state",
    counties = "counties",
-   ami_limit = "ami_limit",
+   ami_limit = .3,
    year = 2018,
    GEOID = "GEOID",
    acsvars = "acsvars",
@@ -164,7 +164,7 @@ afford <- function(
       rent %>%
         dplyr::filter(income_limit == 0) %>%
         dplyr::select(GEOID, tr_rent_total = estimate)
-      )
+    )
 
   total_pop <- sum(income %>%
                   dplyr::filter(limit == 0) %>%
@@ -187,7 +187,7 @@ afford <- function(
                        tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
                        by = "GEOID") %>%
     dplyr::mutate(reg_total_pop = total_pop,
-           reg_class_pop = class_pop, 
+           reg_class_pop = class_pop,
            ami_limit = ami_limit)
 
   tigris::tracts(state, counties) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
