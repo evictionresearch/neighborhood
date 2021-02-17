@@ -12,17 +12,16 @@ options(tigris_use_cache = TRUE)
 # ==========================================================================
 
 us_states <- 
-	states() %>% 
-	st_set_geometry(NULL) %>% 
+  states() %>% 
+  st_set_geometry(NULL) %>% 
   filter(!STUSPS %in% c("AS", "GU", "MP", "VI")) %>% 
-	pull(STUSPS, ) %>% 
+  pull(STUSPS) %>% 
   sort()
 
 us_tracts <-
   map_df(us_states, function(states){
-    bind_rows(
-  	  ntdf(state = states, year = 2019)
-  	  )
+      ntdf(state = states, year = 2019) %>% 
+      mutate(state = states)
     })
 
 saveRDS(us_tracts, "~/git/neighborhood/data/us_nt_tracts.rds")
