@@ -140,7 +140,7 @@ ntdf <- function(
 	geometry = FALSE,
 	cache_table = TRUE,
 	output = "wide",
-	year = 2018,
+	year = NULL,
 	GEOID = "GEOID",
 	WhiteE = "WhiteE",
 	AsianE = "AsianE",
