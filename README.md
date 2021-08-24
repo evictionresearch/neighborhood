@@ -4,7 +4,7 @@ An R package with various functions to study neighborhood dynamics.
 
 ## Install
 
-```
+``` r
 devtools::install_github("timathomas/neighborhood", ref = "main")
 ```
 
@@ -22,7 +22,7 @@ This function is based off this paper:
 ### Example
 You can view an interactive map using this function [here](https://evictions.study/maryland/maps/baltimore.html).
 
-```
+``` r
 Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
 cal <- ntdf(state = "CA")
 ny <- ntdf(state = "NY")
@@ -46,7 +46,7 @@ glimpse()
 ### Concatenation
 After running the above code, look at the counts and consider concatenating and/or reducing outlying (small count) neighborhood types. 
 
-```
+``` r
 ntcheck(Baltimore_nt)
 ntcheck(cal)
 ntcheck(ny)
