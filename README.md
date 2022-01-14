@@ -18,7 +18,7 @@ Because there are so many different combinations, I created the `nt_conc` field 
 
 
 #### Data download
-All U.S. tract definitions can be downloaded in the `data` directory above. 
+All U.S. tract definitions can be downloaded in the [`data`](https://github.com/timathomas/neighborhood/tree/main/data) directory above. 
 
 #### Credits
 This function is based off this paper:  
