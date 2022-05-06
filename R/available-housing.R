@@ -281,24 +281,24 @@ afford <- function(
       # ),
     popup =
       stringr::str_c(
-        '<b>Tract: ', GEOID, '</b>',
-                '<br>',
-                'Tract rental units: ', scales::comma(tr_rent_total, accuracy = 1),
-                '<br>',
-                'Rentals affordable to ', scales::percent(ami_limit), ' AMI: ', scales::comma(tr_rent_accessible, accuracy = 1), ' (', scales::percent(tr_rent_supply, accuracy = 1), ')',
-                '<br>',
-                round(tr_rent_rate), ' affordable rentals per 100,000',
-                '<br>',
-                '<br>',
-                'Tract owned homes: ', scales::comma(tr_own_total, accuracy = 1),
-                '<br>',
-                'Homes affordable to ', scales::percent(ami_limit), ' AMI: ', scales::comma(tr_own_accessible, accuracy = 1), ' (', scales::percent(tr_own_supply, accuracy = 1), ')',
-                '<br>',
-                round(tr_own_rate), ' affordable homes per 100,000',
-                '<br>',
-                '<br>',
-                'Region household count: ', scales::comma(reg_total_pop, accuracy = 1), '<br>',
-                'Region Households at ', scales::percent(ami_limit), ' AMI: ', scales::comma(reg_class_pop, accuracy = 1)
+        "<b>Tract: ", GEOID, "</b>",
+                "<br>",
+                "Tract rental units: ", scales::comma(tr_rent_total, accuracy = 1),
+                "<br>",
+                "Rentals affordable to ", scales::percent(ami_limit), " AMI: ", scales::comma(tr_rent_accessible, accuracy = 1), " (", scales::percent(tr_rent_supply, accuracy = 1), ")",
+                "<br>",
+                scales::percent(tr_rent_rate/100000, accuracy = .1), " of the region's ", scales::percent(ami_limit, accuracy = 1), " AMI households served",
+                "<br>",
+                "<br>",
+                "Tract owned homes: ", scales::comma(tr_own_total, accuracy = 1),
+                "<br>",
+                "Homes affordable to ", scales::percent(ami_limit), " AMI: ", scales::comma(tr_own_accessible, accuracy = 1), " (", scales::percent(tr_own_supply, accuracy = 1), ")",
+                "<br>",
+                scales::percent(tr_own_rate/100000, accuracy = .1), " of the region's ", scales::percent(ami_limit, accuracy = 1), " AMI households served",
+                "<br>",
+                "<br>",
+                "Region household count: ", scales::comma(reg_total_pop, accuracy = 1), "<br>",
+                "Region Households at ", scales::percent(ami_limit), " AMI: ", scales::comma(reg_class_pop, accuracy = 1)
         )
       )
 
@@ -308,11 +308,11 @@ afford <- function(
 #
 # Create measure example
 # --------------------------------------------------------------------------
-options(tigris_use_cache = TRUE)
+# options(tigris_use_cache = TRUE)
 # library(tidyverse)
-king <- afford("53", c("Pierce", "King", "Snohomish"), .8, 2020)
-puget <- afford("53", c("033", "053", "061"), .8, 2020)
-wasatch <- afford("UT", c("Weber", "Davis", "Salt Lake", "Utah"), .8, 2020)
+# king <- afford("53", c("Pierce", "King", "Snohomish"), .8, 2020)
+# puget <- afford("53", c("033", "053", "061"), .8, 2020)
+# wasatch <- afford("49", c('057', '011', '035', '049'), .8, 2020)
 # bay5 <- afford("06", c("001", "013", "041", "075", "081"), .3, 2019)
 # bay9 <- afford("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .3, 2018)
 # bay21 <- afford("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), .3, 2018)
@@ -321,62 +321,41 @@ wasatch <- afford("UT", c("Weber", "Davis", "Salt Lake", "Utah"), .8, 2020)
 # Plot measures
 # --------------------------------------------------------------------------
 
-plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
-  require(sf)
-  require(RColorBrewer)
-  require(tmap)
-  require(dplyr)
-  tmap_mode("view")
-  if(!(FALSE %in% (variable %in% names(data)))){
-
-    tm_rent <-
-      tmap::tm_shape(wasatch) +
-      tmap::tm_fill(
-        c("rent_jenks_cat", "own_jenks_cat"),
-        title = c("Rent", "Own"),
-        style = "fixed",
-        alpha = .5,
-        # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-        palette = "-RdYlBu",
-        # id = c("tr_rent_rate", "tr_own_rate")
-        popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
-      ) +
-      tmap::tm_borders(alpha = .5) +
-      tmap::tm_facets(sync = TRUE, nrow = 2)
-
-tm_rent
-
-        tmap::tm_polygons(
-          id = "tr_rent_rate",
-          breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-          palette = "RdBu"
-        ) +
-        tmap::tmap_options(check.and.fix = TRUE)
-
-    tm_own <- tm_shape(
-        data %>% select(tr_own_rate)
-        ) +
-        tm_polygons(
-          breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-          palette = brewer.pal(6, "RdBu"),         ) +
-        tmap_options(check.and.fix = TRUE)
-
-        tmap_arrange(tm_rent, tm_own)
+      # tmap::tm_shape(wasatch) +
+      # tmap::tm_fill(
+      #   c("rent_jenks_cat", "own_jenks_cat"),
+      #   title = c("Rent", "Own"),
+      #   style = "fixed",
+      #   alpha = .5,
+      #   # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
+      #   palette = "-RdYlBu",
+      #   # id = c("tr_rent_rate", "tr_own_rate")
+      #   popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
+      # ) +
+      # tmap::tm_borders(alpha = .5) +
+      # tmap::tm_facets(sync = TRUE, nrow = 2)
 
 
-    # plot(data[variable],
-    #      breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-    #      pal = brewer.pal(6, "RdBu"),
-    #      lwd = 0.01)
-  } else {
-    stop("Incorrect variable name.")
-  }
-}
+# plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
+#   require(sf)
+#   require(RColorBrewer)
+#   require(tmap)
+#   require(dplyr)
+#   if(!(FALSE %in% (variable %in% names(data)))){
 
-# plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
-# plot_exclusivity_ratio(bay9)
-# plot_exclusivity_ratio(bay21)
-plot_exclusivity_ratio(king)
+#     # plot(data[variable],
+#     #      breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
+#     #      pal = brewer.pal(6, "RdBu"),
+#     #      lwd = 0.01)
+#   } else {
+#     stop("Incorrect variable name.")
+#   }
+# }
+
+# # plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
+# # plot_exclusivity_ratio(bay9)
+# # plot_exclusivity_ratio(bay21)
+# plot_exclusivity_ratio(king)
 
 # ==========================================================================
 # Leaflet
