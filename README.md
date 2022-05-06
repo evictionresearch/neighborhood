@@ -12,6 +12,15 @@ devtools::install_github("timathomas/neighborhood", ref = "main")
 
 The Neighborhood Racial Typologies function is a descriptive, categorical tool to help identify racial and ethnic divides within a region (e.g. city, county, state, etc.). Traditional segregation measures, such as the [disimilarity index](https://en.wikipedia.org/wiki/Index_of_dissimilarity), provide a single measure for a large geographical area. This descripitve function is useful for mapping tract level, small area (e.g. neighborhood level) divisions between ethnic and racial groups.  
 
+The neighborhood typology is designated when a tract's racial/ethnic group share is more than 10%. For example, if a tract is 60% white, 30% Asian, 5% Black, and 5% Latinx then that tract will be called a majority Asian-White tract. This definition can be found in the `NeighType` field.  
+
+Because there are so many different combinations, I created the `nt_conc` field to show concatinated fields of 1, 2, or more groups. 
+
+
+#### Data download
+All U.S. tract definitions can be downloaded in the [`data`](https://github.com/timathomas/neighborhood/tree/main/data) directory above. 
+
+#### Credits
 This function is based off this paper:  
 [Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. “Neighborhood Foreclosures, Racial/Ethnic Transitions, and Residential Segregation.” American Sociological Review 80:526–549.](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4479290/)
 
