@@ -177,32 +177,108 @@ afford <- function(
 
   class_prop <- class_pop/total_pop
 
-  tract_counts <- dplyr::bind_rows(price_counts, value_counts) %>%
-    dplyr::group_by(GEOID) %>% dplyr::summarize_all(~sum(.)) %>%
-    dplyr::mutate(tr_own_supply = tr_own_accessible/tr_own_total,
-           tr_own_ratio = tr_own_supply/class_prop,
-           tr_own_rate = (tr_own_accessible/class_pop)*100000) %>%
-    dplyr::left_join(rent_counts %>%
-                dplyr::mutate(tr_rent_supply = tr_rent_accessible/tr_rent_total,
-                       tr_rent_ratio = tr_rent_supply/class_prop,
-                       tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
-                       by = "GEOID") %>%
-    dplyr::mutate(reg_total_pop = total_pop,
+  tract_counts <-
+    dplyr::bind_rows(price_counts, value_counts) %>%
+    dplyr::group_by(GEOID) %>%
+    dplyr::summarize_all(~sum(.)) %>%
+    dplyr::mutate(
+      tr_own_supply = tr_own_accessible/tr_own_total,
+      tr_own_ratio = tr_own_supply/class_prop,
+      tr_own_rate = (tr_own_accessible/class_pop)*100000) %>%
+    dplyr::left_join(
+      rent_counts %>%
+      dplyr::mutate(
+        tr_rent_supply = tr_rent_accessible/tr_rent_total,
+        tr_rent_ratio = tr_rent_supply/class_prop,
+        tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
+      by = "GEOID") %>%
+    dplyr::mutate(
+      reg_total_pop = total_pop,
            reg_class_pop = class_pop,
-           ami_limit = ami_limit) %>%
+           ami_limit = ami_limit)
+
+# Get breaks for rent and own categories
+    # rent_breaks <- c(round(BAMMtools::getJenksBreaks(puget$tr_rent_rate, 4)[-4], digits = -1), max(puget$tr_rent_rate, na.rm = TRUE))
+    # own_breaks <- c(round(BAMMtools::getJenksBreaks(tract_counts$tr_own_rate, 6)[-6], digits = -1), max(tract_counts$tr_own_rate, na.rm = TRUE))
+
+  tract_counts <-
+    tract_counts %>%
     dplyr::mutate(
     rent_jenks_cat =
-      cut(tr_rent_rate,
-        breaks = BAMMtools::getJenksBreaks(tr_rent_rate, 6),
-        include.lowest = TRUE,
-        dig.lab = 3,
-        ordered_result = TRUE),
+      factor(
+        case_when(
+          tr_rent_rate <= 100 ~ "Less than 0.1%",
+          tr_rent_rate > 100 & tr_rent_rate <= 200  ~ "0.1% to 0.2%",
+          tr_rent_rate > 200 ~
+            paste0(
+              "0.2% to ",
+              scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1)),
+        ),
+        levels = c(
+          "Less than 0.1%",
+          "0.1% to 0.2%",
+          paste0("0.2% to ", scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1))
+        )
+      ),
+      # factor(
+      #   case_when(
+      #     tr_rent_rate <= rent_breaks[2] ~
+      #       paste0(rent_breaks[1], ' - ', rent_breaks[2]),
+      #     tr_rent_rate > rent_breaks[2] & tr_rent_rate <= rent_breaks[3] ~
+      #       paste0(rent_breaks[2], ' - ', rent_breaks[3]),
+      #     tr_rent_rate > rent_breaks[3] & tr_rent_rate <= rent_breaks[4] ~
+      #       paste0(rent_breaks[3], ' - ', rent_breaks[4]),
+      #     tr_rent_rate > rent_breaks[4] & tr_rent_rate <= rent_breaks[5] ~
+      #       paste0(rent_breaks[4], ' - ', rent_breaks[5]),
+      #     tr_rent_rate > rent_breaks[5] ~
+      #       paste0(rent_breaks[5], ' - ', scales::comma(round(rent_breaks[6], digits = 0)))
+      #     ),
+      #   levels = c(
+      #     paste0(rent_breaks[1], ' - ', rent_breaks[2]),
+      #     paste0(rent_breaks[2], ' - ', rent_breaks[3]),
+      #     paste0(rent_breaks[3], ' - ', rent_breaks[4]),
+      #     paste0(rent_breaks[4], ' - ', rent_breaks[5]),
+      #     paste0(rent_breaks[5], ' - ', scales::comma(round(rent_breaks[6], digits = 0)))
+      #   )
+      # ),
     own_jenks_cat =
-      cut(tr_own_rate,
-        breaks = BAMMtools::getJenksBreaks(tr_own_rate, 6),
-        include.lowest = TRUE,
-        dig.lab = 3,
-        ordered_result = TRUE),
+      factor(
+        case_when(
+          tr_own_rate <= 100 ~ "Less than 0.1%",
+          tr_own_rate > 100 & tr_own_rate <= 200  ~ "0.1% to 0.2%",
+          tr_own_rate > 200 ~
+            paste0(
+              "0.2% to ",
+              scales::percent(max(tr_own_rate, na.rm = TRUE)/100000, accuracy = .1)
+            ),
+        ),
+        levels = c(
+          "Less than 0.1%",
+          "0.1% to 0.2%",
+          paste0("0.2% to ", scales::percent(max(tr_own_rate, na.rm = TRUE)/100000, accuracy = .1))
+        )
+      ),
+      # factor(
+      #   case_when(
+      #     tr_own_rate <= own_breaks[2] ~
+      #       paste0(own_breaks[1], ' - ', own_breaks[2]),
+      #     tr_own_rate > own_breaks[2] & tr_own_rate <= own_breaks[3] ~
+      #       paste0(own_breaks[2], ' - ', own_breaks[3]),
+      #     tr_own_rate > own_breaks[3] & tr_own_rate <= own_breaks[4] ~
+      #       paste0(own_breaks[3], ' - ', own_breaks[4]),
+      #     tr_own_rate > own_breaks[4] & tr_own_rate <= own_breaks[5] ~
+      #       paste0(own_breaks[4], ' - ', own_breaks[5]),
+      #     tr_own_rate > own_breaks[5] ~
+      #       paste0(own_breaks[5], ' - ', scales::comma(round(own_breaks[6], digits = 0)))
+      #     ),
+      #   levels = c(
+      #     paste0(own_breaks[1], ' - ', own_breaks[2]),
+      #     paste0(own_breaks[2], ' - ', own_breaks[3]),
+      #     paste0(own_breaks[3], ' - ', own_breaks[4]),
+      #     paste0(own_breaks[4], ' - ', own_breaks[5]),
+      #     paste0(own_breaks[5], ' - ', scales::comma(round(own_breaks[6], digits = 0)))
+      #   )
+      # ),
     popup =
       stringr::str_c(
         '<b>Tract: ', GEOID, '</b>',
@@ -232,10 +308,11 @@ afford <- function(
 #
 # Create measure example
 # --------------------------------------------------------------------------
-
+options(tigris_use_cache = TRUE)
 # library(tidyverse)
-# king <- afford("53", "033", .8, 2019)
-# puget <- afford("53", c("033", "053", "061"), .3, 2018)
+king <- afford("53", c("Pierce", "King", "Snohomish"), .8, 2020)
+puget <- afford("53", c("033", "053", "061"), .8, 2020)
+wasatch <- afford("UT", c("Weber", "Davis", "Salt Lake", "Utah"), .8, 2020)
 # bay5 <- afford("06", c("001", "013", "041", "075", "081"), .3, 2019)
 # bay9 <- afford("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .3, 2018)
 # bay21 <- afford("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), .3, 2018)
@@ -244,61 +321,62 @@ afford <- function(
 # Plot measures
 # --------------------------------------------------------------------------
 
-# plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
-#   require(sf)
-#   require(RColorBrewer)
-#   require(tmap)
-#   require(dplyr)
-#   tmap_mode("view")
-#   if(!(FALSE %in% (variable %in% names(data)))){
+plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
+  require(sf)
+  require(RColorBrewer)
+  require(tmap)
+  require(dplyr)
+  tmap_mode("view")
+  if(!(FALSE %in% (variable %in% names(data)))){
 
-#     tm_rent <-
-#       tmap::tm_shape(king) +
-#       tmap::tm_fill(
-#         c("rent_jenks_cat", "own_jenks_cat"),
-#         title = c("Rent", "Own"),
-#         style = "fixed",
-#         breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-#         palette = "-RdBu",
-#         # id = c("tr_rent_rate", "tr_own_rate")
-#         popup.vars = "popup"
-#       ) +
-#       tmap::tm_borders(alpha = .5) +
-#       tmap::tm_facets(sync = TRUE, nrow = 2)
+    tm_rent <-
+      tmap::tm_shape(wasatch) +
+      tmap::tm_fill(
+        c("rent_jenks_cat", "own_jenks_cat"),
+        title = c("Rent", "Own"),
+        style = "fixed",
+        alpha = .5,
+        # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
+        palette = "-RdYlBu",
+        # id = c("tr_rent_rate", "tr_own_rate")
+        popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
+      ) +
+      tmap::tm_borders(alpha = .5) +
+      tmap::tm_facets(sync = TRUE, nrow = 2)
 
-# tm_rent
+tm_rent
 
-#         tmap::tm_polygons(
-#           id = "tr_rent_rate",
-#           breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-#           palette = "RdBu"
-#         ) +
-#         tmap::tmap_options(check.and.fix = TRUE)
+        tmap::tm_polygons(
+          id = "tr_rent_rate",
+          breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
+          palette = "RdBu"
+        ) +
+        tmap::tmap_options(check.and.fix = TRUE)
 
-#     tm_own <- tm_shape(
-#         data %>% select(tr_own_rate)
-#         ) +
-#         tm_polygons(
-#           breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-#           palette = brewer.pal(6, "RdBu"),         ) +
-#         tmap_options(check.and.fix = TRUE)
+    tm_own <- tm_shape(
+        data %>% select(tr_own_rate)
+        ) +
+        tm_polygons(
+          breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
+          palette = brewer.pal(6, "RdBu"),         ) +
+        tmap_options(check.and.fix = TRUE)
 
-#         tmap_arrange(tm_rent, tm_own)
+        tmap_arrange(tm_rent, tm_own)
 
 
-#     # plot(data[variable],
-#     #      breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-#     #      pal = brewer.pal(6, "RdBu"),
-#     #      lwd = 0.01)
-#   } else {
-#     stop("Incorrect variable name.")
-#   }
-# }
+    # plot(data[variable],
+    #      breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
+    #      pal = brewer.pal(6, "RdBu"),
+    #      lwd = 0.01)
+  } else {
+    stop("Incorrect variable name.")
+  }
+}
 
-# # plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
-# # plot_exclusivity_ratio(bay9)
-# # plot_exclusivity_ratio(bay21)
-# plot_exclusivity_ratio(king)
+# plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
+# plot_exclusivity_ratio(bay9)
+# plot_exclusivity_ratio(bay21)
+plot_exclusivity_ratio(king)
 
 # ==========================================================================
 # Leaflet
