@@ -1,7 +1,7 @@
 Package: neighborhood
 Type: Package
 Title: Neighborhood analysis functions
-Version: 1.0
+Version: 1.0.1
 Author: tim thomas
 Maintainer: The package maintainer <timthomas@berkeley.edu>
 Description: This package features several neighborhood research functions in 
