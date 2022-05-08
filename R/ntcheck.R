@@ -3,7 +3,6 @@
 #' @param df \code{ntdf} created dataframe
 #' @param ... Other keyword arguments
 #' @return Frequncy table of each neighborhood type
-#' @examples \dontrun
 #' @export
 
 ntcheck <- function(df, ...)

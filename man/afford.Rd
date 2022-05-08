@@ -30,6 +30,7 @@ Returns a spatial file
 The \code{afford} function identifies where different income groups can afford to live based on local market value while accounting for the region's count of households of the given income group.
 }
 \examples{
-\dontrun
+\dontrun{
 bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+}
 }

@@ -39,7 +39,8 @@ A dataframe of racial segregated neighborhoods
 Drawn from Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. “Neighborhood Foreclosures, Racial/Ethnic Transitions, and Residential Segregation.” American Sociological Review 80:526–549.
 }
 \examples{
-\dontrun
+\dontrun{
 Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
 dplyr::glimpse(Baltimore_nt)
+}
 }

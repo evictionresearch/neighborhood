@@ -6,8 +6,9 @@
 #' @param year Study year.
 #' @param ... Other keyword arguments
 #' @return Returns a spatial file
-#' @examples \dontrun
+#' @examples \dontrun{
 #' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+#' }
 #' @export
 
 afford <- function(

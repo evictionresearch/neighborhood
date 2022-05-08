@@ -3,7 +3,6 @@
 #' @param df ntdf object
 #' @param ... Other keyword arguments
 #' @return Returns a factored color palette
-#' @examples \dontrun
 #' @export
 
 nt_pal <- function(df, ...){

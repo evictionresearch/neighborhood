@@ -17,6 +17,3 @@ Frequncy table of each neighborhood type
 \description{
 Investigate possible concatenation
 }
-\examples{
-\dontrun
-}

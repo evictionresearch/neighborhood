@@ -17,6 +17,3 @@ Returns a factored color palette
 \description{
 Suggested Color Palette
 }
-\examples{
-\dontrun
-}

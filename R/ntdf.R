@@ -9,9 +9,10 @@
 #' @param year Default "NULL"
 #' @param ... Other keyword arguments
 #' @return A dataframe of racial segregated neighborhoods
-#' @examples \dontrun
+#' @examples \dontrun{
 #' Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
 #' dplyr::glimpse(Baltimore_nt)
+#' }
 #' @export
 
 ntdf <- function(
