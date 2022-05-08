@@ -312,27 +312,27 @@ afford <- function(
 # library(tidyverse)
 # king <- afford("53", c("Pierce", "King", "Snohomish"), .8, 2020)
 # puget <- afford("53", c("033", "053", "061"), .8, 2020)
-# wasatch <- afford("49", c('057', '011', '035', '049'), .8, 2020)
-# bay5 <- afford("06", c("001", "013", "041", "075", "081"), .3, 2019)
-# bay9 <- afford("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .3, 2018)
+# wasatch <- afford("49", c('057', '011', '035', '049'), .5, 2019)
+# bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+# bay9 <- afford("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .5, 2019)
 # bay21 <- afford("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), .3, 2018)
 
 #
 # Plot measures
 # --------------------------------------------------------------------------
-
-      # tmap::tm_shape(wasatch) +
-      # tmap::tm_fill(
-      #   c("rent_jenks_cat", "own_jenks_cat"),
-      #   title = c("Rent", "Own"),
-      #   style = "fixed",
-      #   alpha = .5,
-      #   # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-      #   palette = "-RdYlBu",
-      #   # id = c("tr_rent_rate", "tr_own_rate")
-      #   popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
-      # ) +
-      # tmap::tm_borders(alpha = .5) +
+# tmap::tmap_mode("view")
+#       tmap::tm_shape(bay5) +
+#       tmap::tm_fill(
+#         "rent_jenks_cat",
+#         title = c("Rent", "Own"),
+#         style = "fixed",
+#         alpha = .5,
+#         # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
+#         palette = "-RdYlBu",
+#         # id = c("tr_rent_rate", "tr_own_rate")
+#         popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
+#       ) +
+#       tmap::tm_borders(alpha = .5) +
       # tmap::tm_facets(sync = TRUE, nrow = 2)
 
 
