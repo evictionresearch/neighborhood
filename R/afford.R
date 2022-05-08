@@ -1,49 +1,27 @@
-# ==========================================================================
-# Available Housing Index
-# Developed by Alex Ramiller and Tim Thomas
-# 2020.09.18
-# This pulls the appropriate data to determine the tract rate of homes that
-# are available to various income groups.
-# ==========================================================================
-
-# # census_api_key(read_yaml("/Users/ajramiller/census.yaml"))
-# census_api_key('4c26aa6ebbaef54a55d3903212eabbb506ade381', install = TRUE)
-
-#
-# Function dev.
-# --------------------------------------------------------------------------
-closest <- function(x = "x", limits = "limits") {
-  limits[which.min(abs(limits - x))]
-}
+#' @title Affordable market location
+#' @description The \code{afford} function identifies where different income groups can afford to live based on local market value while accounting for the region's count of households of the given income group.
+#' @param state Study state.
+#' @param counties Study county or counties.
+#' @param ami_limit Specified area median income, or AMI, limit of interest such as 3. or .5 AMI.
+#' @param year Study year.
+#' @param ... Other keyword arguments
+#' @return Returns a spatial file
+#' @examples \dontrun
+#' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+#' @export
 
 afford <- function(
    state = "state",
    counties = "counties",
    ami_limit = "ami_limit",
-   year = NULL,
-   GEOID = "GEOID",
-   acsvars = "acsvars",
-   variable = "variable",
-   estimate = "estimate",
-   limit = "limit",
-   tr_own_accessible = "tr_own_accessible",
-   tr_own_total = "tr_own_total",
-   tr_own_supply = "tr_own_supply",
-   tr_rent_accessible = "tr_rent_accessible",
-   tr_rent_total = "tr_rent_total",
-   tr_rent_supply = "tr_rent_supply",
-   tr_rent_rate = "tr_rent_rate",
-   tr_own_rate = "tr_own_rate",
-   reg_total_pop = "reg_total_pop",
-   reg_class_pop = "reg_class_pop") {
-  requireNamespace(
-    tidycensus,
-    stats,
-    scales,
-    stringr,
-    tigris,
-    sf,
-    dplyr)
+   year = 2019,
+   ...
+   ){
+
+    closest <- function(x = "x", limits = "limits") {
+    limits[which.min(abs(limits - x))]
+    }
+
   income <-
     tidycensus::get_acs(geography = "county",
             table = "B19001",
@@ -135,7 +113,6 @@ afford <- function(
                   900, 1000, 1250, 1500, 2000, 2500, 3000, 3500, Inf)
   rent$limit <- rep(rent_limit, time = nrow(rent)/25)
 
-  #ami <- closest(stats::median(med_inc$estimate, na.rm = TRUE), income$income_limit)
   ami <- stats::median(med_inc$estimate, na.rm = TRUE)
 
   price$income_limit <- price$limit*0.188
@@ -208,10 +185,6 @@ afford <- function(
            reg_class_pop = class_pop,
            ami_limit = ami_limit)
 
-# Get breaks for rent and own categories
-    # rent_breaks <- c(round(BAMMtools::getJenksBreaks(puget$tr_rent_rate, 4)[-4], digits = -1), max(puget$tr_rent_rate, na.rm = TRUE))
-    # own_breaks <- c(round(BAMMtools::getJenksBreaks(tract_counts$tr_own_rate, 6)[-6], digits = -1), max(tract_counts$tr_own_rate, na.rm = TRUE))
-
   tract_counts <-
     tract_counts %>%
     dplyr::mutate(
@@ -231,27 +204,6 @@ afford <- function(
           paste0("0.2% to ", scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1))
         )
       ),
-      # factor(
-      #   case_when(
-      #     tr_rent_rate <= rent_breaks[2] ~
-      #       paste0(rent_breaks[1], ' - ', rent_breaks[2]),
-      #     tr_rent_rate > rent_breaks[2] & tr_rent_rate <= rent_breaks[3] ~
-      #       paste0(rent_breaks[2], ' - ', rent_breaks[3]),
-      #     tr_rent_rate > rent_breaks[3] & tr_rent_rate <= rent_breaks[4] ~
-      #       paste0(rent_breaks[3], ' - ', rent_breaks[4]),
-      #     tr_rent_rate > rent_breaks[4] & tr_rent_rate <= rent_breaks[5] ~
-      #       paste0(rent_breaks[4], ' - ', rent_breaks[5]),
-      #     tr_rent_rate > rent_breaks[5] ~
-      #       paste0(rent_breaks[5], ' - ', scales::comma(round(rent_breaks[6], digits = 0)))
-      #     ),
-      #   levels = c(
-      #     paste0(rent_breaks[1], ' - ', rent_breaks[2]),
-      #     paste0(rent_breaks[2], ' - ', rent_breaks[3]),
-      #     paste0(rent_breaks[3], ' - ', rent_breaks[4]),
-      #     paste0(rent_breaks[4], ' - ', rent_breaks[5]),
-      #     paste0(rent_breaks[5], ' - ', scales::comma(round(rent_breaks[6], digits = 0)))
-      #   )
-      # ),
     own_jenks_cat =
       factor(
         dplyr::case_when(
@@ -269,27 +221,6 @@ afford <- function(
           paste0("0.2% to ", scales::percent(max(tr_own_rate, na.rm = TRUE)/100000, accuracy = .1))
         )
       ),
-      # factor(
-      #   case_when(
-      #     tr_own_rate <= own_breaks[2] ~
-      #       paste0(own_breaks[1], ' - ', own_breaks[2]),
-      #     tr_own_rate > own_breaks[2] & tr_own_rate <= own_breaks[3] ~
-      #       paste0(own_breaks[2], ' - ', own_breaks[3]),
-      #     tr_own_rate > own_breaks[3] & tr_own_rate <= own_breaks[4] ~
-      #       paste0(own_breaks[3], ' - ', own_breaks[4]),
-      #     tr_own_rate > own_breaks[4] & tr_own_rate <= own_breaks[5] ~
-      #       paste0(own_breaks[4], ' - ', own_breaks[5]),
-      #     tr_own_rate > own_breaks[5] ~
-      #       paste0(own_breaks[5], ' - ', scales::comma(round(own_breaks[6], digits = 0)))
-      #     ),
-      #   levels = c(
-      #     paste0(own_breaks[1], ' - ', own_breaks[2]),
-      #     paste0(own_breaks[2], ' - ', own_breaks[3]),
-      #     paste0(own_breaks[3], ' - ', own_breaks[4]),
-      #     paste0(own_breaks[4], ' - ', own_breaks[5]),
-      #     paste0(own_breaks[5], ' - ', scales::comma(round(own_breaks[6], digits = 0)))
-      #   )
-      # ),
     popup =
       stringr::str_c(
         "<b>Tract: ", GEOID, "</b>",
@@ -315,119 +246,3 @@ afford <- function(
 
   tigris::tracts(state = state, county = counties, cb = TRUE, year = year) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
 }
-
-#
-# Create measure example
-# --------------------------------------------------------------------------
-# options(tigris_use_cache = TRUE)
-# library(tidyverse)
-# king <- afford("53", c("Pierce", "King", "Snohomish"), .8, 2020)
-# puget <- afford("53", c("033", "053", "061"), .8, 2020)
-# wasatch <- afford("49", c('057', '011', '035', '049'), .5, 2019)
-# bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
-# bay9 <- afford("06", c("001", "013", "041", "055", "075", "081", "085", "095", "097"), .5, 2019)
-# bay21 <- afford("06", c("001", "013", "017", "041", "047", "053", "055", "061", "067", "069", "075", "077", "081", "085", "087", "095", "097", "099", "101", "113", "115"), .3, 2018)
-
-#
-# Plot measures
-# --------------------------------------------------------------------------
-# tmap::tmap_mode("view")
-#       tmap::tm_shape(bay5) +
-#       tmap::tm_fill(
-#         "rent_jenks_cat",
-#         title = c("Rent", "Own"),
-#         style = "fixed",
-#         alpha = .5,
-#         # breaks = c(0, 20, 40, 60, 80, 100, max(king %>% sf::st_drop_geometry() %>% dplyr::select(tr_rent_rate), na.rm = TRUE)),
-#         palette = "-RdYlBu",
-#         # id = c("tr_rent_rate", "tr_own_rate")
-#         popup.vars = c("GEOID", "tr_rent_rate", "tr_own_rate")
-#       ) +
-#       tmap::tm_borders(alpha = .5) +
-      # tmap::tm_facets(sync = TRUE, nrow = 2)
-
-
-# plot_exclusivity_ratio <- function(data, variable = c("tr_rent_rate", "tr_own_rate")){
-#   require(sf)
-#   require(RColorBrewer)
-#   require(tmap)
-#   require(dplyr)
-#   if(!(FALSE %in% (variable %in% names(data)))){
-
-#     # plot(data[variable],
-#     #      breaks = c(0, 20, 40, 60, 80, 100, max(data %>% st_drop_geometry() %>% select(variable), na.rm = TRUE)),
-#     #      pal = brewer.pal(6, "RdBu"),
-#     #      lwd = 0.01)
-#   } else {
-#     stop("Incorrect variable name.")
-#   }
-# }
-
-# # plot_exclusivity_ratio(bay5, variable = "tr_rent_rate")
-# # plot_exclusivity_ratio(bay9)
-# # plot_exclusivity_ratio(bay21)
-# plot_exclusivity_ratio(king)
-
-# ==========================================================================
-# Leaflet
-# ==========================================================================
-
-# rentpal <- colorNumeric(
-#   palette = "Blues",
-#   domain = king$tr_rent_rate)
-
-# ownpal <- colorNumeric(
-#   palette = "Blues",
-#   domain = king$tr_own_rate)
-
-# map_it <- function(data){
-
-
-#   leaflet(data = king) %>%
-#     addMapPane(name = "polygons", zIndex = 410) %>%
-#     addMapPane(name = "maplabels", zIndex = 420) %>% # higher zIndex rendered on top
-#     addProviderTiles("CartoDB.PositronNoLabels") %>%
-#     addProviderTiles("CartoDB.PositronOnlyLabels",
-#                    options = leafletOptions(pane = "maplabels"),
-#                    group = "map labels") %>%
-#     addPolygons(
-#       group = 'Accessible Rental Market',
-#       label = ~tr_rent_rate,
-#       labelOptions = labelOptions(textsize = '12px'),
-#       # fillOpacity. = .5,
-#       color = ~rentpal(tr_rent_rate),
-#       stroke = TRUE,
-#       weight = .7,
-#       # opacity = .6,
-#       highlightOptions =
-#         highlightOptions(
-#           color = "#ff4a4a",
-#           weight = 5,
-#           bringToFront = TRUE
-#           ),
-#       ) %>%
-#     addPolygons(
-#       group = 'Accessible Housing Market',
-#       label = ~tr_own_rate,
-#       labelOptions = labelOptions(textsize = '12px'),
-#       # fillOpacity. = .5,
-#       color = ~colorQuantile("Blues", king$tr_own_rate, n = 5),
-#       stroke = TRUE,
-#       weight = .7,
-#       opacity = .6,
-#       highlightOptions =
-#         highlightOptions(
-#           color = "#ff4a4a",
-#           weight = 5,
-#           bringToFront = TRUE
-#           ),
-#       ) %>%
-#   addLayersControl(
-#     baseGroups = c(
-#       'Accessible Rental Market',
-#       'Accessible Housing Market'),
-#     options = layersControlOptions(collapsed = FALSE))
-
-#   }
-
-#   map_it(king)
