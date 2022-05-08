@@ -19,7 +19,7 @@ closest <- function(x = "x", limits = "limits") {
 afford <- function(
    state = "state",
    counties = "counties",
-   ami_limit = .3,
+   ami_limit = "ami_limit",
    year = NULL,
    GEOID = "GEOID",
    acsvars = "acsvars",
@@ -31,8 +31,19 @@ afford <- function(
    tr_own_supply = "tr_own_supply",
    tr_rent_accessible = "tr_rent_accessible",
    tr_rent_total = "tr_rent_total",
-   tr_rent_supply = "tr_rent_supply") {
-  require(dplyr)
+   tr_rent_supply = "tr_rent_supply",
+   tr_rent_rate = "tr_rent_rate",
+   tr_own_rate = "tr_own_rate",
+   reg_total_pop = "reg_total_pop",
+   reg_class_pop = "reg_class_pop") {
+  requireNamespace(
+    tidycensus,
+    stats,
+    scales,
+    stringr,
+    tigris,
+    sf,
+    dplyr)
   income <-
     tidycensus::get_acs(geography = "county",
             table = "B19001",
@@ -206,7 +217,7 @@ afford <- function(
     dplyr::mutate(
     rent_jenks_cat =
       factor(
-        case_when(
+        dplyr::case_when(
           tr_rent_rate <= 100 ~ "Less than 0.1%",
           tr_rent_rate > 100 & tr_rent_rate <= 200  ~ "0.1% to 0.2%",
           tr_rent_rate > 200 ~
@@ -243,7 +254,7 @@ afford <- function(
       # ),
     own_jenks_cat =
       factor(
-        case_when(
+        dplyr::case_when(
           tr_own_rate <= 100 ~ "Less than 0.1%",
           tr_own_rate > 100 & tr_own_rate <= 200  ~ "0.1% to 0.2%",
           tr_own_rate > 200 ~

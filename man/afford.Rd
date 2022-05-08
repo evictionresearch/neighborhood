@@ -10,7 +10,7 @@ afford(
    state = "state",
    counties = "counties",
    ami_limit = "ami_limit",
-   year = 2018,
+   year = NULL,
    GEOID = "GEOID",
    acsvars = "acsvars",
    variable = "variable",
@@ -21,7 +21,11 @@ afford(
    tr_own_supply = "tr_own_supply",
    tr_rent_accessible = "tr_rent_accessible",
    tr_rent_total = "tr_rent_total",
-   tr_rent_supply = "tr_rent_supply"
+   tr_rent_supply = "tr_rent_supply",
+   tr_rent_rate = "tr_rent_rate",
+   tr_own_rate = "tr_own_rate",
+   reg_total_pop = "reg_total_pop",
+   reg_class_pop = "reg_class_pop"
   )
 }
 %- maybe also 'usage' for other objects documented here.
@@ -29,7 +33,7 @@ afford(
    \item{state}{ = "state",}
    \item{counties}{ = "counties",}
    \item{ami_limit}{ = "ami_limit",}
-   \item{year}{ = 2018  }
+   \item{year}{ = NULL,}
    \item{GEOID}{ = "GEOID",}
    \item{acsvars}{ = "acs2018",}
    \item{variable}{ = "variable",}
@@ -41,6 +45,10 @@ afford(
    \item{tr_rent_accessible}{ = "tr_rent_accessible",}
    \item{tr_rent_total}{ = "tr_rent_total",}
    \item{tr_rent_supply}{ = "tr_rent_supply",}
+   \item{tr_rent_rate}{ = "tr_rent_rate",}
+   \item{tr_own_rate}{ = "tr_own_rate",}
+   \item{reg_total_pop}{ = "reg_total_pop",}
+   \item{reg_class_pop}{ = "reg_class_pop"}
 }
 % \details{
 % %%  ~~ If necessary, more details than the description above ~~
@@ -78,6 +86,6 @@ Alex Ramiller and tim thomas
 % \keyword{ ~kwd2 }
 % Use only one keyword per line.
 % For non-standard keywords, use \concept instead of \keyword:
-% \concept{ ~cpt1 }
-% \concept{ ~cpt2 }
+\concept{ ~housing }
+\concept{ ~affordability }
 % Use only one concept per line.

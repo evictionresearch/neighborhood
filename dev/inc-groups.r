@@ -60,7 +60,7 @@ tr_data <- function(
   dplyr::mutate(COUNTY = substr(GEOID, 1, 5))
 }
 
-  df <- tr_data(state = 'CA', county_list = 'Alameda', year = 2019) %>% glimpse()
+  # df <- tr_data(state = 'CA', county_list = 'Alameda', year = 2019) %>% glimpse()
 
 inc_names <- c(
   'HHInc_5' = 4999, # Renter occupied!!Less than $5,000

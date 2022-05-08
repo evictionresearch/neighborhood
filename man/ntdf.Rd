@@ -1,5 +1,7 @@
 \name{ntdf}
 \alias{ntdf}
+\alias{nt}
+\alias{ntcheck}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Download data and run nt}
 \description{
@@ -7,13 +9,13 @@ Data creation using the nt formula
 }
 \usage{
 ntdf(
-  	state, 
-	geography = "tract", 
-	county = NULL, 
-	geometry = FALSE, 
-	cache_table = TRUE, 
-	output = "wide", 
-	year = 2018, 
+  	state,
+	geography = "tract",
+	county = NULL,
+	geometry = FALSE,
+	cache_table = TRUE,
+	output = "wide",
+	year = NULL,
 	GEOID = "GEOID",
 	WhiteE = "WhiteE",
 	AsianE = "AsianE",
@@ -30,7 +32,7 @@ ntdf(
 	\item{geometry}{ = FALSE, }
 	\item{cache_table}{ = TRUE, }
 	\item{output}{ = "wide", }
-	\item{year}{ = 2018, }
+	\item{year}{Default is `NULL`}
 	\item{GEOID}{ = "GEOID",}
 	\item{WhiteE}{ = "WhiteE",}
 	\item{AsianE}{ = "AsianE",}
