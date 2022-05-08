@@ -22,6 +22,7 @@
 # ==========================================================================
 
 nt <- function(df, GEOID = "GEOID", totraceE = "toteraceE", pWhite = "pWhite", pBlack = "pBlack", pAsian = "pAsian", pLatinx = "pLatinx", pOther = "pOther", NeighType = "NeighType", nt_conc = "nt_conc"){
+	requireNamespace(dplyr)
 	df %>%
 	dplyr::group_by(GEOID) %>%
 	dplyr::mutate(NeighType =
@@ -148,6 +149,9 @@ ntdf <- function(
 	LatinxE = "LatinxE",
 	totraceE = "totraceE"
 ){
+requireNamespace(
+    tidycensus,
+    dplyr)
 
 race_vars <-
 	c('totrace' = 'B03002_001',

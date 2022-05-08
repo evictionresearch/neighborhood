@@ -1,7 +1,5 @@
 \name{ntdf}
 \alias{ntdf}
-\alias{nt}
-\alias{ntcheck}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Download data and run nt}
 \description{
