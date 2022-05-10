@@ -9,6 +9,7 @@
 #' @return Returns a spatial file
 #' @examples \dontrun{
 #' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+#' wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2019, geometry = TRUE)
 #' }
 #' @export
 
@@ -188,25 +189,28 @@ afford <- function(
            reg_class_pop = class_pop,
            ami_limit = ami_limit)
 
+# max_rent <- max(tract_counts$tr_rent_rate, na.rm = TRUE)/100000
+# max_own <- max(tract_counts$tr_own_rate, na.rm = TRUE)/100000
+
   tract_counts <-
     tract_counts %>%
     dplyr::mutate(
-    rent_jenks_cat =
-      factor(
-        dplyr::case_when(
-          tr_rent_rate <= 100 ~ "Less than 0.1%",
-          tr_rent_rate > 100 & tr_rent_rate <= 200  ~ "0.1% to 0.2%",
-          tr_rent_rate > 200 ~
-            paste0(
-              "0.2% to ",
-              scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1)),
+      rent_jenks_cat =
+        factor(
+          dplyr::case_when(
+            tr_rent_rate <= 100 ~ "Less than 0.1%",
+            tr_rent_rate > 100 & tr_rent_rate <= 200  ~ "0.1% to 0.2%",
+            tr_rent_rate > 200 ~
+              paste0(
+                "0.2% to ",
+                scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1)),
+          ),
+          levels = c(
+            "Less than 0.1%",
+            "0.1% to 0.2%",
+            paste0("0.2% to ", scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1))
+          )
         ),
-        levels = c(
-          "Less than 0.1%",
-          "0.1% to 0.2%",
-          paste0("0.2% to ", scales::percent(max(tr_rent_rate, na.rm = TRUE)/100000, accuracy = .1))
-        )
-      ),
     own_jenks_cat =
       factor(
         dplyr::case_when(
