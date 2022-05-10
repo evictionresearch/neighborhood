@@ -4,6 +4,7 @@
 #' @param counties Study county or counties.
 #' @param ami_limit Specified area median income, or AMI, limit of interest such as 3. or .5 AMI.
 #' @param year Study year.
+#' @param get_geometry Download spatial data.
 #' @param ... Other keyword arguments
 #' @return Returns a spatial file
 #' @examples \dontrun{
@@ -16,6 +17,7 @@ afford <- function(
    counties = "counties",
    ami_limit = "ami_limit",
    year = 2019,
+   get_geometry = FALSE,
    ...
    ){
 
@@ -245,5 +247,8 @@ afford <- function(
         )
       )
 
+if(get_geometry == TRUE){
+  print("spatial tract data")
   tigris::tracts(state = state, county = counties, cb = TRUE, year = year) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
+}
 }
