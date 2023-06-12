@@ -16,6 +16,7 @@ ntdf(
 	cache_table = TRUE,
 	output = "wide",
 	year = NULL,
+	cb = TRUE,
 	GEOID = "GEOID",
 	WhiteE = "WhiteE",
 	AsianE = "AsianE",
@@ -27,12 +28,13 @@ ntdf(
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   	\item{state}{State of choice. Can add multiple states with `c()` function}
-	\item{geography}{Default is "tract", can choose any geography based on tidycensus `get_acs` parameters.}
-	\item{county}{Default is `NULL`}
-	\item{geometry}{ = FALSE, }
-	\item{cache_table}{ = TRUE, }
-	\item{output}{ = "wide", }
-	\item{year}{Default is `NULL`}
+	\item{geography}{ = Default is "tract", can choose any geography based on tidycensus `get_acs` parameters.}
+	\item{county}{ = Select a state's specific county or group of counties. Default is `NULL` to download the entire state.}
+	\item{geometry}{ = Download spatial files. Default = FALSE.}
+	\item{cache_table}{ = Decide whether to cache the census data for repeated downloads. Default = TRUE.}
+	\item{output}{ = Default is "wide". Can set to "long" }
+	\item{year}{ = Census data year. Default is `NULL`}
+	\item{cb}{ = Download the census' smaller cartographic boundary for visualization. Default is `TRUE`. Set to `FALSE` for more accurate boundaries appropriate for spatial analysis.}
 	\item{GEOID}{ = "GEOID",}
 	\item{WhiteE}{ = "WhiteE",}
 	\item{AsianE}{ = "AsianE",}

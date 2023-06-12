@@ -141,6 +141,7 @@ ntdf <- function(
 	cache_table = TRUE,
 	output = "wide",
 	year = NULL,
+	cb = TRUE,
 	GEOID = "GEOID",
 	WhiteE = "WhiteE",
 	AsianE = "AsianE",
@@ -166,7 +167,7 @@ acs_data <-
 		cache_table = cache_table,
 		output = output,
 		year = year,
-		cb = TRUE
+		cb = cb
 		) %>%
 	dplyr::select(-dplyr::ends_with("M")) %>%
 	dplyr::group_by(GEOID) %>%
