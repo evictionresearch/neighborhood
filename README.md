@@ -36,7 +36,7 @@ This function is based off this paper:
 3. `ntcheck`: identify counts that can be concatenated
 
 ### Example
-You can view an interactive map using this function [here](https://evictions.study/maryland/maps/baltimore.html).
+You can view an interactive map using this function [here](https://evictionresearch.net/maryland/maps/baltimore.html). Choose the "Neighborhood Segregation" layer
 
 ``` r
 Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
@@ -70,3 +70,6 @@ ntcheck(ps_nt)
 ```
 
 The `nt_conc` field concatenates the `NeighType` field automatically and may satisfy most people. 
+
+## Get County and PUMA cross sections
+The `get_co_puma` function defines the county associated with a PUMA. In some cases, multiple PUMAs fall within one county, such as in urban areas. In other situations, multiple counties may fall within one PUMA, such as in rural situations. Tracts nest within PUMAs so this
