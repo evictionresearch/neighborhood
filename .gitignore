@@ -43,3 +43,4 @@ vignettes/*.pdf
 
 # Github extras
 .github
+docs

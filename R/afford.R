@@ -8,7 +8,7 @@
 #' @param ... Other keyword arguments
 #' @return Returns a spatial file
 #' @examples \dontrun{
-#' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+#' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)<br>
 #' wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2019, geometry = TRUE)
 #' }
 #' @export

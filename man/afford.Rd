@@ -9,6 +9,7 @@ afford(
   counties = "counties",
   ami_limit = "ami_limit",
   year = 2019,
+  geometry = FALSE,
   ...
 )
 }
@@ -21,6 +22,8 @@ afford(
 
 \item{year}{Study year.}
 
+\item{geometry}{Download spatial data.}
+
 \item{...}{Other keyword arguments}
 }
 \value{
@@ -31,6 +34,7 @@ The \code{afford} function identifies where different income groups can afford t
 }
 \examples{
 \dontrun{
-bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)
+bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)<br>
+wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2019, geometry = TRUE)
 }
 }

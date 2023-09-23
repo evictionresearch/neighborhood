@@ -1,8 +1,16 @@
 Package: neighborhood
 Type: Package
 Title: Neighborhood analysis functions
-Version: 1.0.1
-Author: tim thomas
+Version: 1.0.2
+Authors@R: c(
+    person(given = "tim thomas",
+           family = "Creator",
+           role = c("aut", "cre"),
+           email = "timthomas@berkeley.edu"),
+    person(given = "Alex Ramiller",
+           family = "Contributor",
+           role = c("ctb"))
+    )
 Maintainer: The package maintainer <timthomas@berkeley.edu>
 Description: This package features several neighborhood research functions in 
     relation to racial segregation, housing market trends, and residential mobility. 
@@ -16,5 +24,10 @@ Imports:
     tigris, 
     leaflet, 
     scales, 
-    stringr
-RoxygenNote: 7.1.2
+    stringr, 
+    purrr,
+	  stats,
+RoxygenNote: 7.2.3
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

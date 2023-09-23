@@ -1,3 +1,10 @@
+<!-- Read this: 
+https://www.r-bloggers.com/2022/09/the-package-learning-how-to-build-an-r-package/
+
+library(pkgdown)
+usethis::use_pkgdown()
+pkgdown::build_site()
+usethis::use_pkgdown_github_pages() -->
 # The Neighborhood Package
 
 An R package with various functions to study neighborhood dynamics. 
