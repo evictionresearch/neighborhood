@@ -7,6 +7,9 @@ pkgdown::build_site()
 usethis::use_pkgdown_github_pages() -->
 # The Neighborhood Package
 
+[![DOI](https://zenodo.org/badge/300691126.svg)](https://zenodo.org/doi/10.5281/zenodo.10642018)
+
+
 An R package with various functions to study neighborhood dynamics. 
 
 ## Install
