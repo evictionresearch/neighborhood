@@ -15,7 +15,7 @@ An R package with various functions to study neighborhood dynamics.
 ## Install
 
 ``` r
-devtools::install_github("timathomas/neighborhood", ref = "main")
+devtools::install_github("evictionresearch/neighborhood", ref = "main")
 ```
 
 ## Neighborhood Racial Typologies Function
@@ -28,7 +28,7 @@ Because there are so many different combinations, I created the `nt_conc` field 
 
 
 #### Data download
-All U.S. tract definitions can be downloaded in the [`data`](https://github.com/timathomas/neighborhood/tree/main/data) directory above. 
+All U.S. tract definitions can be downloaded in the [`data`](https://github.com/evictionresearch/neighborhood/tree/main/data) directory above. 
 
 #### Credits
 This function is based off this paper:  
