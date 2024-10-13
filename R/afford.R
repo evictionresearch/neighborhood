@@ -107,12 +107,12 @@ afford <- function(
 
   income_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000,
                     50000, 60000, 75000, 100000, 125000, 150000, 200000, Inf)
-  income$limit <- rep(income_limit, times = nrow(income)/17)
+  income$limit <- rep(income_limit, times = nrow(income)/length(income_limit))
   price_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000,
                    50000, 60000, 70000, 80000, 90000, 100000, 125000, 150000, 175000, 200000,
                    250000, 300000, 400000, 500000, 750000, 1000000, 1500000, 2000000, Inf)
-  price$limit <- rep(price_limit, times = nrow(price)/27)
-  value$limit <- rep(price_limit, times = nrow(price)/27)
+  price$limit <- rep(price_limit, times = nrow(price)/length(price_limit))
+  value$limit <- rep(price_limit, times = nrow(price)/length(price_limit))
   rent_limit <- c(0, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800,
                   900, 1000, 1250, 1500, 2000, 2500, 3000, 3500, Inf)
   rent$limit <- rep(rent_limit, time = nrow(rent)/25)
