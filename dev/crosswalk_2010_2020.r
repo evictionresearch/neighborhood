@@ -126,7 +126,7 @@ crosswalk_tract <- function(state){
       arrange(tract20, tract10)
 
     print(paste0("Saving ", state, " crosswalk"))
-    qsave(cw, paste0("~/data/evictionresearch/library/crosswalk/tracts/cw_", state, ".qs"))
+    qsave(cw, paste0("~/data/evictionresearch/neighborhood/crosswalk/tracts/cw_", state, ".qs"))
 
     print(summary(cw))
     print("Clean up")
@@ -151,7 +151,7 @@ map("TX", crosswalk_tract) %>% compact()
 # ==========================================================================
 # Create complete us tract file
 # ==========================================================================
-cw_files <- list.files("~/data/evictionresearch/library/crosswalk/tracts", full.names = TRUE)
+cw_files <- list.files("~/data/evictionresearch/neighborhood/crosswalk/tracts", full.names = TRUE)
 
 us_cw <-
   map_dfr(cw_files, function(x){
@@ -219,7 +219,7 @@ crosswalk_county <- function(state){
       arrange(county20, county10)
 
     print(paste0("Saving ", state, " crosswalk"))
-    qsave(cw, paste0("~/data/evictionresearch/library/crosswalk/counties/cw_", state, ".qs"))
+    qsave(cw, paste0("~/data/evictionresearch/neighborhood/crosswalk/counties/cw_", state, ".qs"))
 
     print(summary(cw))
     print("Clean up")
@@ -242,7 +242,7 @@ map("ID", crosswalk_county) %>% compact()
 # ==========================================================================
 # Create complete us counties file
 # ==========================================================================
-cw_files <- list.files("~/data/evictionresearch/library/crosswalk/counties", full.names = TRUE)
+cw_files <- list.files("~/data/evictionresearch/neighborhood/crosswalk/counties", full.names = TRUE)
 
 us_cw <-
   map_dfr(cw_files, function(x){
