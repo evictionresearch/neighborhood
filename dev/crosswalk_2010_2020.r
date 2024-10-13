@@ -126,7 +126,7 @@ crosswalk_tract <- function(state){
       arrange(tract20, tract10)
 
     print(paste0("Saving ", state, " crosswalk"))
-    qsave(cw, paste0("~git/evictionresearch/neighborhood/data/crosswalk/tracts/cw_", state, ".qs"))
+    qsave(cw, paste0("~/data/evictionresearch/library/crosswalk/tracts/cw_", state, ".qs"))
 
     print(summary(cw))
     print("Clean up")
@@ -151,7 +151,7 @@ map("TX", crosswalk_tract) %>% compact()
 # ==========================================================================
 # Create complete us tract file
 # ==========================================================================
-cw_files <- list.files("~/git/evictionresearch/neighborhood/data/crosswalk/tracts", full.names = TRUE)
+cw_files <- list.files("~/data/evictionresearch/library/crosswalk/tracts", full.names = TRUE)
 
 us_cw <-
   map_dfr(cw_files, function(x){
@@ -159,7 +159,7 @@ us_cw <-
   }
   )
 
-qsave(us_cw, "~/git/evictionresearch/neighborhood/data/crosswalk/us_tracts/cw_tract_us.qs")
+qsave(us_cw, "~/git/evictionresearch/neighborhood/data/cw_tract_us.qs")
 
 # ==========================================================================
 # Create crosswalk for counties
@@ -219,7 +219,7 @@ crosswalk_county <- function(state){
       arrange(county20, county10)
 
     print(paste0("Saving ", state, " crosswalk"))
-    qsave(cw, paste0("~/git/evictionresearch/neighborhood/data/crosswalk/counties/cw_", state, ".qs"))
+    qsave(cw, paste0("~/data/evictionresearch/library/crosswalk/counties/cw_", state, ".qs"))
 
     print(summary(cw))
     print("Clean up")
@@ -242,7 +242,7 @@ map("ID", crosswalk_county) %>% compact()
 # ==========================================================================
 # Create complete us counties file
 # ==========================================================================
-cw_files <- list.files("~/git/evictionresearch/neighborhood/data/crosswalk/counties", full.names = TRUE)
+cw_files <- list.files("~/data/evictionresearch/library/crosswalk/counties", full.names = TRUE)
 
 us_cw <-
   map_dfr(cw_files, function(x){
@@ -250,4 +250,4 @@ us_cw <-
   }
   )
 
-qsave(us_cw, "~/git/evictionresearch/neighborhood/data/crosswalk/us_counties/cw_county_us.qs")
+qsave(us_cw, "~/git/evictionresearch/neighborhood/data/cw_county_us.qs")
