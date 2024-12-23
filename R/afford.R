@@ -17,7 +17,7 @@ afford <- function(
    state = "state",
    counties = "counties",
    ami_limit = "ami_limit",
-   year = 2021,
+   year = NULL,
    geometry = FALSE,
    ...
    ){
@@ -167,7 +167,12 @@ afford <- function(
                      dplyr::filter(limit <= closest(ami_limit*ami, income_limit) & income_limit > 0) %>%
                      dplyr::select(estimate))
 
-  class_prop <- class_pop/total_pop
+  class_prop <- case_when(
+    class_pop == 0 & total_pop == 0 ~ 0,
+    class_pop > 0 & total_pop == 0 ~ 0,
+    TRUE ~ class_pop/total_pop
+  )
+
 
   tract_counts <-
     dplyr::bind_rows(price_counts, value_counts) %>%
@@ -181,8 +186,16 @@ afford <- function(
       rent_counts %>%
       dplyr::mutate(
         tr_rent_supply = tr_rent_accessible/tr_rent_total,
-        tr_rent_ratio = tr_rent_supply/class_prop,
-        tr_rent_rate = (tr_rent_accessible/class_pop)*100000),
+        tr_rent_ratio = case_when(
+          tr_rent_supply == 0 & class_prop == 0 ~ 0,
+          tr_rent_supply > 0 & class_prop == 0 ~ 0,
+          TRUE ~ tr_rent_supply/class_prop
+        ),
+        tr_rent_rate = case_when(
+          tr_rent_accessible == 0 & class_prop == 0 ~ 0,
+          tr_rent_accessible > 0 & class_prop == 0 ~ 0,
+          (tr_rent_accessible/class_pop)*100000)
+        ),
       by = "GEOID") %>%
     dplyr::mutate(
       reg_total_pop = total_pop,
@@ -259,3 +272,7 @@ if(geometry == TRUE){
   return(tract_counts)
 }
 }
+
+# marin_co_afford <- afford("CA", "Marin", .3, year = 2022)
+# marin_co_afford %>% glimpse()
+# marin_co_afford %>% summary()
