@@ -194,7 +194,7 @@ afford <- function(
         tr_rent_rate = case_when(
           tr_rent_accessible == 0 & class_prop == 0 ~ 0,
           tr_rent_accessible > 0 & class_prop == 0 ~ 0,
-          (tr_rent_accessible/class_pop)*100000)
+          TRUE ~ (tr_rent_accessible/class_pop)*100000)
         ),
       by = "GEOID") %>%
     dplyr::mutate(
@@ -273,6 +273,6 @@ if(geometry == TRUE){
 }
 }
 
-# marin_co_afford <- afford("CA", "Marin", .3, year = 2022)
+# marin_co_afford <- afford("CA", "Marin", .8, year = 2022)
 # marin_co_afford %>% glimpse()
 # marin_co_afford %>% summary()
