@@ -26,10 +26,6 @@ The neighborhood typology is designated when a tract's racial/ethnic group share
 
 Because there are so many different combinations, I created the `nt_conc` field to show concatinated fields of 1, 2, or more groups. 
 
-
-#### Data download
-All U.S. tract definitions can be downloaded in the [`data`](https://github.com/evictionresearch/neighborhood/tree/main/data) directory above. 
-
 #### Credits
 This function is based off this paper:  
 [Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. “Neighborhood Foreclosures, Racial/Ethnic Transitions, and Residential Segregation.” American Sociological Review 80:526–549.](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4479290/)
