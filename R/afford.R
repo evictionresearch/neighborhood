@@ -22,123 +22,109 @@ afford <- function(
    ...
    ){
 
+  # Input validation warnings
+  if (!is.character(state) || nchar(state) != 2 || !grepl("^[0-9]{2}$", state)) {
+    warning("'state' should be a 2-digit FIPS code as character (e.g., '06' for California, '53' for Washington), not a state name or abbreviation. Use tigris::fips_codes to find the correct FIPS code.")
+  }
+
+  if (!is.character(counties) || any(nchar(counties) != 3) || any(!grepl("^[0-9]{3}$", counties))) {
+    warning("'counties' should be 3-digit FIPS codes as character strings (e.g., '001', '013'), not county names")
+  }
+
 #### BEGIN TESTING ####
 
 librarian::shelf(tidycensus, dplyr, stats, scales, stringr, tigris, sf)
 options(width = Sys.getenv("COLUMNS", unset = 120))
-state <- "NJ"
-counties <- "Atlantic"
+state <- "34"
+counties <-
+  fips_codes %>%
+  filter(
+    county %in% # nolint
+    c("Atlantic County", "Cape May County", "Cumberland County", # nolint
+    "Ocean County", "Gloucester County", "Camden County", "Burlington County"), # nolint
+    state == "NJ") %>% # nolint
+    pull(county_code) # Atlantic, Cape May, Cumberland, Ocean, Gloucester, Camden, Burlington # nolint
 ami_limit <- .8
 year <- 2023
 
   closest <- function(x = "x", limits = "limits") {
     limits[which.min(abs(limits - x))]
   }
-  state_to_fips <- function(state) {
-    # List of state names, abbreviations, and FIPS codes
-    state_table <- data.frame(
-      name = c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"),
-      abbr = c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"),
-      fips = c("01", "02", "04", "05", "06", "08", "09", "10", "11", "12", "13", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "44", "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56"),
-      stringsAsFactors = FALSE
-    )
-    # If already a 2-digit FIPS code, return as character
-    if (is.character(state) && nchar(state) == 2 && state %in% state_table$fips) {
-      return(state)
-    }
-    # Try matching by abbreviation (case-insensitive)
-    abbr_match <- which(toupper(state) == state_table$abbr)
-    if (length(abbr_match) == 1) {
-      return(state_table$fips[abbr_match])
-    }
-    # Try matching by full name (case-insensitive, ignore spaces)
-    name_match <- which(tolower(gsub("\\s+", "", state)) == tolower(gsub("\\s+", "", state_table$name)))
-    if (length(name_match) == 1) {
-      return(state_table$fips[name_match])
-    }
-    stop("State not recognized. Please provide a valid state name, abbreviation, or 2-digit FIPS code.")
-  }
 
-  income <-
-    tidycensus::get_acs(geography = "county",
-            table = "B19001",
-            state = state_to_fips(state),
-            year = year,
-            cache_table = TRUE) %>%
-    dplyr::filter(GEOID %in% paste0(state, counties)) %>%
-    dplyr::left_join(tidycensus::load_variables(year, "acs5", cache = TRUE), by = c("variable" = "name"))
-### LEFT OFF HERE: RECHECK ABOVE FUNCTION
+# County count of household income
 
+income <-
+  tidycensus::get_acs(
+    geography = "county",
+    table = "B19001",
+    state = state,
+    year = year,
+    cache_table = TRUE
+  ) %>%
+  dplyr::filter(GEOID %in% paste0(state, counties)) %>%
+  dplyr::left_join(
+    tidycensus::load_variables(year, "acs5", cache = TRUE),
+    by = c("variable" = "name")
+  )
+
+# Tract level median income levels
   med_inc <-
-    tidycensus::get_acs(geography = "tract",
-            variables = "B19013_001",
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE)
+    tidycensus::get_acs(
+      geography = "tract",
+      variables = "B19013_001",
+      state = state,
+      county = counties,
+      year = year,
+      cache_table = TRUE
+    )
 
+# Get ACS variables to join to data
   acsvars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
 
-  price <- dplyr::bind_rows(
-    tidycensus::get_acs(geography = "tract",
-            variables = c("B25085_001", "B25085_002", "B25085_003", "B25085_004", "B25085_005",
-                          "B25085_006", "B25085_007", "B25085_008", "B25085_009", "B25085_010",
-                          "B25085_011", "B25085_012", "B25085_013", "B25085_014", "B25085_015",
-                          "B25085_016", "B25085_017", "B25085_018", "B25085_019", "B25085_020",
-                          "B25085_021", "B25085_022", "B25085_023", "B25085_024"),
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE),
-    tidycensus::get_acs(geography = "tract",
-            variables = c("B25085_025", "B25085_026", "B25085_027"),
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+# Home asking price
+  price <-
+    tidycensus::get_acs(
+      geography = "tract",
+      table = "B25085",
+      state = state,
+      county = counties,
+      year = year,
+      cache_table = TRUE
+    ) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
     dplyr::arrange(GEOID, variable)
 
-  value <- dplyr::bind_rows(
-    tidycensus::get_acs(geography = "tract",
-            variables = c("B25075_001", "B25075_002", "B25075_003", "B25075_004", "B25075_005",
-                          "B25075_006", "B25075_007", "B25075_008", "B25075_009", "B25075_010",
-                          "B25075_011", "B25075_012", "B25075_013", "B25075_014", "B25075_015",
-                          "B25075_016", "B25075_017", "B25075_018", "B25075_019", "B25075_020",
-                          "B25075_021", "B25075_022", "B25075_023", "B25075_024"),
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE),
-    tidycensus::get_acs(geography = "tract",
-            variables = c("B25075_025", "B25075_026", "B25075_027"),
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+# Home value
+  value <-
+    tidycensus::get_acs(
+      geography = "tract",
+      table = "B25075",
+      state = state,
+      county = counties,
+      year = year,
+      cache_table = TRUE
+    ) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
     dplyr::arrange(GEOID, variable)
 
-  rent <- dplyr::bind_rows(
-    tidycensus::get_acs(geography = "tract",
-            variables = c("B25063_002", "B25063_003", "B25063_004", "B25063_005",
-                          "B25063_006", "B25063_007", "B25063_008", "B25063_009", "B25063_010",
-                          "B25063_011", "B25063_012", "B25063_013", "B25063_014", "B25063_015",
-                          "B25063_016", "B25063_017", "B25063_018", "B25063_019", "B25063_020",
-                          "B25063_021", "B25063_022", "B25063_023", "B25063_024", "B25063_025"),
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE),
-    tidycensus::get_acs(geography = "tract",
-            variables = "B25063_026",
-            state = state,
-            county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+  rent <-
+    tidycensus::get_acs(
+      geography = "tract",
+      table = "B25063", # use table because some years have added levels
+      state = state,
+      county = counties,
+      year = year,
+      cache_table = TRUE
+    ) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
-    dplyr::arrange(GEOID, variable)
-
+    dplyr::arrange(GEOID, variable) %>%
+    dplyr::group_by(GEOID) %>%
+    dplyr::filter(
+      variable != dplyr::first(variable) & variable != dplyr::last(variable)
+    ) %>% # remove first and last variables because they are not income limits
+    dplyr::ungroup()
+### LEFT OFF
+# Double check each limit is represented in the data
   income_limit <- c(0, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000,
                     50000, 60000, 75000, 100000, 125000, 150000, 200000, Inf)
   income$limit <- rep(income_limit, times = nrow(income)/length(income_limit))

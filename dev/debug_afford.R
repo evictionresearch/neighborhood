@@ -2,12 +2,7 @@
 # This script helps identify and fix issues with the afford function
 
 # Load required libraries
-library(tidyverse)
-library(tidycensus)
-library(sf)
-library(tigris)
-library(scales)
-library(stringr)
+librarian::shelf(tidyverse, tidycensus, sf, tigris, scales, stringr)
 
 # Check if Census API key is set
 if (is.null(tidycensus::census_api_key())) {
