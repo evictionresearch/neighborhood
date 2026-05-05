@@ -40,7 +40,7 @@ vignettes/*.pdf
 
 # Mac extras
 .DS_Store
+**/.DS_Store
 
 # Github extras
-.github
 docs

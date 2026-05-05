@@ -4,14 +4,7 @@
 \alias{afford}
 \title{Affordable market location}
 \usage{
-afford(
-  state = "state",
-  counties = "counties",
-  ami_limit = "ami_limit",
-  year = 2019,
-  geometry = FALSE,
-  ...
-)
+afford(state, counties, ami_limit, year = 2022, geometry = FALSE, ...)
 }
 \arguments{
 \item{state}{Study state.}
@@ -34,7 +27,7 @@ The \code{afford} function identifies where different income groups can afford t
 }
 \examples{
 \dontrun{
-bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2019)<br>
-wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2019, geometry = TRUE)
+bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2022)
+wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2022, geometry = TRUE)
 }
 }

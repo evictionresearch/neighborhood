@@ -108,7 +108,7 @@ get_co_puma <-
       sf::st_join(us_pumas, us_tracts) %>%
       sf::st_drop_geometry() %>%
       dplyr::left_join(
-        fips_codes %>%
+        tidycensus::fips_codes %>%
           dplyr::select(
             STATEFP = state_code,
             COUNTYFP = county_code,

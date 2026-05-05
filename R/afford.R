@@ -8,16 +8,16 @@
 #' @param ... Other keyword arguments
 #' @return Returns a spatial file
 #' @examples \dontrun{
-#' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2021)<br>
-#' wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2019, geometry = TRUE)
+#' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2022)
+#' wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2022, geometry = TRUE)
 #' }
 #' @export
 
 afford <- function(
-   state = "state",
-   counties = "counties",
-   ami_limit = "ami_limit",
-   year = NULL,
+   state,
+   counties,
+   ami_limit,
+   year = 2022,
    geometry = FALSE,
    ...
    ){
@@ -167,7 +167,7 @@ afford <- function(
                      dplyr::filter(limit <= closest(ami_limit*ami, income_limit) & income_limit > 0) %>%
                      dplyr::select(estimate))
 
-  class_prop <- case_when(
+  class_prop <- dplyr::case_when(
     class_pop == 0 & total_pop == 0 ~ 0,
     class_pop > 0 & total_pop == 0 ~ 0,
     TRUE ~ class_pop/total_pop
@@ -186,12 +186,12 @@ afford <- function(
       rent_counts %>%
       dplyr::mutate(
         tr_rent_supply = tr_rent_accessible/tr_rent_total,
-        tr_rent_ratio = case_when(
+        tr_rent_ratio = dplyr::case_when(
           tr_rent_supply == 0 & class_prop == 0 ~ 0,
           tr_rent_supply > 0 & class_prop == 0 ~ 0,
           TRUE ~ tr_rent_supply/class_prop
         ),
-        tr_rent_rate = case_when(
+        tr_rent_rate = dplyr::case_when(
           tr_rent_accessible == 0 & class_prop == 0 ~ 0,
           tr_rent_accessible > 0 & class_prop == 0 ~ 0,
           TRUE ~ (tr_rent_accessible/class_pop)*100000)
