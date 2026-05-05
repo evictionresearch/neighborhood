@@ -4,17 +4,10 @@ target_cols <- c(
   "NeighType", "nt_conc", "state", "year"
 )
 
-for (ds in c("us_nt_tracts2019", "us_nt_tracts2021", "us_nt_tracts2022")) {
-  test_that(paste(ds, "has expected schema and rows"), {
-    df <- get(ds)
-    expect_true(nrow(df) > 0)
-    expect_identical(names(df), target_cols)
-    expect_s3_class(df$nt_conc, "factor")
-  })
-}
-
-test_that("year column matches dataset name", {
-  expect_true(all(us_nt_tracts2019$year == 2019))
-  expect_true(all(us_nt_tracts2021$year == 2021))
-  expect_true(all(us_nt_tracts2022$year == 2022))
+test_that("us_nt_tracts2024 has expected schema and rows", {
+  expect_true(nrow(us_nt_tracts2024) > 0)
+  expect_identical(names(us_nt_tracts2024), target_cols)
+  expect_s3_class(us_nt_tracts2024$nt_conc, "factor")
+  expect_true(all(us_nt_tracts2024$year == 2024))
+  expect_false(any(is.na(us_nt_tracts2024$nt_conc)))
 })
