@@ -1,12 +1,43 @@
-#' @title Affordable market location
-#' @description The \code{afford} function identifies where different income groups can afford to live based on local market value while accounting for the region's count of households of the given income group.
-#' @param state Study state.
-#' @param counties Study county or counties.
-#' @param ami_limit Specified area median income, or AMI, limit of interest such as 3. or .5 AMI.
-#' @param year Study year.
-#' @param geometry Download spatial data.
-#' @param ... Other keyword arguments
-#' @return Returns a spatial file
+#' @title Tract-level housing affordability index
+#' @description
+#' `afford()` identifies, for a given income group, how much of each census tract's
+#' housing stock is affordable, and compares that supply to the region's share of
+#' households in the same income group. It returns a per-tract supply measure, a
+#' supply-to-demand location quotient (`*_ratio`), and an accessible-units rate
+#' (`*_rate`) for both rental and owner-occupied housing. See
+#' `vignette("affordability-index")` for the full methodology and
+#' `dev/affordability-index-review.md` for known limitations and the remediation plan.
+#'
+#' @details
+#' For the requested income level the regional income threshold is
+#' `ami_limit * AMI`, where `AMI` is the median of tract median household incomes
+#' (`B19013_001`). Each housing-cost bracket is converted to the income needed to
+#' afford it under a 30%-of-income rule: rentals via
+#' `(monthly_rent / 0.30) * 12` (`B25063`), ownership via `price * 0.188`
+#' (`B25075` + `B25085`). A unit is "accessible" if its required income is at or
+#' below the threshold. Per tract the function reports `*_supply`
+#' (accessible / total), `*_ratio` (supply divided by the region's share of
+#' group households), and `*_rate` (accessible units per 100,000 group households).
+#'
+#' Known caveats (see the review document for fixes): the `0.188` ownership factor
+#' embeds a fixed ~3.8% mortgage assumption and overstates ownership affordability
+#' at higher interest rates; `AMI` is a median of tract medians rather than HUD AMI;
+#' the index reflects occupied stock rather than available (vacant) units; and
+#' `state`/`counties` must be FIPS codes, not names.
+#'
+#' @param state Study state, as a two-digit FIPS code (e.g. `"06"`). Names are not supported.
+#' @param counties Study county or counties, as three-digit FIPS codes (e.g. `c("001", "013")`).
+#' @param ami_limit Income level of interest as a fraction of Area Median Income
+#'   (e.g. `0.3`, `0.5`, `0.8`). Units affordable at or below this level are counted (cumulative).
+#' @param year ACS 5-year endpoint year (default `2024`).
+#' @param geometry If `TRUE`, return an `sf` object with tract polygons; if `FALSE`
+#'   (default), return a tibble.
+#' @param ... Reserved for future use.
+#' @return A data frame (or an `sf` data frame when `geometry = TRUE`) with one row
+#'   per tract, including `tr_rent_supply`/`tr_own_supply`,
+#'   `tr_rent_ratio`/`tr_own_ratio`, `tr_rent_rate`/`tr_own_rate`, regional totals,
+#'   map categories, and a `popup` field for use with `leaflet`.
+#' @seealso `vignette("affordability-index")`, [ntdf()]
 #' @examples \dontrun{
 #' bay5 <- afford("06", c("001", "013", "041", "075", "081"), .5, 2024)
 #' wasatch5 <- afford("49", c('057', '011', '035', '049'), .5, 2024, geometry = TRUE)

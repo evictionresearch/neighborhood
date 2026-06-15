@@ -1,6 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^data-raw$
+^dev$
 ^\.github$
 ^\.DS_Store$
 ^.*\.DS_Store$

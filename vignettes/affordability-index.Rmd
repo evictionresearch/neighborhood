@@ -1,0 +1,174 @@
+---
+title: "The Affordability Index: methodology and interpretation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Affordability Index: methodology and interpretation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+## What the index is for
+
+The affordability index answers one question at the census-tract scale:
+
+> **For households at a given income level, how much of a tract's housing is within reach,
+> and how does that compare to the region's share of households at that income level?**
+
+It is the housing-supply counterpart to the Eviction Research Network's displacement and
+eviction-risk models. Conceptually it supports the *highways of migration* idea: people priced
+out of one place can only move to the few places that can actually house them. The index maps
+where that affordable housing is — and, by comparing supply to the regional count of
+same-income households, where it is scarce relative to need.
+
+> **Note — two implementations.** `afford_index()` is the rebuilt v2 engine and the recommended
+> entry point: it fixes the AMI basis (county median *family* income), interpolates within income
+> brackets, supports standardized ELI/VLI/LI/MI tiers and household sizes, and offers both owner
+> cost bases (current cost vs. cost to buy in). `afford()` is the original, kept for backward
+> compatibility. This vignette documents the legacy `afford()`; see `?afford_index` and the design
+> notes in `dev/affordability-index-design.md` for v2.
+
+`afford()` is the original implementation. **Read the "Assumptions and known limitations"
+section below before using its output in a report** — the ownership numbers in particular carry a
+hard-coded interest-rate assumption, and a fuller methodological review with a remediation plan
+lives in [`dev/affordability-index-review.md`](https://github.com/evictionresearch/neighborhood).
+
+## Quick start
+
+```{r}
+library(neighborhood)
+
+# 5-county Bay Area, households at 50% of Area Median Income, 2024 ACS
+bay <- afford(
+  state    = "06",
+  counties = c("001", "013", "041", "075", "081"),
+  ami_limit = 0.5,
+  year     = 2024
+)
+
+# With tract geometry for mapping (returns an sf object)
+wasatch <- afford(
+  state    = "49",
+  counties = c("011", "035", "049", "057"),
+  ami_limit = 0.5,
+  year     = 2024,
+  geometry = TRUE
+)
+```
+
+`ami_limit` is the income level of interest as a fraction of Area Median Income: `0.3` ≈
+extremely low income, `0.5` ≈ very low income, `0.8` ≈ low income. **Use FIPS codes** for
+`state` and `counties` (e.g. `"06"`, `"041"`), not names — see limitations.
+
+## How it is calculated
+
+For a chosen income level `ami_limit`, the index is built in four steps.
+
+### 1. Set the income threshold
+
+```
+AMI        = median of tract median household incomes in the region   (B19013_001)
+threshold  = ami_limit * AMI                                          (e.g. 0.5 * AMI)
+```
+
+All affordability is judged against this single regional `threshold`.
+
+### 2. Translate housing costs into the income needed to afford them
+
+Each housing-cost bracket from the ACS is converted into the household income required to
+afford it without spending more than **30%** of income on housing:
+
+| Tenure | Source | Cost → required income |
+|---|---|---|
+| **Rental** | gross rent, `B25063` | `income = (monthly_rent / 0.30) * 12` |
+| **Ownership** | value `B25075` + price asked `B25085` | `income = price * 0.188` |
+
+The rental rule is the standard 30%-of-gross-rent affordability test. The ownership factor
+`0.188` is a *fixed* approximation of the income needed to carry a home of a given price (see
+limitations — it embeds an interest-rate assumption).
+
+### 3. Count what each tract offers the income group
+
+Within each tract, a unit is **accessible** to the group if the income it requires is at or
+below the `threshold`. The index then forms, per tract and per tenure:
+
+```
+supply = accessible_units / total_units_in_tract
+       = "what share of this tract's stock is affordable to the group"
+```
+
+### 4. Compare supply to regional need
+
+Let `class_prop` be the region's share of households at or below the threshold. Then:
+
+```
+ratio = supply / class_prop
+      = location quotient: >1 means the tract carries MORE than its
+        "fair share" of affordable housing for this income group; <1 means less
+
+rate  = (accessible_units / regional_group_households) * 100000
+      = accessible units per 100,000 of the region's same-income households
+```
+
+`ratio` is the analytical heart of the index — it is the same idea the EDR reports lead with
+("fewer than one affordable rental unit per three extremely-low-income households").
+
+## Reading the output
+
+`afford()` returns one row per tract. The most useful columns:
+
+| Column | Meaning |
+|---|---|
+| `tr_rent_total`, `tr_own_total` | rental / owned units in the tract |
+| `tr_rent_accessible`, `tr_own_accessible` | units affordable to the income group |
+| `tr_rent_supply`, `tr_own_supply` | accessible ÷ total (share affordable) |
+| `tr_rent_ratio`, `tr_own_ratio` | supply ÷ regional group share (**location quotient**) |
+| `tr_rent_rate`, `tr_own_rate` | accessible per 100k regional group-households |
+| `reg_total_pop`, `reg_class_pop` | region households (all / in the income group) |
+| `ami_limit` | the income level used |
+| `*_cat` | 3-class map categories (fixed cut points) |
+| `popup` | preformatted HTML for `leaflet` maps |
+
+A simple read: tracts with **`ratio` well above 1** are the region's affordable-housing
+reservoirs for that income group; tracts with **`ratio` near 0** cannot house the group at all.
+Overlaying low-`ratio` tracts with displacement-risk tracts reveals the migration squeeze the
+theory predicts — *nowhere affordable to move that isn't already under pressure.*
+
+## Assumptions and known limitations
+
+These are summarized here so results are not over-read; the full treatment and fixes are in
+`dev/affordability-index-review.md`.
+
+1. **Ownership affordability embeds a fixed interest rate.** The `0.188` factor corresponds to a
+   ~3.8%, 30-year, 0%-down mortgage with no taxes/insurance. At 2024 rates (~7%) it **overstates**
+   ownership affordability by roughly 30–40%. Treat `tr_own_*` columns as provisional.
+2. **"AMI" is the median of tract medians**, not HUD AMI and not a population-weighted regional
+   median. It also collapses multi-county regions into a single cutoff.
+3. **Occupied stock, not availability.** The index scores the affordability of *existing* units,
+   not whether units are *vacant/available to move into*. A tract can be "affordable" yet have
+   nowhere to actually go.
+4. **Price/value mixes two census universes** (owner-occupied value + vacant-for-sale price asked).
+5. **No non-price barriers.** Discrimination, voucher rejection, and eviction-record/credit
+   screening ("the scarlet E") are not represented — though they are central to who can *actually*
+   move where.
+6. **Margins of error are dropped.** Small-denominator tracts (e.g. 1 of 2 units affordable) are
+   presented with the same confidence as large ones.
+7. **Inputs must be FIPS codes.** Passing `state = "CA"` / `county = "Marin"` (names) returns an
+   empty internal join and silently distorts the regional totals.
+
+## Data sources
+
+All inputs are American Community Survey 5-year estimates via `tidycensus::get_acs()`; a
+`CENSUS_API_KEY` must be set. Tables used: `B19013` (median income), `B19001` (income
+distribution), `B25075`/`B25085` (owner value / price), `B25063` (gross rent). Geometry, when
+requested, comes from `tigris::tracts()`.
+
+## See also
+
+- `dev/affordability-index-review.md` — full methodological review and remediation plan.
+- `evictionresearch/library/code/d_calc_ami_incomplete.R` — the organization's HUD-style AMI tier
+  engine (county AMI + within-bracket interpolation) that future versions should build on.
+- `ntdf()` — neighborhood racial typologies, joinable to the index on `GEOID` for equity analysis.

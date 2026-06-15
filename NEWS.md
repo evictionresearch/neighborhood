@@ -1,3 +1,41 @@
+# neighborhood (development version)
+
+## New features
+
+* `afford_index()` — rebuilt tract-level affordability index (Phase 1, "Afford"
+  gate). Successor to `afford()` with the methodology fixes from the review:
+  AMI from county median **family** income (`B19113`); income brackets parsed
+  from ACS variable **labels** (not positional `rep()`); **within-bracket linear
+  interpolation** (no `closest()` snapping); standardized ELI/VLI/LI/MI tiers and
+  HUD family-size adjustment (1–8, default 4); FIPS **or** name inputs; and three
+  owner/renter cost models — `rent` (gross rent), `own_current` (basis A, current
+  monthly owner cost), and `own_buyin` (basis B, income needed to buy in today
+  via an explicit, parameterized mortgage model). Returns a tidy long table with
+  `supply`, `ratio` (location quotient), and `rate` per tract × tenure × tier.
+* `ami_cutoffs()` — county AMI and tier income ceilings (the demand-side engine).
+* `ami_source = "hud"` pulls official HUD income limits (validated cell-by-cell
+  against the live API: e.g. San Diego FY2024 VLI(4) = $75,750, ELI(4) = $45,450).
+  ELI/VLI/LI use HUD's per-household-size limits (caps/floors/high-cost baked in);
+  the path is snapshot-first with live-API fallback and never leaks the API key
+  on error. Needs the `hudr` package (now in Suggests) + `HUD_API_KEY`.
+* `data-raw/build_hud_il.R` builds a bundled national `hud_il_<year>` snapshot so
+  the `"hud"` path works offline once committed (longevity insurance).
+* `ami_source = "hud_acs"` (full HUD-cascade reproduction) still fails fast with
+  guidance; arrives next (see `dev/hud-income-limits-architecture.md`).
+
+## Documentation
+
+* New vignette `affordability-index` documenting the `afford()` methodology,
+  output schema, and known limitations.
+* `afford()` roxygen rewritten: corrected `@return` (a data frame is returned
+  unless `geometry = TRUE`), documented every output column, the 30%-rule and
+  AMI threshold math, and the major caveats (the `0.188` ownership factor's
+  embedded interest-rate assumption; median-of-tract-medians AMI; occupied-stock
+  vs. availability; FIPS-only inputs).
+* Added `dev/affordability-index-review.md`: a full methodological review of the
+  affordability index with a prioritized remediation plan and a proposed R
+  package design. (Build-ignored; not shipped.)
+
 # neighborhood 1.0.6
 
 ## Bug fixes
