@@ -1,7 +1,7 @@
 Package: neighborhood
 Type: Package
 Title: Neighborhood analysis functions
-Version: 1.0.6
+Version: 1.1.0
 Authors@R: c(
     person(given = "Tim",
            family = "Thomas",
@@ -13,7 +13,10 @@ Authors@R: c(
     )
 Description: This package features several neighborhood research functions in
     relation to racial segregation, housing market trends, and residential
-    mobility.
+    mobility. It also provides a small, customizable toolkit for building
+    interactive MapLibre GL maps of census-tract data (legends, labels, popups,
+    and PMTiles vector tiles), built on the 'mapgl' and 'tidycensus' packages by
+    Kyle Walker. Mapping functions are deterministic and require no AI to run.
 License: MIT + file LICENSE
 URL: https://github.com/evictionresearch/neighborhood
 BugReports: https://github.com/evictionresearch/neighborhood/issues
@@ -28,15 +31,22 @@ Imports:
     sf,
     tigris,
     leaflet,
+    mapgl (>= 0.4.0),
+    echarts4r (>= 0.4.0),
     scales,
     stringr,
     purrr,
-    stats
-RoxygenNote: 7.3.3
+    grDevices,
+    stats,
+    utils,
+    htmlwidgets
+Roxygen: list(markdown = TRUE)
 Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
     hudr
+SystemRequirements: tippecanoe (optional, for building PMTiles vector tiles)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

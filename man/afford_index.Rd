@@ -65,15 +65,15 @@ Affordability uses a 30\%-of-income rule throughout. For each tenure a tract's
 housing-cost brackets (parsed from ACS labels) are compared to the tier's
 income ceiling:
 \itemize{
-  \item \code{"rent"}: gross rent (\code{B25063}); affordable if
-    \code{rent <= income_cutoff * 0.30 / 12}.
-  \item \code{"own_current"} (basis A, default): current selected monthly
-    owner cost (\code{B25094}); same 30\% rule as rent. Describes the
-    affordability of the existing owned stock as currently financed.
-  \item \code{"own_buyin"} (basis B): home value (\code{B25075}) converted to
-    the income needed to \emph{buy in today} via an explicit mortgage model
-    (\code{interest_rate}, \code{term_years}, \code{down_pct},
-    \code{tax_ins_rate}). Answers "could a mover afford to buy here now?".
+\item \code{"rent"}: gross rent (\code{B25063}); affordable if
+\code{rent <= income_cutoff * 0.30 / 12}.
+\item \code{"own_current"} (basis A, default): current selected monthly
+owner cost (\code{B25094}); same 30\% rule as rent. Describes the
+affordability of the existing owned stock as currently financed.
+\item \code{"own_buyin"} (basis B): home value (\code{B25075}) converted to
+the income needed to \emph{buy in today} via an explicit mortgage model
+(\code{interest_rate}, \code{term_years}, \code{down_pct},
+\code{tax_ins_rate}). Answers "could a mover afford to buy here now?".
 }
 Counts use linear interpolation within brackets; open-topped brackets count
 only when fully below the cutoff. Per tract/tenure/tier the function returns

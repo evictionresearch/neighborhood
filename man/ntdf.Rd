@@ -33,7 +33,9 @@ ntdf(
 \item{...}{Other keyword arguments}
 }
 \value{
-A dataframe of racial segregated neighborhoods
+A dataframe of racial segregated neighborhoods. When
+\code{geometry = TRUE}, an \code{sf} object you can map directly with \code{\link[=nt_map]{nt_map()}} /
+\code{\link[=nt_add_choropleth]{nt_add_choropleth()}}.
 }
 \description{
 Drawn from Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. “Neighborhood Foreclosures, Racial/Ethnic Transitions, and Residential Segregation.” American Sociological Review 80:526–549.
@@ -42,5 +44,13 @@ Drawn from Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. “Neighborhood Fo
 \dontrun{
 Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
 dplyr::glimpse(Baltimore_nt)
+
+# Map it in one line
+nt_map(Baltimore_nt)
 }
+}
+\seealso{
+\code{\link[=ntcheck]{ntcheck()}} to tabulate the types, \code{\link[=nt_pal]{nt_pal()}} for leaflet colors,
+\code{\link[=nt_map]{nt_map()}} / \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} to map them, and the bundled
+\link{us_nt_tracts2024} for a precomputed national table.
 }

@@ -1,4 +1,5 @@
 #' @importFrom dplyr %>%
+#' @importFrom dplyr .data
 NULL
 
 utils::globalVariables(c(

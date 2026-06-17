@@ -2,18 +2,30 @@
 % Please edit documentation in R/ntcheck.R
 \name{ntcheck}
 \alias{ntcheck}
-\title{Investigate possible concatenation}
+\title{Tabulate neighborhood types}
 \usage{
 ntcheck(df, ...)
 }
 \arguments{
-\item{df}{\code{ntdf} created dataframe}
+\item{df}{A data frame created by \code{\link[=ntdf]{ntdf()}} (must contain a \code{NeighType}
+column).}
 
-\item{...}{Other keyword arguments}
+\item{...}{Unused; present for backward compatibility.}
 }
 \value{
-Frequncy table of each neighborhood type
+A data frame with one row per \code{NeighType} and its count \code{n}, ordered
+by descending frequency.
 }
 \description{
-Investigate possible concatenation
+Counts how many tracts fall into each \code{NeighType}, sorted from most to least
+common. Use it after \code{\link[=ntdf]{ntdf()}} to see which fine-grained types are rare enough
+to be worth collapsing — the \code{nt_conc} column already does a default
+concatenation, and this table helps you decide whether to go further.
+}
+\examples{
+ntcheck(us_nt_tracts2024)
+}
+\seealso{
+\code{\link[=ntdf]{ntdf()}} to create the input, \code{\link[=nt_pal]{nt_pal()}} / \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} to
+map the result.
 }

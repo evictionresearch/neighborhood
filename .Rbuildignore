@@ -9,3 +9,9 @@
 ^\.claude$
 ^LICENSE\.md$
 ^cran-comments\.md$
+^_pkgdown\.yml$
+^docs$
+^.*\.tar\.gz$
+^\.gitignore$
+^\.plan$
+^plan\.md$

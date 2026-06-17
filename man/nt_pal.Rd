@@ -2,18 +2,41 @@
 % Please edit documentation in R/nt_pal.R
 \name{nt_pal}
 \alias{nt_pal}
-\title{Suggested Color Palette}
+\title{Neighborhood-typology color palette (for leaflet)}
 \usage{
 nt_pal(df, ...)
 }
 \arguments{
-\item{df}{ntdf object}
+\item{df}{An \code{ntdf()}-created data frame containing an \code{nt_conc} factor.}
 
-\item{...}{Other keyword arguments}
+\item{...}{Unused; present for backward compatibility.}
 }
 \value{
-Returns a factored color palette
+A \code{leaflet} palette function (the result of \code{\link[leaflet:colorFactor]{leaflet::colorFactor()}})
+that maps \code{nt_conc} levels to hex colors, with grey (\verb{#C0C0C0}) for \code{NA}.
 }
 \description{
-Suggested Color Palette
+Returns a \code{\link[leaflet:colorFactor]{leaflet::colorFactor()}} palette mapping the 19 concatenated
+neighborhood-typology levels in the \code{nt_conc} column (created by \code{\link[=ntdf]{ntdf()}})
+to the Eviction Research Network house colors. Use it to color a \code{leaflet}
+choropleth of typologies.
+
+For \strong{MapLibre} maps, you do not need this function: \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}
+applies the same color key automatically when it detects an \code{nt_conc}
+column. Both paths read from one internal color vector, so they always
+agree.
+}
+\examples{
+\dontrun{
+md <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+pal <- nt_pal(md)
+leaflet::leaflet(md) |>
+  leaflet::addPolygons(fillColor = ~pal(nt_conc), fillOpacity = 0.7,
+                       weight = 0.3, color = "#ffffff") |>
+  leaflet::addLegend(pal = pal, values = ~nt_conc)
+}
+}
+\seealso{
+\code{\link[=ntdf]{ntdf()}} to create the data, \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} for the MapLibre
+equivalent, and \code{\link[leaflet:colorFactor]{leaflet::colorFactor()}}.
 }

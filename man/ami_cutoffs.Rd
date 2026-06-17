@@ -35,7 +35,7 @@ default \code{4}. Use \code{NULL} to leave AMI unadjusted (4-person basis).}
 }
 \value{
 A tibble with one row per county: \code{GEOID}, \code{NAME}, \code{ami}, and one
-\code{cut_<TIER>} income-ceiling column per tier.
+\verb{cut_<TIER>} income-ceiling column per tier.
 }
 \description{
 Returns each study county's Area Median Income (AMI) and the income ceilings

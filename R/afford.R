@@ -233,9 +233,6 @@ afford <- function(
            reg_class_pop = class_pop,
            ami_limit = ami_limit)
 
-# max_rent <- max(tract_counts$tr_rent_rate, na.rm = TRUE)/100000
-# max_own <- max(tract_counts$tr_own_rate, na.rm = TRUE)/100000
-
   tract_counts <-
     tract_counts %>%
     dplyr::mutate(
@@ -296,14 +293,8 @@ afford <- function(
       )
 
 if(geometry == TRUE){
-  print("Return sf dataframe")
   tigris::tracts(state = state, county = counties, cb = TRUE, year = year) %>% dplyr::left_join(tract_counts) %>% sf::st_transform(crs = 4326)
 } else {
-  print("Return dataframe")
   return(tract_counts)
 }
 }
-
-# marin_co_afford <- afford("CA", "Marin", .8, year = 2022)
-# marin_co_afford %>% glimpse()
-# marin_co_afford %>% summary()

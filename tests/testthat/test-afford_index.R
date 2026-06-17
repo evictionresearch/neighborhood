@@ -15,7 +15,10 @@ test_that(".afi_interp_le interpolates and handles open-top brackets", {
 })
 
 test_that(".afi_mortgage_constant matches the closed-form annuity", {
-  expect_equal(neighborhood:::.afi_mortgage_constant(0.06, 30), 0.071935, tolerance = 1e-4)
+  # Correct closed-form annual mortgage constant 12 * (i / (1 - (1 + i)^-n)) for
+  # i = 0.06/12, n = 360 is 0.0719461; the prior literal 0.071935 was imprecise
+  # and exceeded the 1e-4 relative tolerance under testthat edition 3.
+  expect_equal(neighborhood:::.afi_mortgage_constant(0.06, 30), 0.0719461, tolerance = 1e-4)
   # zero-interest fallback is 1/term
   expect_equal(neighborhood:::.afi_mortgage_constant(0, 30), 1/30)
 })
@@ -23,7 +26,7 @@ test_that(".afi_mortgage_constant matches the closed-form annuity", {
 test_that(".afi_price_income_factor composes mortgage + taxes over the burden", {
   f <- neighborhood:::.afi_price_income_factor(0.06, 30, down_pct = 0.20,
                                                tax_ins_rate = 0.0125, burden = 0.30)
-  expect_equal(f, ((0.80 * 0.071935) + 0.0125) / 0.30, tolerance = 1e-4)
+  expect_equal(f, ((0.80 * 0.0719461) + 0.0125) / 0.30, tolerance = 1e-4)
   # higher rates -> need more income per dollar of price
   expect_gt(neighborhood:::.afi_price_income_factor(0.07),
             neighborhood:::.afi_price_income_factor(0.04))

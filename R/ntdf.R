@@ -8,10 +8,18 @@
 #' @param output Default "wide", other option is "tidy"
 #' @param year Default "NULL"
 #' @param ... Other keyword arguments
-#' @return A dataframe of racial segregated neighborhoods
+#' @return A dataframe of racial segregated neighborhoods. When
+#'   `geometry = TRUE`, an `sf` object you can map directly with [nt_map()] /
+#'   [nt_add_choropleth()].
+#' @seealso [ntcheck()] to tabulate the types, [nt_pal()] for leaflet colors,
+#'   [nt_map()] / [nt_add_choropleth()] to map them, and the bundled
+#'   [us_nt_tracts2024] for a precomputed national table.
 #' @examples \dontrun{
 #' Baltimore_nt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
 #' dplyr::glimpse(Baltimore_nt)
+#'
+#' # Map it in one line
+#' nt_map(Baltimore_nt)
 #' }
 #' @export
 

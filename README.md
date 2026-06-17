@@ -71,4 +71,83 @@ ntcheck(ps_nt)
 The `nt_conc` field concatenates the `NeighType` field automatically and may satisfy most people. 
 
 ## Get County and PUMA cross sections
-The `get_co_puma` function defines the county associated with a PUMA. In some cases, multiple PUMAs fall within one county, such as in urban areas. In other situations, multiple counties may fall within one PUMA, such as in rural situations. Tracts nest within PUMAs so this
+The `get_co_puma` function defines the county associated with a PUMA. In some cases, multiple PUMAs fall within one county, such as in urban areas. In other situations, multiple counties may fall within one PUMA, such as in rural situations. Tracts nest within PUMAs so this crosswalk lets you aggregate tract- or PUMA-level data to counties.
+
+## Interactive maps (MapLibre)
+
+The package includes a small, customizable toolkit for building interactive
+[MapLibre GL](https://maplibre.org/) maps of neighborhood data — the same kind
+of maps used in the Eviction Research Network state profiles (HPRM, Minnesota,
+Washington), with legends, labels, popups, and (for large data) PMTiles vector
+tiles. It is a deterministic tool: plain R, no AI required to run it.
+
+A map is one line:
+
+``` r
+library(neighborhood)
+
+balt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+nt_map(balt)   # typologies, colored, with legend + popup + controls
+```
+
+![A choropleth map of Baltimore City census tracts colored by neighborhood typology, with a legend, basemap, and address search box.](man/figures/README-map.png)
+
+…and composes up to whatever you need:
+
+``` r
+nt_maplibre(balt) |>
+  nt_add_choropleth(balt, "nt_conc", legend = "interactive") |>
+  nt_add_labels(balt, "NAME", min_zoom = 11)
+```
+
+| Function | Purpose |
+|---|---|
+| `nt_map()` | One-line map of an `sf` layer |
+| `nt_maplibre()` | Start a map (basemap, controls, fit to data) |
+| `nt_add_choropleth()` | Add a colored layer + legend + popup/tooltip |
+| `nt_add_labels()` | Add text labels |
+| `nt_popup()` | Build deterministic HTML popups |
+| `nt_pmtiles()` | Build PMTiles for large/full-US data |
+
+Maps accept an `sf` object **or** a path to a shapefile / GeoJSON / GeoPackage
+(or an `sfc` / `sp` / `terra` object) — everything is normalized to `sf`.
+
+See `vignette("mapping-with-maplibre")` for the full tutorial (from a one-liner
+to HPRM-style rich popups) and `vignette("neighborhood-typologies")` for the
+typology workflow.
+
+## Interactive charts (echarts)
+
+`nt_chart()` builds the editorial trend/bar charts from the state profiles, where
+**hovering reveals the y-axis** (a crosshair prints the value on the axis at the
+cursor) plus a tooltip — with one-argument baselines, shaded bands, and a
+highlighted latest point. `nt_spark()` makes inline sparklines.
+
+``` r
+filings <- data.frame(month = seq(as.Date("2019-01-01"), by = "month", length.out = 72),
+                      filings = round(1000 + 250 * sin(seq_len(72) / 6)))
+nt_chart(filings, "month", "filings", type = "line",
+         baseline = mean(filings$filings[1:12]), baseline_label = "2019 avg",
+         highlight_last = TRUE)
+```
+
+![An editorial trend line shown mid-hover: a red crosshair tracks the cursor and prints the value on the y-axis, alongside a tooltip, the dashed baseline, and the accented latest point.](man/figures/README-chart.png)
+
+See `vignette("interactive-charts")` for the full tour.
+
+## Credits
+
+Census data come from [**tidycensus**](https://walker-data.com/tidycensus/) and
+the interactive maps are built on [**mapgl**](https://walker-data.com/mapgl/),
+both by [Kyle Walker](https://walker-data.com/). His book,
+[*Analyzing US Census Data*](https://walker-data.com/census-r/), is an excellent
+companion. PMTiles are built with
+[tippecanoe](https://github.com/felt/tippecanoe). The interactive charts are
+built on [**echarts4r**](https://echarts4r.john-coene.com/) by
+[John Coene](https://john-coene.com/) (bundling Apache ECharts).
+
+For transparency: the MapLibre mapping functions (`nt_map()`, `nt_maplibre()`,
+`nt_add_choropleth()`, `nt_add_labels()`, `nt_popup()`, `nt_pmtiles()`) and the
+chart functions (`nt_chart()`, `nt_spark()`) were designed and implemented with
+the assistance of **Claude Opus 4.8** (Anthropic). They are deterministic R code
+and require no AI to operate.

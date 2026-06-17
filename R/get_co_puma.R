@@ -4,6 +4,8 @@
 #' @param yr PUMA year Default "NULL"
 #' @param ... Other keyword arguments
 #' @return A data frame of PUMA and county FIPS codes
+#' @seealso [ntdf()] for tract-level typologies and [tidycensus::get_pums()] for
+#'   the PUMS microdata these crosswalks pair with (both by Kyle Walker).
 #' @examples \dontrun{
 #' devtools::install_github("timathomas/neighborhood", ref = "main")
 #' #

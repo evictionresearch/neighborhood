@@ -31,8 +31,8 @@ map categories, and a \code{popup} field for use with \code{leaflet}.
 \code{afford()} identifies, for a given income group, how much of each census tract's
 housing stock is affordable, and compares that supply to the region's share of
 households in the same income group. It returns a per-tract supply measure, a
-supply-to-demand location quotient (\code{*_ratio}), and an accessible-units rate
-(\code{*_rate}) for both rental and owner-occupied housing. See
+supply-to-demand location quotient (\verb{*_ratio}), and an accessible-units rate
+(\verb{*_rate}) for both rental and owner-occupied housing. See
 \code{vignette("affordability-index")} for the full methodology and
 \code{dev/affordability-index-review.md} for known limitations and the remediation plan.
 }
@@ -43,9 +43,9 @@ For the requested income level the regional income threshold is
 afford it under a 30\%-of-income rule: rentals via
 \code{(monthly_rent / 0.30) * 12} (\code{B25063}), ownership via \code{price * 0.188}
 (\code{B25075} + \code{B25085}). A unit is "accessible" if its required income is at or
-below the threshold. Per tract the function reports \code{*_supply}
-(accessible / total), \code{*_ratio} (supply divided by the region's share of
-group households), and \code{*_rate} (accessible units per 100,000 group households).
+below the threshold. Per tract the function reports \verb{*_supply}
+(accessible / total), \verb{*_ratio} (supply divided by the region's share of
+group households), and \verb{*_rate} (accessible units per 100,000 group households).
 
 Known caveats (see the review document for fixes): the \code{0.188} ownership factor
 embeds a fixed ~3.8\% mortgage assumption and overstates ownership affordability

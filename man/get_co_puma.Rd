@@ -97,3 +97,7 @@ study_pums_head <-
 data.frame(study_pums_head)
 }
 }
+\seealso{
+\code{\link[=ntdf]{ntdf()}} for tract-level typologies and \code{\link[tidycensus:get_pums]{tidycensus::get_pums()}} for
+the PUMS microdata these crosswalks pair with (both by Kyle Walker).
+}

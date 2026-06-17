@@ -1,6 +1,58 @@
-# neighborhood (development version)
+# neighborhood 1.1.0 (development version)
 
 ## New features
+
+* **Interactive MapLibre mapping.** A new, deterministic toolkit for building
+  interactive MapLibre GL maps of neighborhood data — the same kind of maps used
+  in the Eviction Research Network state profiles (HPRM, Minnesota, Washington),
+  with choropleths, legends, labels, popups, and PMTiles vector tiles for
+  large/full-US data. The API scales from a one-liner to full composition:
+    - `nt_map()` — one-line map of an `sf` layer.
+    - `nt_maplibre()` — start an ERN-styled map (OpenFreeMap basemap, control
+      set with address search, fit-to-data).
+    - `nt_add_choropleth()` — the workhorse: colors features by a column
+      (categorical typologies use the `nt_pal()` key automatically; numeric
+      columns use the ERN sequential ramp) and adds a matching legend, hover
+      tooltip, and click popup. Draws inline for small layers and switches to
+      PMTiles for large ones.
+    - `nt_add_labels()` — text labels at interior points.
+    - `nt_popup()` — deterministic HTML popups, from a simple field table up to
+      the HPRM-style race bars / bubble tracks (see the tutorial).
+    - `nt_pmtiles()` — build a PMTiles archive from `sf` via `tippecanoe`.
+
+  Built on [mapgl](https://walker-data.com/mapgl/) by Kyle Walker; every `nt_*`
+  function returns an ordinary `mapgl` map, so you can drop to raw `mapgl` at any
+  point. Maps are `htmlwidgets` and save to standalone HTML with
+  `htmlwidgets::saveWidget()`. `mapgl` is now a hard dependency (`Imports`);
+  `tippecanoe` is an optional system requirement used only for PMTiles.
+
+  For transparency, this mapping toolkit was designed and implemented with the
+  assistance of **Claude Opus 4.8** (Anthropic). The functions are deterministic
+  and require no AI to run.
+
+* **Interactive charts.** `nt_chart()` and `nt_spark()` build the editorial
+  "newspaper graphic" charts used in the state profiles — trend lines, bars,
+  multi-series, and sparklines — where **hovering reveals the y-axis** (a
+  crosshair prints the value on the axis at the cursor) plus a tooltip, with
+  one-argument support for a dashed baseline, a shaded band (e.g. a moratorium
+  window), and a highlighted latest point. Built on
+  [echarts4r](https://echarts4r.john-coene.com/) (John Coene) / Apache ECharts
+  (now an `Imports` dependency); returns the raw `echarts4r` widget so you can
+  keep piping `e_*` functions. Also developed with the assistance of Claude Opus
+  4.8.
+
+* The mapping functions now accept **user-supplied spatial inputs** beyond a
+  pre-built `sf` object: a path to a shapefile / GeoJSON / GeoPackage, a bare
+  `sfc` geometry, or an `sp`/`terra` object — all normalized to `sf` (the
+  canonical representation) and re-projected to WGS84 as needed.
+
+* New vignettes: `mapping-with-maplibre` (a full tutorial from a one-line map up
+  to HPRM-style rich popups and full-US PMTiles), `interactive-charts`, and
+  `neighborhood-typologies` (the `ntdf()` -> `ntcheck()` -> map workflow).
+
+* `nt_pal()` now reads from a single shared internal color key, so the leaflet
+  palette and the MapLibre typology colors can never drift apart. `ntcheck()`
+  documentation expanded.
 
 * `afford_index()` — rebuilt tract-level affordability index (Phase 1, "Afford"
   gate). Successor to `afford()` with the methodology fixes from the review:

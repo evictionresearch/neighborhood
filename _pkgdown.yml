@@ -2,3 +2,47 @@ url: ~
 template:
   bootstrap: 5
 
+reference:
+  - title: Neighborhood typologies
+    desc: Build and summarize tract-level racial/ethnic typologies.
+    contents:
+      - ntdf
+      - ntcheck
+      - nt_pal
+      - us_nt_tracts2024
+  - title: Affordability index
+    desc: Tract-level housing affordability relative to area median income.
+    contents:
+      - afford_index
+      - ami_cutoffs
+      - afford
+  - title: Mapping (MapLibre)
+    desc: >
+      Build interactive MapLibre GL maps of neighborhood data — choropleths,
+      legends, labels, popups, and PMTiles. Built on Kyle Walker's mapgl.
+    contents:
+      - nt_map
+      - nt_maplibre
+      - nt_add_choropleth
+      - nt_add_labels
+      - nt_popup
+      - nt_pmtiles
+  - title: Charts (interactive)
+    desc: >
+      Interactive editorial charts (trend lines, bars, sparklines) where hovering
+      reveals the y-axis. Built on John Coene's echarts4r.
+    contents:
+      - nt_chart
+      - nt_spark
+  - title: Crosswalks
+    contents:
+      - get_co_puma
+
+articles:
+  - title: Articles
+    navbar: ~
+    contents:
+      - mapping-with-maplibre
+      - interactive-charts
+      - neighborhood-typologies
+      - affordability-index
