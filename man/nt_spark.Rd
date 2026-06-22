@@ -40,6 +40,17 @@ nt_spark(c(3, 5, 4, 6, 8, 7, 9, 12), type = "bar")
 \code{\link[=nt_chart]{nt_chart()}} for full charts.
 
 Other ern_charts:
-\code{\link[=nt_chart]{nt_chart()}}
+\code{\link[=ern_palette]{ern_palette()}},
+\code{\link[=nt_bar]{nt_bar()}},
+\code{\link[=nt_chart]{nt_chart()}},
+\code{\link[=nt_dumbbell]{nt_dumbbell()}},
+\code{\link[=nt_lollipop]{nt_lollipop()}},
+\code{\link[=nt_range]{nt_range()}},
+\code{\link[=nt_scatter]{nt_scatter()}},
+\code{\link[=nt_slope]{nt_slope()}},
+\code{\link[=nt_stacked_bar]{nt_stacked_bar()}},
+\code{\link[=nt_waffle]{nt_waffle()}},
+\code{\link{scale_ern}},
+\code{\link[=theme_ern]{theme_ern()}}
 }
 \concept{ern_charts}

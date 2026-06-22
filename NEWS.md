@@ -2,6 +2,49 @@
 
 ## New features
 
+* **A gallery of editorial chart types.** Seven new `echarts4r`-backed functions
+  extend the "newspaper graphic" look (minimal axes, `yaxis = "hover"`, accent
+  highlight, direct labels, dark tooltip, `source` credit) beyond trend lines to
+  the rest of the forms the Eviction Research Network publishes — with a bias
+  toward the racial-disparity comparisons that are the org's specialty:
+    - `nt_bar()` — ranked / horizontal bars (top-N counties by rate), with
+      `diverging` (above/below a reference) and `group` (dodged) variants.
+    - `nt_lollipop()` — the leaner dot-plot ranking (e.g. rates indexed to the
+      white rate), with an optional stem.
+    - `nt_dumbbell()` — two dots joined by a connector: the core disparity idiom
+      (Black vs. white rate by county; 2019 vs. 2024), sorted by the gap.
+    - `nt_range()` — ranked estimate + error-bar (a dot with a whisker for an ACS
+      margin of error or explicit low/high bounds), so survey-based disparity
+      comparisons show the interval, not just the point.
+    - `nt_stacked_bar()` — composition / 100%-stacked bars (tenure by race,
+      rent-burden by AMI, racial composition) with in-bar share labels.
+    - `nt_slope()` — slope chart for before/after change, with direct end labels.
+    - `nt_scatter()` — scatter with an optional linear trend line.
+    - `nt_waffle()` — a unit / "data portrait" chart in the spirit of W.E.B.
+      Du Bois (one square per share of the whole).
+
+* **A ggplot2 kit for the static (print/PDF) artifacts.** `theme_ern()` plus
+  `scale_color_ern()` / `scale_fill_ern()` (discrete; `palette = "typology"` for
+  the 19 neighborhood-typology colors), their `_c` continuous counterparts, and
+  `ern_palette()` to expose the house colors — so the same design language
+  reproduces the report and paper figures, not just the interactive widgets.
+  `ggplot2` is now an `Imports` dependency.
+
+* **Honest, consistent charts.** Filled bars (`nt_bar`, `nt_stacked_bar`) now
+  always start at zero, `nt_range` extends its axis so confidence whiskers can't
+  be clipped, and composition palettes scale to 6–7 categories without recycling
+  colors. The chart family shares one argument vocabulary — `palette` for colors,
+  `value_labels` for direct labels, identical `value_fmt` options — with
+  deprecated aliases (`nt_dumbbell(colors=)`, `nt_waffle(n=)`) that warn.
+  `nt_chart()` now stacks areas (not just bars), currency formats as `-$100`, and
+  `nt_scatter()` accepts a `Date` x (time axis). Map coloring degrades gracefully
+  on low-variance / all-missing columns instead of erroring cryptically.
+
+* **Exhaustive vignettes.** All six articles were expanded to document every
+  function from the basic one-call form up through each argument, with
+  per-function reference tables — including `afford_index()`/`ami_cutoffs()` and
+  `get_co_puma()`, which previously appeared in no tutorial.
+
 * **Bundled dataset.** `mn_evictions` (Minnesota county-month eviction filings,
   the public data behind the state profile, with race breakdowns) — documented
   and ready to plot.
@@ -27,9 +70,13 @@
 * New articles: `interactive-charts` (refreshed — replicates the Minnesota
   profile charts from `mn_evictions`, demonstrates `yaxis = "hover"` and the
   editorial end-label/line-style/source touches, and pulls Apartment List rent
-  data from a URL to chart regional rents) and `precarity-mapping` (an advanced
-  tutorial that builds a precarity-style interactive map — switchable risk
-  layers, a threshold slider, and rich popups — entirely from public data).
+  data from a URL to chart regional rents); `chart-gallery` (the ranked,
+  disparity, and composition chart forms — `nt_bar`/`nt_lollipop`/`nt_dumbbell`/
+  `nt_range`/`nt_stacked_bar`/`nt_slope`/`nt_scatter`/`nt_waffle` plus the
+  `theme_ern` static kit — all built from `mn_evictions`); and `precarity-mapping`
+  (an advanced tutorial that builds a precarity-style interactive map —
+  switchable risk layers, a threshold slider, and rich popups — entirely from
+  public data).
 
 * **Interactive MapLibre mapping.** A new, deterministic toolkit for building
   interactive MapLibre GL maps of neighborhood data — the same kind of maps used

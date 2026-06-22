@@ -9,6 +9,10 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
 ```
 
 This tutorial builds an interactive map from nothing to something close to the
@@ -16,7 +20,9 @@ This tutorial builds an interactive map from nothing to something close to the
 (HPRM, Minnesota, Washington) — and it does so in deterministic R, with no AI in
 the loop. We start with a one-line map of neighborhood typologies, then *graft
 on* more: a numeric layer, custom breaks and colors, place labels, richer
-popups, and — for the full United States — vector tiles.
+popups, a layer switcher, and — for the whole United States — vector tiles. The
+goal is a complete reference: every argument of every `nt_*` map function, each
+with a small, correct example.
 
 The mapping functions are a thin, opinionated layer over
 [**mapgl**](https://walker-data.com/mapgl/), Kyle Walker's R package for
@@ -26,6 +32,11 @@ point you can stop using the `neighborhood` shortcuts and reach for the full
 [**tidycensus**](https://walker-data.com/tidycensus/); his book,
 [*Analyzing US Census Data*](https://walker-data.com/census-r/), is the best
 companion to this vignette.
+
+A note on what runs here. The map-building chunks need a Census API key and a
+web browser, so they are **shown but not executed** when the vignette builds.
+The screenshots are pre-rendered. You can copy any chunk into an interactive R
+session and it will run.
 
 ```{r setup}
 library(neighborhood)
@@ -45,7 +56,7 @@ nt_map(balt)
 ```
 
 ```{r typology-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: Baltimore City census tracts colored by neighborhood typology, with the legend, basemap, and address search."}
-knitr::include_graphics("figures/map-typologies.png")
+fig("map-typologies.png")
 ```
 
 That single call gives you a finished map: an OpenFreeMap *Positron* basemap, the
@@ -53,11 +64,15 @@ view framed to Baltimore, every tract colored by its typology (`nt_conc`) using
 the canonical palette, a legend, a hover tooltip, a click popup, and the standard
 controls (zoom, fullscreen, locate-me, and an address search box).
 
-When you don't pass `color`, `nt_map()` looks for an `nt_conc` column and maps it.
-Point it at any other column to map that instead:
+`nt_map(data, color = NULL, ...)` is the whole signature. When you don't pass
+`color`, it looks for an `nt_conc` column and maps it; point it at any other
+column to map that instead. Everything in `...` flows straight to
+`nt_add_choropleth()`, so every styling argument in Section 4 is available here
+too.
 
 ```{r}
-nt_map(balt, color = "pBlack")   # share of residents who are Black
+nt_map(balt, color = "pBlack")                       # share of residents who are Black
+nt_map(balt, color = "pBlack", type = "continuous")  # ... as a smooth gradient
 ```
 
 ## 2. The anatomy of a map
@@ -66,19 +81,18 @@ nt_map(balt, color = "pBlack")   # share of residents who are Black
 this is what "small or large" means: reach for as many pieces as you need.
 
 ```{r}
-nt_maplibre(balt) |>                 # 1. basemap + controls + fit to data
+nt_maplibre(balt) |>                  # 1. basemap + controls + fit to data
   nt_add_choropleth(balt, "nt_conc")  # 2. the colored layer + legend + popup
 ```
 
 - **`nt_maplibre()`** starts the map: basemap, projection, controls, and (if you
-  hand it data) a fit to its bounds. Turn pieces off with `controls = FALSE` or
-  `search = FALSE`, change the basemap with `style = "dark"`, etc.
-- **`nt_add_choropleth()`** is the workhorse. It colors features by a column and,
+  hand it data) a fit to its bounds (Section 3).
+- **`nt_add_choropleth()`** is the workhorse: it colors features by a column and,
   unless told otherwise, adds a matching legend, a hover tooltip, and a click
-  popup.
+  popup (Section 4).
 
 Because the return value is a plain `mapgl` map, you can splice in any `mapgl`
-call — here, a scale bar and a layer switcher:
+call — here, a scale bar and `mapgl`'s own raw layer switcher:
 
 ```{r}
 nt_maplibre(balt) |>
@@ -87,33 +101,140 @@ nt_maplibre(balt) |>
   mapgl::add_layers_control()
 ```
 
-## 3. Categorical maps: typologies
+## 3. Starting the map: `nt_maplibre()`
+
+`nt_maplibre()` is the foundation. Called with no arguments it returns an empty
+ERN-styled map; hand it spatial `data` and it frames the view to that data's
+bounds.
+
+```{r}
+nt_maplibre()        # empty map, default view
+nt_maplibre(balt)    # framed to Baltimore
+```
+
+### Every argument
+
+| Argument | Default | What it does |
+|---|---|---|
+| `data` | `NULL` | Optional spatial data used only to frame the view (not drawn). `sf`, a shapefile/GeoJSON/GeoPackage path, `sfc`, or `sp`/`terra`; normalized to `sf` and re-projected to WGS84. |
+| `style` | `"positron"` | Basemap (see below). |
+| `controls` | `TRUE` | Add the standard control set (zoom/compass, fullscreen, geolocate). |
+| `search` | `TRUE` | Add an OpenStreetMap/Nominatim address search box (no API key). Ignored when `controls = FALSE`. |
+| `fit` | `TRUE` | If `data` is supplied, fit the opening view to its bounds. Ignored when `center` is given. |
+| `center` | `NULL` | `c(lng, lat)` to center the map instead of fitting to data. |
+| `zoom` | `NULL` | Initial zoom level, paired with `center`. |
+| `projection` | `"mercator"` | `"mercator"` (the flat state-profile look) or `"globe"` for the 3-D globe. |
+| `...` | — | Passed to `mapgl::maplibre()` (e.g. `height`, `bearing`, `pitch`). |
+
+### Basemaps (`style`)
+
+There are five built-in OpenFreeMap basemaps. Any other value (a style URL, or
+the result of `mapgl::carto_style()` / `mapgl::maptiler_style()`) passes straight
+through to `mapgl`.
+
+```{r}
+nt_maplibre(balt, style = "positron")  # light grey (default)
+nt_maplibre(balt, style = "bright")    # full-color OSM
+nt_maplibre(balt, style = "liberty")   # OSM "Liberty" theme
+nt_maplibre(balt, style = "dark")      # dark mode
+nt_maplibre(balt, style = "fiord")     # muted blue-grey
+
+# Anything mapgl accepts also works:
+nt_maplibre(balt, style = mapgl::carto_style("positron"))
+```
+
+### View: fit, center/zoom, projection
+
+By default a map with `data` fits to that data. To open on a fixed point instead,
+give `center` (and usually `zoom`); when `center` is set, `fit` is ignored.
+
+```{r}
+# Open centered on downtown Baltimore at zoom 12 instead of fitting to tracts
+nt_maplibre(balt, center = c(-76.61, 39.29), zoom = 12)
+
+# Don't auto-fit even though data was supplied
+nt_maplibre(balt, fit = FALSE)
+
+# 3-D globe instead of the flat web-mercator map
+nt_maplibre(balt, projection = "globe")
+```
+
+### Controls and search
+
+The control cluster (zoom/compass, fullscreen, geolocate, address search) is on
+by default. Turn the whole cluster off with `controls = FALSE`, or keep the
+controls but drop just the search box with `search = FALSE`.
+
+```{r}
+nt_maplibre(balt, controls = FALSE)               # bare map, no chrome
+nt_maplibre(balt, search = FALSE)                 # controls, but no search box
+nt_maplibre(balt, height = "600px", bearing = 20) # `...` -> mapgl::maplibre()
+```
+
+## 4. The workhorse: `nt_add_choropleth()`
+
+This is the layer that colors features by a column. It picks sensible defaults
+from the data so a one-liner looks right, while leaving every piece overridable.
+
+### Every argument
+
+| Argument | Default | What it does |
+|---|---|---|
+| `map` | — | A map from `nt_maplibre()` (or `mapgl::maplibre()`). |
+| `data` | — | Polygon spatial data (`sf`/path/`sfc`/`sp`/`terra`). |
+| `column` | — | Name of the column to color by. |
+| `type` | `"auto"` | `"auto"` (categorical for factor/character, binned for numeric), `"categorical"`, `"continuous"` (smooth), or `"step"` (binned). |
+| `breaks` | `NULL` | Interior thresholds for `"step"`/`"continuous"`; defaults to data quantiles. |
+| `colors` | `NULL` | Fill colors (one per category, or the numeric ramp). |
+| `labels` | `NULL` | Legend labels for binned numeric maps. |
+| `fill_color` | `NULL` | A raw MapLibre paint expression used verbatim — the full-control escape hatch. |
+| `id` | `NULL` | Layer id (defaults to a name derived from `column`). |
+| `legend` | `TRUE` | `TRUE`, `FALSE`, or `"interactive"` (clickable legend that filters the map). |
+| `legend_title` | `NULL` | Legend title (defaults to `column`). |
+| `popup` | `TRUE` | Click popup: `TRUE`, `FALSE`/`NULL`, a column name, or a length-`nrow` vector. |
+| `tooltip` | `TRUE` | Hover tooltip: `TRUE` (mapped value), `FALSE`/`NULL`, a column name, or a vector. |
+| `opacity` | `0.7` | Fill opacity. |
+| `outline_color` | `"#ffffff"` | Polygon outline color. |
+| `na_color` | `NULL` | Color for missing values (defaults to ERN grey `#C0C0C0`). |
+| `visible` | `TRUE` | Whether the layer starts visible (set `FALSE` for hidden layers in a switcher). |
+| `tiles` | `"auto"` | `"auto"`, `"inline"`, or `"pmtiles"` (see Section 8). |
+| `max_inline` | `25000` | Feature-count threshold at which `"auto"` switches to PMTiles. |
+| `...` | — | Passed to `mapgl::add_fill_layer()`. |
+
+### Categorical maps: typologies
 
 `nt_conc` is a factor with up to 19 levels, and `nt_add_choropleth()` recognizes
 it and applies the Eviction Research Network color key automatically (the same
-colors as `nt_pal()` for leaflet). You rarely need to touch the colors, but you
-can: pass your own `colors`, set `legend = "interactive"` to make the legend
-filter the map, or change the `legend_title`.
+colors as `nt_pal()` for leaflet — see Section 9). You rarely need to touch the
+colors, but you can: pass your own `colors`, set `legend = "interactive"` to make
+the legend filter the map, change the `legend_title`, or dial down `opacity`.
 
 ```{r}
 nt_maplibre(balt) |>
   nt_add_choropleth(
     balt, "nt_conc",
-    legend       = "interactive",        # click a swatch to isolate that type
+    legend       = "interactive",  # click a swatch to isolate that type
     legend_title = "Neighborhood type",
     opacity      = 0.8
   )
 ```
 
-## 4. Grafting on numbers: income, rent, precarity
+To force categorical treatment on a column that happens to be numeric (codes, for
+example), set `type = "categorical"` and supply your own `colors`:
 
-Real analysis layers numbers onto the typologies. Any numeric column maps as a
-**binned choropleth** using the sequential ERN ramp
-(yellow → orange → red → purple). Join whatever you like onto the tracts first.
-Here we bring in the affordability index from `afford()` and map the location
-quotient of affordable rental supply (`tr_rent_ratio` — values above 1 mean a
-tract carries more than its regional "fair share" of housing affordable to the
-income group):
+```{r}
+nt_maplibre(balt) |>
+  nt_add_choropleth(balt, "some_code",
+                    type   = "categorical",
+                    colors = c("#1f78b4", "#33a02c", "#e31a1c"))
+```
+
+### Numeric maps: binned, continuous, stepped
+
+Any numeric column maps as a **binned choropleth** using the sequential ERN ramp
+(yellow → orange → red → purple). `breaks` are the *interior* thresholds; with
+the 4-color ramp you supply three of them. Omit `breaks` and the data's quantiles
+are used.
 
 ```{r}
 aff <- afford(state = "24", counties = "510", ami_limit = 0.5, year = 2024,
@@ -122,47 +243,125 @@ aff <- afford(state = "24", counties = "510", ami_limit = 0.5, year = 2024,
 nt_maplibre(aff) |>
   nt_add_choropleth(
     aff, "tr_rent_ratio",
-    breaks       = c(0.5, 1, 2),         # interior thresholds (3 breaks -> 4 classes)
+    breaks       = c(0.5, 1, 2),  # 3 interior breaks -> 4 classes
     legend_title = "Affordable-rental ratio"
   )
 ```
 
-```{r numeric-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: a numeric choropleth (here the share of residents who are Black) binned with the four-class ERN ramp -- Lower, Moderate, High, Extreme."}
-knitr::include_graphics("figures/map-numeric.png")
+```{r numeric-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: a numeric choropleth binned with the four-class ERN ramp -- Lower, Moderate, High, Extreme."}
+fig("map-numeric.png")
 ```
 
-`breaks` are the *interior* thresholds. With the 4-color ramp you supply three of
-them. (If you prefer to write all the bin edges including a floor — the
-`c(0, 0.5, 1, 2)` style used in the state configs — that works too; the leading
-floor is dropped.) Omit `breaks` entirely and the data's quartiles are used.
+If you prefer to write *all* bin edges including a floor (the
+`c(0, 0.5, 1, 2)` style used in the state configs), that works too — the leading
+floor is dropped automatically.
 
-Prefer a smooth gradient over discrete bins? Switch the type:
+`type` controls the binning style:
+
+```{r}
+# Smooth gradient (continuous interpolation) instead of discrete bins
+nt_maplibre(aff) |>
+  nt_add_choropleth(aff, "tr_rent_ratio", type = "continuous")
+
+# Explicit step (binned) classification, identical to the numeric default
+nt_maplibre(aff) |>
+  nt_add_choropleth(aff, "tr_rent_ratio", type = "step", breaks = c(0.5, 1, 2))
+```
+
+### Custom colors and labels
+
+Override the ramp with `colors`, and rename the bins with `labels`. The default
+labels for a 4-class numeric ramp are `c("Lower", "Moderate", "High", "Extreme")`.
 
 ```{r}
 nt_maplibre(aff) |>
-  nt_add_choropleth(aff, "tr_rent_ratio", type = "continuous")
+  nt_add_choropleth(
+    aff, "tr_rent_ratio",
+    breaks = c(0.5, 1, 2),
+    colors = c("#fee5d9", "#fcae91", "#fb6a4a", "#cb181d"),
+    labels = c("Scarce", "Below fair share", "Fair share", "Abundant"),
+    legend_title = "Affordable-rental supply"
+  )
 ```
 
-`afford()` even precomputes a `popup` column for you, so you can wire up a rich
-popup with no extra work:
+### Outline, missing values, opacity
 
 ```{r}
-nt_map(aff, color = "tr_rent_ratio", popup = "popup", legend_title = "Affordable-rental ratio")
+nt_maplibre(aff) |>
+  nt_add_choropleth(
+    aff, "tr_rent_ratio",
+    opacity       = 0.85,        # more saturated fill
+    outline_color = "#444444",   # dark polygon borders instead of white
+    na_color      = "#eeeeee"    # how tracts with no data are drawn
+  )
 ```
 
-### Multiple layers with a switcher
+### Tooltips and popups
+
+The **tooltip** is the hover label; the **popup** is the click panel. Both accept
+`TRUE` (auto), `FALSE`/`NULL` (off), a column name, or a length-`nrow` vector.
+
+```{r}
+# Default: tooltip shows the mapped value, popup shows id + value
+nt_maplibre(balt) |> nt_add_choropleth(balt, "nt_conc")
+
+# Turn the hover tooltip off, keep the click popup
+nt_maplibre(balt) |> nt_add_choropleth(balt, "nt_conc", tooltip = FALSE)
+
+# Hover shows a different column than the one being colored
+nt_maplibre(balt) |> nt_add_choropleth(balt, "nt_conc", tooltip = "NAME")
+
+# Use a pre-built HTML column for the click popup (see Section 6)
+nt_maplibre(balt) |> nt_add_choropleth(balt, "nt_conc", popup = "popup")
+
+# No popup at all
+nt_maplibre(balt) |> nt_add_choropleth(balt, "nt_conc", popup = FALSE)
+```
+
+`afford()` precomputes a `popup` column for you, so a rich popup is free:
+
+```{r}
+nt_map(aff, color = "tr_rent_ratio", popup = "popup",
+       legend_title = "Affordable-rental ratio")
+```
+
+### The escape hatch: `fill_color`
+
+For bespoke maps you can hand `nt_add_choropleth()` a raw MapLibre paint
+expression (built with `mapgl::interpolate()`, `step_expr()`, or `match_expr()`)
+and it uses it **verbatim** as the fill, taking full control of coloring. The
+column is still used for the popup, tooltip, and `id`. Because a raw expression
+carries no legend, supply `colors` *and* `labels` if you want one.
+
+```{r}
+expr <- mapgl::interpolate(
+  column = "tr_rent_ratio",
+  values = c(0, 1, 2),
+  stops  = c("#fee5d9", "#fb6a4a", "#cb181d")
+)
+
+nt_maplibre(aff) |>
+  nt_add_choropleth(
+    aff, "tr_rent_ratio",
+    fill_color = expr,
+    colors     = c("#fee5d9", "#fb6a4a", "#cb181d"),  # only for the legend
+    labels     = c("0", "1", "2")
+  )
+```
+
+## 5. Multiple layers with a switcher: `nt_layers_control()`
 
 A single map can carry several layers and let the reader switch between them.
 Give each layer its own `id`, hide all but the first with `visible = FALSE`, then
-add `nt_layers_control()` — it shows **one layer at a time** and reveals only that
-layer's legend. Here we put the neighborhood typology and the share of each
-demographic group on one map:
+add `nt_layers_control()` — a compact **radio** control that shows one layer at a
+time and reveals only that layer's legend.
 
 ```{r}
 demos <- c(White = "pWhite", Black = "pBlack", Asian = "pAsian", Latine = "pLatine")
 
 m <- nt_maplibre(balt) |>
-  nt_add_choropleth(balt, "nt_conc", id = "Typology", legend_title = "Neighborhood type")
+  nt_add_choropleth(balt, "nt_conc", id = "Typology",
+                    legend_title = "Neighborhood type")
 
 # Add a hidden layer for each demographic share
 for (i in seq_along(demos)) {
@@ -174,20 +373,40 @@ for (i in seq_along(demos)) {
 nt_layers_control(m, layers = c("Typology", names(demos)), title = "Show layer")
 ```
 
-```{r layers-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: typology plus a hidden layer for each demographic share, with a switcher (bottom-right) that shows one layer — and only its legend — at a time."}
-knitr::include_graphics("figures/map-layers.png")
+```{r layers-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: typology plus a hidden layer for each demographic share, with a switcher (bottom-right) that shows one layer -- and only its legend -- at a time."}
+fig("map-layers.png")
 ```
 
-The same pattern works for any set of measures — it is how the HPRM map toggles
-its eviction-risk, displacement-risk, and composite layers (just give each its
-own `id`). For a raw multi-select (checkbox) toggle instead of a one-at-a-time
-switcher, drop to `mapgl::add_layers_control()`.
+### Every argument
 
-## 5. Labels
+| Argument | Default | What it does |
+|---|---|---|
+| `map` | — | A map with two or more layers added via `nt_add_choropleth()`. |
+| `layers` | — | Character vector of layer `id`s to switch between, in order. The first shows initially. |
+| `labels` | `NULL` | Display labels for the control (defaults to `layers` — use this to show friendly names while switching by id). |
+| `title` | `NULL` | Optional title shown above the radio options. |
+| `position` | `"bottom-right"` | `"bottom-right"`, `"bottom-left"`, `"top-left"`, or `"top-right"`. The default keeps it clear of the legend (top-left) and the navigation/search controls (top-right). |
 
-Add place or value labels with `nt_add_labels()`. Labels sit at an interior point
-of each polygon (so they never drift into water) and carry a white halo for
-legibility. Use `min_zoom` to keep them from cluttering the zoomed-out view:
+```{r}
+# Switch by layer id but display readable labels; place the control top-left
+nt_layers_control(
+  m,
+  layers   = c("Typology", "White", "Black", "Asian", "Latine"),
+  labels   = c("Neighborhood type", "% White", "% Black", "% Asian", "% Latine"),
+  title    = "Measure",
+  position = "top-left"
+)
+```
+
+The same pattern drives the HPRM map's eviction-risk / displacement-risk /
+composite toggle. For a raw multi-select (checkbox) toggle instead of a
+one-at-a-time switcher, drop to `mapgl::add_layers_control()`.
+
+## 6. Labels: `nt_add_labels()`
+
+Add place or value labels with `nt_add_labels()`. Labels sit at an *interior*
+point of each polygon (computed with `sf::st_point_on_surface()`, not a centroid),
+so they never drift into a bay or notch, and they carry a halo for legibility.
 
 ```{r}
 nt_maplibre(balt) |>
@@ -195,14 +414,52 @@ nt_maplibre(balt) |>
   nt_add_labels(balt, "NAME", min_zoom = 11)
 ```
 
-## 6. Popups, from plain to HPRM-rich
+### Every argument
 
-By default the popup lists the tract id and the mapped value. To control it, build
-your own HTML with `nt_popup()` and pass the column name (or feed it straight to
-`popup =`). `nt_popup()` returns one HTML string per row and is fully
-deterministic.
+| Argument | Default | What it does |
+|---|---|---|
+| `map` | — | A map from `nt_maplibre()`. |
+| `data` | — | Spatial data; polygons are reduced to interior label points. |
+| `text_column` | — | Column whose values are shown as labels. |
+| `id` | `NULL` | Layer id (defaults to a name derived from `text_column`). |
+| `size` | `11` | Text size in pixels. |
+| `color` | `"#333333"` | Text color (dark grey). |
+| `halo_color` | `"#ffffff"` | Halo color (white). |
+| `halo_width` | `1.2` | Halo width in pixels. |
+| `min_zoom` | `NULL` | Minimum zoom at which labels appear — handy to de-clutter the zoomed-out view. |
+| `...` | — | Passed to `mapgl::add_symbol_layer()`. |
 
-**Start simple** — a title and a few fields:
+```{r}
+nt_maplibre(balt) |>
+  nt_add_choropleth(balt, "nt_conc") |>
+  nt_add_labels(
+    balt, "NAME",
+    size       = 13,
+    color      = "#19222C",   # near-black text
+    halo_color = "#ffffff",
+    halo_width = 2,           # fatter halo for contrast over busy fills
+    min_zoom   = 12           # only show once zoomed in
+  )
+```
+
+## 7. Popups, from plain to HPRM-rich: `nt_popup()`
+
+By default the choropleth popup lists the tract id and the mapped value. To
+control it, build your own HTML with `nt_popup()` and pass the resulting column
+to `popup =`. `nt_popup()` returns one HTML string per row and is fully
+**deterministic** — same data in, byte-for-byte identical HTML out.
+
+### Every argument
+
+| Argument | Default | What it does |
+|---|---|---|
+| `data` | — | A data frame or `sf` object (geometry is ignored). |
+| `fields` | `NULL` | Named vector/list mapping **display label → column name**, rendered in order. |
+| `title` | `NULL` | Bold title at the top. If it names a column, the per-row value is used; otherwise it is a literal string shared by every popup. |
+| `html` | `NULL` | Extra HTML (length 1 or `nrow(data)`) appended after the fields — bar charts, SVG, links. |
+| `prefix_title` | `TRUE` | When `title` names a column, prefix the value with the column name, e.g. `"GEOID: 24510...";` set `FALSE` for the bare value. |
+
+### Start simple — a title and a few fields
 
 ```{r}
 balt$popup <- nt_popup(
@@ -219,12 +476,33 @@ balt$popup <- nt_popup(
 nt_map(balt, popup = "popup")
 ```
 
-Numeric fields format themselves: values in `[0, 1]` render as percentages,
-counts get thousands separators.
+Numeric fields **format themselves**: values that all fall in `[0, 1]` render as
+percentages (e.g. `pBlack` → `"61.4%"`), other numerics get thousands separators
+(e.g. `totraceE` → `"4,213"`). You write the columns; the formatting is automatic.
 
-**Graft on a chart.** The HPRM popup shows a small racial-composition bar chart.
-Because a popup is just HTML, you build it in R and append it with the `html`
-argument. This is plain string assembly — no JavaScript, fully reproducible:
+### `prefix_title`: column-name prefix on or off
+
+With `title = "GEOID"`, the default reads `GEOID: 24510010100`. Set
+`prefix_title = FALSE` for just the bare value (useful when the title is a place
+name rather than an id):
+
+```{r}
+# "GEOID: 24510010100"
+nt_popup(balt, title = "GEOID", fields = c("Type" = "nt_conc"))
+
+# bare value, no "NAME:" prefix
+nt_popup(balt, title = "NAME", fields = c("Type" = "nt_conc"),
+         prefix_title = FALSE)
+
+# A literal shared title (not a column) is always shown as-is
+nt_popup(balt, title = "Baltimore City", fields = c("Type" = "nt_conc"))
+```
+
+### Graft on a chart with `html`
+
+The HPRM popup shows a small racial-composition bar chart. Because a popup is just
+HTML, you build it in R and append it through `html`. This is plain string
+assembly — no JavaScript, fully reproducible:
 
 ```{r}
 race_bar <- function(p, color, label) {
@@ -258,24 +536,23 @@ nt_map(balt, popup = "popup")
 ```
 
 **Bubble tracks** — comparing a tract to its county and the nation — follow the
-same idea: join the reference values (e.g. a county median and a national median)
-onto your data, then build an inline `<svg>` per row positioning a marker on a
-0–max track, and pass it through `html`. Everything stays deterministic because
-it is just string math over columns you control.
+same idea: join the reference values (a county median and a national median) onto
+your data, then build an inline `<svg>` per row positioning a marker on a 0–max
+track, and pass it through `html`. Everything stays deterministic because it is
+just string math over columns you control. The *precarity-mapping* vignette walks
+through that recipe in full.
 
-## 7. Large data: the whole country with PMTiles
+## 8. Large data: the whole country with PMTiles (`nt_pmtiles()`)
 
 Embedding tens of thousands of polygons directly in a web page is slow. The
 state-profile maps solve this with [PMTiles](https://docs.protomaps.com/pmtiles/)
 — a single static vector-tile file served over HTTP range requests. The bundled
-`us_nt_tracts2024` table covers every U.S. tract; join it to geometry and build
-tiles with `nt_pmtiles()` (which calls the
-[`tippecanoe`](https://github.com/felt/tippecanoe) command-line tool — install it
-once with e.g. `brew install tippecanoe`):
+`us_nt_tracts2024` table covers every U.S. tract.
 
-With `tiles = "auto"` (the default) `nt_add_choropleth()` draws small layers
-inline and switches to PMTiles once a layer exceeds `max_inline` (25,000
-features); set `tiles = "pmtiles"` to force it:
+`nt_add_choropleth()` handles the switch for you. With `tiles = "auto"` (the
+default) it draws small layers inline and converts to PMTiles once a layer exceeds
+`max_inline` (25,000 features). Force it either way with `tiles = "inline"` or
+`tiles = "pmtiles"`:
 
 ```{r}
 us <- tigris::tracts(cb = TRUE, year = 2024) |>
@@ -283,10 +560,30 @@ us <- tigris::tracts(cb = TRUE, year = 2024) |>
 
 nt_maplibre(us) |>
   nt_add_choropleth(us, "nt_conc", tiles = "pmtiles")
+
+# Or raise the inline ceiling so a mid-size layer still draws inline:
+nt_maplibre(us) |>
+  nt_add_choropleth(us, "nt_conc", tiles = "auto", max_inline = 80000)
 ```
 
-Need the tiles as a standalone artifact (to host on GitHub Pages, say)? Build
-them directly with `nt_pmtiles()` and wire them up with `mapgl`:
+The PMTiles path calls the
+[`tippecanoe`](https://github.com/felt/tippecanoe) command-line tool, an optional
+external dependency (install once with e.g. `brew install tippecanoe`). If a layer
+exceeds `max_inline` under `tiles = "auto"` but `tippecanoe` is missing, the layer
+falls back to drawing inline with a warning; `tiles = "pmtiles"` errors instead.
+
+### Building tiles directly with `nt_pmtiles()`
+
+Need the tiles as a standalone artifact (to host on GitHub Pages, say)? Build them
+with `nt_pmtiles()` and wire them up with `mapgl`.
+
+| Argument | Default | What it does |
+|---|---|---|
+| `data` | — | Spatial data; **all** non-geometry columns are carried into the tiles as feature properties (so popup/tooltip columns survive tiling). |
+| `path` | `NULL` | Output `.pmtiles` path (defaults to a temp file). |
+| `layer` | `"nt"` | Tile layer name — must equal the `source_layer` used when drawing it. |
+| `tippecanoe_args` | `NULL` | Character vector of flags that *replaces* the defaults (`-o`, `-l`, and the input are always set for you). |
+| `quiet` | `FALSE` | Suppress tippecanoe's console output and the "wrote ..." message. |
 
 ```{r}
 tiles <- nt_pmtiles(us, path = "us_typologies.pmtiles", layer = "nt")
@@ -297,10 +594,40 @@ nt_maplibre() |>
                         fill_color = "#1f78b4", fill_opacity = 0.7)
 ```
 
+The default tippecanoe flags (`-zg --drop-densest-as-needed
+--extend-zooms-if-still-dropping --force`) auto-select a zoom range and keep tiles
+a reasonable size. Override them wholesale with `tippecanoe_args`, and silence the
+console with `quiet = TRUE`:
+
+```{r}
+nt_pmtiles(
+  us, path = "us_z4_12.pmtiles", layer = "nt",
+  tippecanoe_args = c("-Z4", "-z12", "--drop-densest-as-needed", "--force"),
+  quiet = TRUE
+)
+```
+
 Host the resulting `.pmtiles` file alongside your HTML and point the source `url`
 at it.
 
-## 8. Saving a standalone HTML map
+## 9. The leaflet bridge: `nt_pal()`
+
+For **MapLibre** maps you never need `nt_pal()` — `nt_add_choropleth()` applies
+the typology color key automatically. But if you are drawing typologies in
+**leaflet** instead, `nt_pal(df)` returns a `leaflet::colorFactor()` palette over
+the 19 `nt_conc` levels using the same ERN house colors (grey `#C0C0C0` for `NA`).
+Both paths read from one internal color vector, so the two engines always agree.
+
+```{r}
+pal <- nt_pal(balt)
+
+leaflet::leaflet(balt) |>
+  leaflet::addPolygons(fillColor = ~pal(nt_conc), fillOpacity = 0.7,
+                       weight = 0.3, color = "#ffffff") |>
+  leaflet::addLegend(pal = pal, values = ~nt_conc)
+```
+
+## 10. Saving a standalone HTML map
 
 A map is an `htmlwidget`, so a self-contained, shareable HTML file is one call —
 the same kind of artifact the ERN state profiles publish:
@@ -313,7 +640,7 @@ htmlwidgets::saveWidget(m, "baltimore_typologies.html", selfcontained = TRUE)
 For inline (non-PMTiles) maps the file is fully self-contained. PMTiles maps
 additionally need the `.pmtiles` file hosted next to the page.
 
-## 9. When to drop to raw mapgl
+## 11. When to drop to raw mapgl
 
 The `neighborhood` functions cover the common path. Anything they don't expose,
 `mapgl` does — and you never have to leave the pipe to get to it. Reach for
@@ -335,3 +662,5 @@ deterministic R code and require no AI to run.
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
+</content>
+</invoke>

@@ -9,6 +9,14 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+
+# fig() embeds a pre-rendered PNG from vignettes/figures/ if it exists, and
+# silently renders nothing if it is missing -- so a stale figure never breaks
+# the package build.
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
 ```
 
 ## What the index is for
@@ -24,157 +32,466 @@ out of one place can only move to the few places that can actually house them. T
 where that affordable housing is — and, by comparing supply to the regional count of
 same-income households, where it is scarce relative to need.
 
-> **Note — two implementations.** `afford_index()` is the rebuilt v2 engine and the recommended
-> entry point: it fixes the AMI basis (county median *family* income), interpolates within income
-> brackets, supports standardized ELI/VLI/LI/MI tiers and household sizes, and offers both owner
-> cost bases (current cost vs. cost to buy in). `afford()` is the original, kept for backward
-> compatibility. This vignette documents the legacy `afford()`; see `?afford_index` and the design
-> notes in `dev/affordability-index-design.md` for v2.
+In the larger design (`dev/affordability-index-design.md`) affordability is **Gate 1** of a
+three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette documents Gate 1, the
+supply engine, which is the part that ships today.
 
-`afford()` is the original implementation. **Read the "Assumptions and known limitations"
-section below before using its output in a report** — the ownership numbers in particular carry a
-hard-coded interest-rate assumption, and a fuller methodological review with a remediation plan
-lives in [`dev/affordability-index-review.md`](https://github.com/evictionresearch/neighborhood).
+> **Note — two implementations, lead with the new one.** `afford_index()` is the rebuilt **v2
+> engine** and the recommended entry point. `afford()` is the original v1 implementation, kept for
+> backward compatibility and documented in an appendix at the end. New work should use
+> `afford_index()`; the v1→v2 crosswalk below explains exactly what it fixes.
+
+---
+
+# `afford_index()` — the recommended engine
+
+`afford_index()` rebuilds the index on a defensible footing: AMI from county median **family**
+income (HUD's anchor), income brackets parsed from ACS variable *labels* with within-bracket
+interpolation, standardized ELI/VLI/LI/MI tiers, HUD household-size adjustment, and explicit cost
+models for both renting and owning. Its output is **tidy and long**: one row per
+tract × tenure × tier.
+
+All inputs are American Community Survey 5-year estimates via `tidycensus::get_acs()`, so a
+`CENSUS_API_KEY` must be set. The `"hud"` AMI source additionally needs the `hudr` package and a
+free `HUD_API_KEY`. Because every example below touches the Census (and sometimes the HUD) API, the
+code chunks are shown but **not executed** at build time.
+
+## Quick start
+
+The very simplest call needs only `state` and `counties` (FIPS codes or names both work). Everything
+else has a default: `year = 2024`, all three tenures, all four tiers, the pure-ACS AMI source.
+
+```{r}
+library(neighborhood)
+
+# San Francisco County, defaults for everything else
+sf_idx <- afford_index("06", "075")
+
+# Look at one slice: very-low-income (50% AMI) rental supply, per tract
+sf_idx[sf_idx$tenure == "rent" & sf_idx$ami_tier == "VLI",
+       c("GEOID", "ami", "income_cutoff", "accessible", "total", "supply", "ratio")]
+```
+
+`state` and `counties` accept either FIPS codes (`"06"`, `"075"`) **or** names (`"CA"`,
+`"San Francisco"`) — unlike legacy `afford()`, which only takes FIPS. A multi-county region is just
+a vector of counties:
+
+```{r}
+# 5-county Bay Area core, 2023 ACS
+bay <- afford_index(
+  state    = "CA",
+  counties = c("Alameda", "Contra Costa", "Marin", "San Francisco", "San Mateo"),
+  year     = 2023
+)
+```
+
+## The full argument reference
+
+Every argument is a real formal of `afford_index()` (defaults shown). The mortgage knobs in the
+lower block only affect the `"own_buyin"` tenure.
+
+| Argument | Default | What it does |
+|---|---|---|
+| `state` | — (required) | State FIPS (`"06"`) or name/abbreviation (`"CA"`). |
+| `counties` | — (required) | One or more 3-digit county FIPS or names. |
+| `year` | `2024` | ACS 5-year endpoint year. |
+| `tenure` | `c("rent","own_current","own_buyin")` | Which tenures to compute (any subset; see below). |
+| `ami_source` | `"acs"` | `"acs"`, `"hud"`, or `"hud_acs"` (the last not yet implemented). |
+| `ami_tiers` | `c(ELI=.30, VLI=.50, LI=.80, MI=1.20)` | Named tier fractions of AMI. |
+| `hud_hh_size` | `4` | Household size 1–8 for the family-size adjustment; `NULL` = unadjusted. |
+| `interest_rate` | `NULL` | Annual mortgage rate for `own_buyin`; `NULL` = built-in by-year value. |
+| `term_years` | `30` | `own_buyin` mortgage term. |
+| `down_pct` | `0.10` | `own_buyin` down payment fraction. |
+| `tax_ins_rate` | `0.0125` | `own_buyin` annual taxes + insurance as a fraction of value. |
+| `geometry` | `FALSE` | If `TRUE`, attach tract polygons (an `sf` tibble). |
+
+### `tenure` — three housing-cost models
+
+`tenure` is the most important conceptual choice. Renting has one model; owning has **two**, because
+"can you afford the homes here?" has two honest meanings.
+
+```{r}
+# Just renters
+afford_index("06", "075", tenure = "rent")
+
+# Renters plus the "could a mover buy in today?" owner basis
+afford_index("06", "075", tenure = c("rent", "own_buyin"))
+```
+
+| `tenure` value | ACS table | Cost model | Question it answers |
+|---|---|---|---|
+| `"rent"` | `B25063` (gross rent) | affordable if `rent <= income_cutoff * 0.30 / 12` | What share of *rentals* is affordable to the tier? |
+| `"own_current"` (basis A) | `B25094` (selected monthly owner cost) | same 30%-of-income rule as rent | Affordability of the *existing* owned stock as currently financed (most owners locked in old, low payments). |
+| `"own_buyin"` (basis B) | `B25075` (home value) | value → required income via an explicit mortgage model | Could a *mover* afford to **buy in here today** at this year's rate? |
+
+The distinction matters: `own_current` describes who could carry the homes people already own
+(often very affordable thanks to old mortgages), while `own_buyin` describes the true barrier facing
+someone trying to move in now. Reports about *displacement* and *migration* almost always want
+`own_buyin`.
+
+### `ami_source` — where the income limits come from
+
+```{r}
+# Pure ACS (default): AMI = county median FAMILY income (B19113)
+afford_index("06", "075", ami_source = "acs")
+
+# Official HUD published limits (needs hudr + HUD_API_KEY)
+afford_index("06", "075", ami_source = "hud")
+```
+
+- **`"acs"`** (default): AMI is the county median **family** income (ACS `B19113`), and each tier is
+  a simple fraction of it. Fully reproducible from Census alone.
+- **`"hud"`**: ELI/VLI/LI come straight from HUD's *published* per-household-size limits (so HUD's
+  caps, floors, and high-cost adjustments are baked in); any tier without a HUD limit (e.g.
+  `MI = 120%`) is *derived* as fraction × area median × size factor. Requires the `hudr` package and
+  a `HUD_API_KEY` (register free at huduser.gov; e.g. in `~/.Renviron`), unless a HUD snapshot is
+  bundled with the package.
+- **`"hud_acs"`**: the full HUD-cascade reproduction; **not yet implemented** — calling it errors
+  with a pointer to `dev/hud-income-limits-architecture.md`.
+
+### `ami_tiers` — which income tiers to compute
+
+A named numeric vector of AMI fractions. The defaults are the standard HUD-style cumulative ceilings;
+a VLI household can use anything affordable at or below 50% AMI.
+
+```{r}
+# Default tiers, named explicitly
+afford_index("06", "075",
+             ami_tiers = c(ELI = 0.30, VLI = 0.50, LI = 0.80, MI = 1.20))
+
+# A custom, coarser set
+afford_index("06", "075", ami_tiers = c(VeryLow = 0.50, Moderate = 1.00))
+```
+
+The names become the `ami_tier` factor levels in the output (in the order you supply), and each
+tier appears as its own block of rows per tract.
+
+### `hud_hh_size` — family-size adjustment
+
+HUD scales income limits by household size (a 4-person household is the unadjusted basis = 1.00).
+`hud_hh_size` applies that factor to the tier cutoffs; pass `NULL` to leave AMI on the 4-person
+basis.
+
+```{r}
+# A single-person household (limits scaled to 0.70 of the 4-person basis)
+afford_index("06", "075", hud_hh_size = 1)
+
+# No size adjustment at all
+afford_index("06", "075", hud_hh_size = NULL)
+```
+
+The factors are HUD's: `1 = 0.70, 2 = 0.80, 3 = 0.90, 4 = 1.00, 5 = 1.08, 6 = 1.16, 7 = 1.24,
+8 = 1.32`. Values outside 1–8 error.
+
+### The `own_buyin` mortgage knobs
+
+These four arguments define the explicit mortgage used to convert a home's *value* into the income
+needed to **buy in today**. They are inert for `"rent"` and `"own_current"`.
+
+The model: a household spends at most 30% of income on (principal & interest on the financed portion)
+plus (taxes & insurance on the full value). Lower the rate or raise the down payment and more homes
+become "affordable."
+
+```{r}
+# Spell out today's terms instead of the built-in by-year rate
+afford_index(
+  "06", "075",
+  tenure        = "own_buyin",
+  interest_rate = 0.069,   # 6.9% annual; NULL uses a built-in per-year approximation
+  term_years    = 30,      # loan term in years
+  down_pct      = 0.20,    # 20% down
+  tax_ins_rate  = 0.0125   # 1.25% of value/yr for taxes + insurance
+)
+```
+
+| Knob | Default | Effect |
+|---|---|---|
+| `interest_rate` | `NULL` → built-in by-year (~6.9% for 2024) | higher rate → fewer homes affordable |
+| `term_years` | `30` | longer term → slightly more affordable |
+| `down_pct` | `0.10` | bigger down payment → smaller loan → more affordable |
+| `tax_ins_rate` | `0.0125` | higher carrying cost → fewer homes affordable |
+
+The built-in `interest_rate = NULL` default looks up a rough 30-year average for the requested
+`year` (e.g. ~3.1% for 2020, ~6.9% for 2024), so even the bare call is rate-aware — but for a report,
+state the rate explicitly so the assumption is auditable.
+
+### `geometry` — attach polygons for mapping
+
+```{r}
+# Returns an sf tibble (tract polygons joined to every tenure/tier row)
+sf_geo <- afford_index("06", "075", geometry = TRUE)
+```
+
+Because the output is long, `geometry = TRUE` **duplicates each tract polygon** across every
+tenure × tier combination. Always filter to **one** tenure and **one** tier before mapping (see
+*Mapping the index* below).
+
+## The output schema (tidy long)
+
+`afford_index()` returns one row per **tract × tenure × tier**. Verified column order and meaning:
+
+| Column | Meaning |
+|---|---|
+| `GEOID` | 11-digit tract FIPS |
+| `county` | 5-digit county FIPS |
+| `year` | ACS endpoint year used |
+| `ami_source` | `"acs"` / `"hud"` |
+| `tenure` | `"rent"` / `"own_current"` / `"own_buyin"` |
+| `ami_tier` | factor: `ELI`/`VLI`/`LI`/`MI` (or your custom names) |
+| `ami` | the county's AMI (median family income basis) |
+| `income_cutoff` | the tier's income ceiling in dollars (this is `cut_<TIER>` from `ami_cutoffs()`) |
+| `accessible` | interpolated count of units affordable to the tier in this tract/tenure |
+| `total` | total units of this tenure in the tract |
+| `supply` | `accessible / total` — share of this tract's stock affordable to the tier |
+| `reg_hh_tier` | regional households in the tier (interpolated demand) |
+| `reg_hh_total` | regional households, all tiers |
+| `class_prop` | `reg_hh_tier / reg_hh_total` — region's share of households in the tier |
+| `ratio` | `supply / class_prop` — **location quotient** (>1 = more than fair share) |
+| `rate` | `accessible / reg_hh_tier * 100000` — accessible units per 100k tier households |
+
+A quick read of the analytical columns:
+
+```{r}
+sf_idx <- afford_index("06", "075")
+
+# Where is VLI rental supply most over- or under-represented?
+vli_rent <- sf_idx[sf_idx$tenure == "rent" & sf_idx$ami_tier == "VLI", ]
+head(vli_rent[order(-vli_rent$ratio), c("GEOID", "supply", "class_prop", "ratio", "rate")])
+```
+
+- **`supply`** is the within-tract share affordable to the tier.
+- **`ratio`** is the analytical heart: `> 1` means the tract carries *more* than its fair share of
+  affordable housing for the tier; near `0` means it cannot house the tier at all. It is the same
+  idea the EDR reports lead with ("fewer than one affordable unit per N tier households").
+- **`rate`** rescales `accessible` to a per-100k-households figure for cross-region comparison.
+
+Reshape to one row per tract when you want side-by-side tenures/tiers:
+
+```{r}
+library(tidyr)
+wide <- tidyr::pivot_wider(
+  sf_idx[, c("GEOID", "tenure", "ami_tier", "ratio")],
+  names_from = c(tenure, ami_tier), values_from = ratio
+)
+```
+
+## Mapping the index
+
+`nt_add_choropleth()` expects **one polygon per tract**, so filter the long `sf` output to a single
+tenure and tier first, then pipe through the MapLibre helpers (`vignette("mapping-with-maplibre")`).
+
+```{r}
+library(neighborhood)
+
+idx <- afford_index("06", "075", geometry = TRUE)
+
+# ONE tenure + ONE tier => one polygon per tract
+vli_rent <- idx[idx$tenure == "rent" & idx$ami_tier == "VLI", ]
+
+nt_map(vli_rent) |>
+  nt_add_choropleth(
+    data         = vli_rent,
+    column       = "ratio",
+    type         = "continuous",
+    legend_title = "VLI rental supply ratio"
+  )
+```
+
+```{r afford-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Very-low-income (VLI) rental supply ratio by tract, San Francisco — below 1 means fewer affordable units than VLI renter households."}
+# Pre-rendered if available; renders nothing otherwise (build-safe).
+fig("map-afford-ratio.png")
+```
+
+---
+
+# `ami_cutoffs()` — the income ceilings underneath
+
+`afford_index()` calls `ami_cutoffs()` internally, but it is exported so you can inspect the dollar
+thresholds the whole index hinges on. It returns one row **per county**, with each tier's income
+ceiling.
+
+```{r}
+ami_cutoffs("06", c("075", "081"), 2024)
+#> # A tibble: 2 x 7
+#>   GEOID NAME                          ami cut_ELI cut_VLI cut_LI cut_MI
+#>   <chr> <chr>                       <dbl>   <dbl>   <dbl>  <dbl>  <dbl>
+#> ...
+```
+
+### Arguments
+
+`ami_cutoffs()` shares its income-side arguments with `afford_index()` (it has no tenure or mortgage
+arguments — it is purely the income limits):
+
+| Argument | Default | What it does |
+|---|---|---|
+| `state` | — (required) | State FIPS or name. |
+| `counties` | — (required) | County FIPS or names. |
+| `year` | `2024` | ACS 5-year endpoint year. |
+| `ami_source` | `"acs"` | `"acs"` / `"hud"` / `"hud_acs"` (see above). |
+| `ami_tiers` | `c(ELI=.30, VLI=.50, LI=.80, MI=1.20)` | Named tier fractions of AMI. |
+| `hud_hh_size` | `4` | Household size 1–8 (or `NULL` for unadjusted). |
+
+```{r}
+# A 2-person household, just the ELI and VLI ceilings, official HUD limits
+ami_cutoffs("CA", "San Francisco", 2024,
+            ami_source  = "hud",
+            ami_tiers   = c(ELI = 0.30, VLI = 0.50),
+            hud_hh_size = 2)
+```
+
+### Output
+
+| Column | Meaning |
+|---|---|
+| `GEOID` | 5-digit county FIPS |
+| `NAME` | county name (from ACS, or HUD area name under `ami_source = "hud"`) |
+| `ami` | the county AMI (median family income basis) |
+| `cut_<TIER>` | one income-ceiling column per tier — e.g. `cut_ELI`, `cut_VLI`, … |
+
+Each `cut_<TIER>` is exactly the `income_cutoff` that `afford_index()` uses for that tier in that
+county. Inspecting it is the fastest sanity check on a region's results: if the dollar ceilings look
+wrong, the supply numbers will too.
+
+---
+
+# From v1 to v2: what `afford_index()` fixes
+
+The table below is the practical crosswalk — each legacy `afford()` limitation and how the new engine
+addresses it.
+
+| Concern | Legacy `afford()` (v1) | `afford_index()` (v2) |
+|---|---|---|
+| **AMI basis** | median of *tract median household* incomes (`B19013`), collapsed to one regional number | county median **family** income (`B19113`), HUD's anchor — one cutoff **per county** |
+| **Income brackets** | positional `rep()` of hard-coded bracket vectors | brackets parsed from ACS variable **labels** (robust to table changes) |
+| **Within a bracket** | `closest()` snaps the cutoff to the nearest bracket edge | **linear interpolation** within the bracket (no snapping) |
+| **Income tiers** | one `ami_limit` fraction per call | standardized **ELI/VLI/LI/MI** (configurable) in one call |
+| **Household size** | none | HUD **family-size factors** via `hud_hh_size` |
+| **Owner cost** | single fixed `price * 0.188` factor (≈3.8% mortgage baked in) | two explicit bases: `own_current` (actual `B25094` cost) and `own_buyin` (full mortgage model with your rate/term/down/tax) |
+| **Owner universe** | mixes owner value `B25075` + price-asked `B25085` | clean single universe per basis (`B25094` or `B25075`) |
+| **Official limits** | ACS only | `ami_source = "hud"` for HUD's published limits |
+| **Output shape** | wide, one row per tract with `tr_rent_*`/`tr_own_*` | tidy **long**, one row per tract × tenure × tier |
+| **Inputs** | FIPS codes only (names silently break joins) | FIPS **or** names, normalized up front |
+
+The headline fix is the owner side: v1's `0.188` factor corresponds to a ~3.8%, 30-year, 0%-down
+loan and at 2024 rates (~7%) **overstates** ownership affordability by roughly 30–40%. v2 replaces it
+with a transparent mortgage model whose every assumption is an argument you can set.
+
+---
+
+# Appendix: the legacy `afford()` engine
+
+`afford()` is the original v1 implementation, retained for backward compatibility. Prefer
+`afford_index()` for new work. Read the limitations before quoting v1 ownership numbers in a report;
+the full review lives in `dev/affordability-index-review.md`.
 
 ## Quick start
 
 ```{r}
 library(neighborhood)
 
-# 5-county Bay Area, households at 50% of Area Median Income, 2024 ACS
+# 5-county Bay Area, households at 50% of AMI, 2024 ACS
 bay <- afford(
-  state    = "06",
-  counties = c("001", "013", "041", "075", "081"),
+  state     = "06",
+  counties  = c("001", "013", "041", "075", "081"),
   ami_limit = 0.5,
-  year     = 2024
+  year      = 2024
 )
 
 # With tract geometry for mapping (returns an sf object)
 wasatch <- afford(
-  state    = "49",
-  counties = c("011", "035", "049", "057"),
+  state     = "49",
+  counties  = c("011", "035", "049", "057"),
   ami_limit = 0.5,
-  year     = 2024,
-  geometry = TRUE
+  year      = 2024,
+  geometry  = TRUE
 )
 ```
 
-`ami_limit` is the income level of interest as a fraction of Area Median Income: `0.3` ≈
-extremely low income, `0.5` ≈ very low income, `0.8` ≈ low income. **Use FIPS codes** for
-`state` and `counties` (e.g. `"06"`, `"041"`), not names — see limitations.
+`ami_limit` is the income level of interest as a fraction of AMI: `0.3` ≈ extremely low income,
+`0.5` ≈ very low income, `0.8` ≈ low income. Units affordable at or below it are counted
+cumulatively. **Use FIPS codes** for `state` and `counties` — names silently break the internal
+join.
+
+### Arguments
+
+| Argument | Default | What it does |
+|---|---|---|
+| `state` | — (required) | 2-digit state FIPS (e.g. `"06"`). Names not supported. |
+| `counties` | — (required) | 3-digit county FIPS codes. |
+| `ami_limit` | — (required) | Income level as a fraction of AMI. |
+| `year` | `2024` | ACS 5-year endpoint year. |
+| `geometry` | `FALSE` | If `TRUE`, return an `sf` object with tract polygons. |
+| `...` | — | Reserved for future use. |
 
 ## How it is calculated
 
-For a chosen income level `ami_limit`, the index is built in four steps.
+1. **Income threshold.** `AMI` = the median of tract median *household* incomes (`B19013_001`);
+   `threshold = ami_limit * AMI`.
+2. **Cost → required income.** Rentals (`B25063`): `income = (monthly_rent / 0.30) * 12`. Ownership
+   (`B25075` value + `B25085` price): `income = price * 0.188`.
+3. **Accessible units.** A unit is accessible if its required income is at or below the threshold;
+   `supply = accessible / total` per tract and tenure.
+4. **Compare to need.** `ratio = supply / class_prop` (location quotient) and
+   `rate = accessible / class_pop * 100000`.
 
-### 1. Set the income threshold
+## Output columns
 
-```
-AMI        = median of tract median household incomes in the region   (B19013_001)
-threshold  = ami_limit * AMI                                          (e.g. 0.5 * AMI)
-```
-
-All affordability is judged against this single regional `threshold`.
-
-### 2. Translate housing costs into the income needed to afford them
-
-Each housing-cost bracket from the ACS is converted into the household income required to
-afford it without spending more than **30%** of income on housing:
-
-| Tenure | Source | Cost → required income |
-|---|---|---|
-| **Rental** | gross rent, `B25063` | `income = (monthly_rent / 0.30) * 12` |
-| **Ownership** | value `B25075` + price asked `B25085` | `income = price * 0.188` |
-
-The rental rule is the standard 30%-of-gross-rent affordability test. The ownership factor
-`0.188` is a *fixed* approximation of the income needed to carry a home of a given price (see
-limitations — it embeds an interest-rate assumption).
-
-### 3. Count what each tract offers the income group
-
-Within each tract, a unit is **accessible** to the group if the income it requires is at or
-below the `threshold`. The index then forms, per tract and per tenure:
-
-```
-supply = accessible_units / total_units_in_tract
-       = "what share of this tract's stock is affordable to the group"
-```
-
-### 4. Compare supply to regional need
-
-Let `class_prop` be the region's share of households at or below the threshold. Then:
-
-```
-ratio = supply / class_prop
-      = location quotient: >1 means the tract carries MORE than its
-        "fair share" of affordable housing for this income group; <1 means less
-
-rate  = (accessible_units / regional_group_households) * 100000
-      = accessible units per 100,000 of the region's same-income households
-```
-
-`ratio` is the analytical heart of the index — it is the same idea the EDR reports lead with
-("fewer than one affordable rental unit per three extremely-low-income households").
-
-## Reading the output
-
-`afford()` returns one row per tract. The most useful columns:
+`afford()` returns one **wide** row per tract:
 
 | Column | Meaning |
 |---|---|
 | `tr_rent_total`, `tr_own_total` | rental / owned units in the tract |
 | `tr_rent_accessible`, `tr_own_accessible` | units affordable to the income group |
-| `tr_rent_supply`, `tr_own_supply` | accessible ÷ total (share affordable) |
-| `tr_rent_ratio`, `tr_own_ratio` | supply ÷ regional group share (**location quotient**) |
+| `tr_rent_supply`, `tr_own_supply` | accessible ÷ total |
+| `tr_rent_ratio`, `tr_own_ratio` | supply ÷ regional group share (location quotient) |
 | `tr_rent_rate`, `tr_own_rate` | accessible per 100k regional group-households |
 | `reg_total_pop`, `reg_class_pop` | region households (all / in the income group) |
 | `ami_limit` | the income level used |
-| `*_cat` | 3-class map categories (fixed cut points) |
+| `rent_jenks_cat`, `own_jenks_cat` | 3-class map categories |
 | `popup` | preformatted HTML for `leaflet` maps |
 
-A simple read: tracts with **`ratio` well above 1** are the region's affordable-housing
-reservoirs for that income group; tracts with **`ratio` near 0** cannot house the group at all.
-Overlaying low-`ratio` tracts with displacement-risk tracts reveals the migration squeeze the
-theory predicts — *nowhere affordable to move that isn't already under pressure.*
+## Known limitations
 
-## Assumptions and known limitations
+1. **Ownership embeds a fixed interest rate.** The `0.188` factor ≈ a 3.8%, 30-year, 0%-down loan;
+   at 2024 rates it overstates ownership affordability ~30–40%. (Fixed in v2 via the explicit
+   `own_buyin` model.)
+2. **"AMI" is the median of tract medians**, not HUD AMI, and collapses multi-county regions into one
+   cutoff. (Fixed in v2: county median family income.)
+3. **Occupied stock, not availability.** Scores existing units, not vacant/available ones (Gate 2 in
+   the design).
+4. **Price/value mixes two census universes** (`B25075` + `B25085`).
+5. **No non-price barriers** — discrimination, voucher rejection, eviction-record screening
+   ("the scarlet E") are absent (Gate 3 in the design).
+6. **Margins of error are dropped.**
+7. **Inputs must be FIPS codes** — passing names returns an empty join and distorts regional totals.
 
-These are summarized here so results are not over-read; the full treatment and fixes are in
-`dev/affordability-index-review.md`.
-
-1. **Ownership affordability embeds a fixed interest rate.** The `0.188` factor corresponds to a
-   ~3.8%, 30-year, 0%-down mortgage with no taxes/insurance. At 2024 rates (~7%) it **overstates**
-   ownership affordability by roughly 30–40%. Treat `tr_own_*` columns as provisional.
-2. **"AMI" is the median of tract medians**, not HUD AMI and not a population-weighted regional
-   median. It also collapses multi-county regions into a single cutoff.
-3. **Occupied stock, not availability.** The index scores the affordability of *existing* units,
-   not whether units are *vacant/available to move into*. A tract can be "affordable" yet have
-   nowhere to actually go.
-4. **Price/value mixes two census universes** (owner-occupied value + vacant-for-sale price asked).
-5. **No non-price barriers.** Discrimination, voucher rejection, and eviction-record/credit
-   screening ("the scarlet E") are not represented — though they are central to who can *actually*
-   move where.
-6. **Margins of error are dropped.** Small-denominator tracts (e.g. 1 of 2 units affordable) are
-   presented with the same confidence as large ones.
-7. **Inputs must be FIPS codes.** Passing `state = "CA"` / `county = "Marin"` (names) returns an
-   empty internal join and silently distorts the regional totals.
+---
 
 ## Data sources
 
-All inputs are American Community Survey 5-year estimates via `tidycensus::get_acs()`; a
-`CENSUS_API_KEY` must be set. Tables used: `B19013` (median income), `B19001` (income
-distribution), `B25075`/`B25085` (owner value / price), `B25063` (gross rent). Geometry, when
-requested, comes from `tigris::tracts()`.
+All inputs are ACS 5-year estimates via `tidycensus::get_acs()` (`CENSUS_API_KEY` required). v2 tables:
+`B19113` (median family income), `B19001` (income distribution), `B25063` (gross rent), `B25094`
+(owner cost, basis A), `B25075` (home value, basis B). v1 additionally uses `B19013` and `B25085`.
+Geometry comes from `tigris::tracts()`. `ami_source = "hud"` uses the `hudr` package + `HUD_API_KEY`.
 
 ## See also
 
-- `dev/affordability-index-review.md` — full methodological review and remediation plan.
-- `evictionresearch/library/code/d_calc_ami_incomplete.R` — the organization's HUD-style AMI tier
-  engine (county AMI + within-bracket interpolation) that future versions should build on.
-- `ntdf()` — neighborhood racial typologies, joinable to the index on `GEOID` for equity analysis.
+- `dev/affordability-index-design.md` — the three-gate "choice" funnel and the full v2 design.
+- `dev/affordability-index-review.md` — the v1 methodological review and remediation plan.
+- `dev/hud-income-limits-architecture.md` — HUD income-limit reproduction and longevity.
+- `vignette("mapping-with-maplibre")` — mapping `afford_index()` output.
+- `ntdf()` — neighborhood racial typologies, joinable on `GEOID` for equity analysis.
+
+## Acknowledgments
+
+The affordability index is part of the Eviction Research Network and CiDR Lab housing-precarity
+stack. Thanks to the ERN team and collaborators who pressure-tested the methodology.
 
 ## Issues and feedback
 
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
+</content>
+</invoke>

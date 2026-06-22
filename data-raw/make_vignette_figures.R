@@ -155,6 +155,136 @@ shot(with_hover(
            source = "lsc · acs · wru v2.0 · birdie", height = "440px"),
   data_index = 80), "chart-mn-ratio.png", delay = 3, vheight = 500)
 
+# ---- Chart gallery: ranked / disparity / composition from mn_evictions ----
+# All from the bundled data (no network), so these always render. The latest
+# complete 12-month window drives the cross-sectional charts.
+last_date <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  summarise(m = max(date)) |> pull(m)
+cutoff <- seq(last_date, by = "-12 months", length.out = 2)[2]
+win <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date > cutoff)
+
+county12 <- win |>
+  group_by(county) |>
+  summarise(filings = sum(filings), renters = dplyr::first(renters),
+            fb = sum(filings_black), fw = sum(filings_white),
+            rb = dplyr::first(renters_black), rw = dplyr::first(renters_white),
+            .groups = "drop") |>
+  mutate(rate  = 1000 * filings / renters,
+         black = 1000 * fb / rb, white = 1000 * fw / rw,
+         share_black = rb / renters) |>
+  filter(is.finite(rate))
+
+top <- county12 |> arrange(dplyr::desc(rate)) |> head(10)
+
+# 1. Ranked horizontal bars: top-10 counties by 12-month filing rate.
+shot(with_hover(
+  nt_bar(top, "county", "rate", value_fmt = "comma", yaxis = "hover",
+         source = "lsc · acs", height = "440px"), data_index = 0),
+  "chart-rank-counties.png", delay = 3, vheight = 500)
+
+# 2. Disparity dumbbell: Black vs white 12-month rate, widest gaps.
+gap <- county12 |> filter(is.finite(black), is.finite(white)) |>
+  mutate(g = black - white) |> arrange(dplyr::desc(g)) |> head(10)
+shot(nt_dumbbell(gap, "county", low = "white", high = "black",
+                 low_label = "White", high_label = "Black",
+                 source = "lsc · acs · wru v2.0 · birdie", height = "460px"),
+     "chart-dumbbell-race.png", delay = 3, vheight = 520)
+
+# 3. Lollipop: statewide rate by race, indexed to the white rate.
+sw <- win |>
+  summarise(across(c(filings_black, filings_white, filings_latine, filings_other,
+                     renters_black, renters_white, renters_latine, renters_other), sum)) |>
+  mutate(Black = 1000 * filings_black / renters_black,
+         White = 1000 * filings_white / renters_white,
+         Latine = 1000 * filings_latine / renters_latine,
+         Other = 1000 * filings_other / renters_other)
+idx <- data.frame(race = c("Black", "Latine", "Other", "White"),
+                  index = c(sw$Black, sw$Latine, sw$Other, sw$White) / sw$White)
+shot(nt_lollipop(idx, "race", "index", value_fmt = "multiple", highlight = "Black",
+                 baseline = 1, baseline_label = "parity with white",
+                 source = "lsc · acs · wru v2.0 · birdie", height = "360px"),
+     "chart-lollipop-race.png", delay = 3, vheight = 400)
+
+# 4. Composition (100% stacked): renter racial composition, top-6 counties.
+sc <- win |> group_by(county) |>
+  summarise(Black = dplyr::first(renters_black), White = dplyr::first(renters_white),
+            Latine = dplyr::first(renters_latine), Other = dplyr::first(renters_other),
+            .groups = "drop") |>
+  filter(county %in% top$county[1:6]) |>
+  tidyr::pivot_longer(c(Black, White, Latine, Other), names_to = "race", values_to = "renters")
+shot(nt_stacked_bar(sc, "county", "renters", group = "race", height = "420px",
+                    palette = c(White = "#9fb6c4", Black = "#19222C",
+                                Latine = "#F9322B", Other = "#6c7a89"),
+                    source = "acs"), "chart-stacked-renters.png", delay = 3, vheight = 460)
+
+# 5. Slope: 2019 -> 2024 annual filing rate per 1,000, biggest movers.
+ann <- mn_evictions |> filter(year %in% c(2019, 2024)) |>
+  group_by(county, year) |>
+  summarise(filings = sum(filings), renters = dplyr::first(renters), .groups = "drop") |>
+  mutate(rate = 1000 * filings / renters) |> filter(is.finite(rate))
+mov <- ann |>
+  tidyr::pivot_wider(id_cols = county, names_from = year, values_from = rate,
+                     names_prefix = "y") |>
+  mutate(d = y2024 - y2019) |> arrange(dplyr::desc(abs(d))) |> head(6)
+shot(nt_slope(filter(ann, county %in% mov$county), "year", "rate", group = "county",
+              value_fmt = "comma", source = "lsc · acs", height = "440px"),
+     "chart-slope-counties.png", delay = 3, vheight = 500)
+
+# 6. Scatter: county filing rate vs. share of renters who are Black (+ trend).
+sca <- county12 |> filter(is.finite(share_black))
+shot(with_hover(
+  nt_scatter(sca, "share_black", "rate", trend = TRUE, x_fmt = "percent",
+             value_fmt = "comma", yaxis = "hover", source = "lsc · acs",
+             height = "440px"), data_index = 0),
+  "chart-scatter-share.png", delay = 3, vheight = 500)
+
+# 7. Waffle: statewide composition of filings by race (12-month). Pass the race
+# palette so the focus group (Black) carries the accent and White stays light.
+race_pal <- c(Black = "#F9322B", White = "#aab4be", Latine = "#223754", Other = "#6c7a89")
+comp <- c(Black = sw$filings_black, White = sw$filings_white,
+          Latine = sw$filings_latine, Other = sw$filings_other)
+shot(nt_waffle(comp, palette = race_pal,
+               title = "Share of eviction filings by race, last 12 months",
+               source = "lsc · acs · wru v2.0 · birdie", height = "440px"),
+     "chart-waffle-race.png", delay = 2, vheight = 480)
+
+# 7b. Estimate + error bar: top counties by 12-month rate with a count-based
+# (Poisson) 95% interval, so the uncertainty in low-filing counties is visible.
+ci <- top |>
+  mutate(se = 1000 * sqrt(filings) / renters,
+         lo = pmax(0, rate - 1.96 * se), hi = rate + 1.96 * se)
+shot(with_hover(
+  nt_range(ci, "county", value = "rate", low = "lo", high = "hi",
+           value_fmt = "comma", yaxis = "hover", source = "lsc · acs",
+           height = "440px"), data_index = 0),
+  "chart-range-counties.png", delay = 3, vheight = 500)
+
+# 8. Static (ggplot2) version of the ranked bar in the ERN look — no browser
+#    needed, so this one renders even without a Chromium-family browser.
+{
+  library(ggplot2)
+  gg <- top |> mutate(hl = rate == max(rate)) |>
+    ggplot(aes(stats::reorder(county, rate), rate, fill = hl)) +
+    geom_col(width = 0.68) +
+    geom_text(aes(label = round(rate, 1)), hjust = -0.15, size = 3.3,
+              color = ern_palette("brand")[["navy"]]) +
+    scale_fill_manual(values = c(`FALSE` = ern_palette("brand")[["navy"]],
+                                 `TRUE` = ern_palette("brand")[["accent"]]),
+                      guide = "none") +
+    coord_flip(clip = "off") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+    labs(title = "Eviction filing rate by county",
+         subtitle = "Filings per 1,000 renter households · latest 12 months",
+         x = NULL, y = NULL, caption = "Source: ERN · LSC court records") +
+    theme_ern(grid = "x") +
+    theme(axis.text.x = element_blank(), panel.grid.major.x = element_blank())
+  ggsave(file.path(fig_dir, "chart-ggtheme.png"), gg, width = 8, height = 4.2, dpi = 140)
+  message("wrote ", file.path(fig_dir, "chart-ggtheme.png"))
+}
+
 # ---- Apartment List: pull from URL, Minneapolis metro median rent ----
 # Scrape the current link off the data page; fall back to a pinned vintage if
 # the page serves bot-filtered content to readLines().
@@ -220,6 +350,19 @@ prec_ok <- tryCatch({
   shot(m_prec, "map-precarity.png", delay = 7, vheight = 620)
   TRUE
 }, error = function(e) { message("Precarity figure skipped: ", conditionMessage(e)); FALSE })
+
+# ---- Affordability index map (afford_index ratio, for affordability-index.Rmd) ----
+# VLI rental supply ratio by tract, San Francisco. Needs a Census API key (the
+# pure-ACS AMI source); skipped cleanly if unavailable.
+afford_ok <- tryCatch({
+  idx <- afford_index("06", "075", geometry = TRUE)
+  vli_rent <- idx[idx$tenure == "rent" & idx$ami_tier == "VLI" & !is.na(idx$ratio), ]
+  m_aff <- nt_maplibre(vli_rent) |>
+    nt_add_choropleth(vli_rent, "ratio", type = "continuous",
+                      legend_title = "VLI rental supply ratio")
+  shot(m_aff, "map-afford-ratio.png", delay = 7, vheight = 620)
+  TRUE
+}, error = function(e) { message("Affordability figure skipped: ", conditionMessage(e)); FALSE })
 
 # Remove orphaned figures from earlier revisions.
 unlink(file.path(fig_dir, c("chart-trend.png", "chart-race.png", "chart-bars.png",

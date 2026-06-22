@@ -9,19 +9,26 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
 ```
 
 The neighborhood racial typology is a **descriptive, categorical** measure of
 who lives where, at the census-tract scale. Where a single-number segregation
 index (such as the [index of
 dissimilarity](https://en.wikipedia.org/wiki/Index_of_dissimilarity)) summarizes
-a whole region, the typology labels each tract — "All White", "Black-White",
-"Diverse", and so on — so you can map the fine-grained pattern of who shares (or
-does not share) a neighborhood.
+a whole region into one figure, the typology labels each tract — "All White",
+"Black-White", "Diverse", and so on — so you can map the fine-grained pattern of
+who shares (or does not share) a neighborhood.
 
 This vignette walks the end-to-end workflow: build the data with `ntdf()`,
-inspect and collapse the types with `ntcheck()`, and color or map the result.
-The method follows Hall, Crowder, and Spring (2015).[^hall]
+inspect and collapse the types with `ntcheck()`, color a leaflet map with
+`nt_pal()` or map it in one line with `nt_map()`, reach for the bundled national
+table `us_nt_tracts2024`, pair typologies with `afford_index()`, and — as a
+short aside — crosswalk PUMAs to counties with `get_co_puma()` for PUMS
+microdata. The classification follows Hall, Crowder, and Spring (2015).[^hall]
 
 [^hall]: Hall, Matthew, Kyle Crowder, and Amy Spring. 2015. "Neighborhood
 Foreclosures, Racial/Ethnic Transitions, and Residential Segregation."
@@ -34,81 +41,197 @@ library(dplyr)
 
 ## 1. Build the typologies with `ntdf()`
 
-`ntdf()` pulls the race/ethnicity table from the ACS via
+`ntdf()` pulls the race/ethnicity table (ACS `B03002`) via
 [tidycensus](https://walker-data.com/tidycensus/) (Kyle Walker) and classifies
-each tract. A tract is assigned to every group whose population share exceeds
-10%; the combination becomes its type. Set `geometry = TRUE` to get an `sf`
-object you can map.
+each geography. It computes the population share of five mutually exclusive
+groups — White, Black, Asian, Latine, and Other (everyone else, including
+multiracial and Native populations) — then assigns a tract to **every group
+whose share exceeds 10%**; the combination becomes its type. A group above 90%
+makes the tract "All …".
+
+The only required argument is `state`. The simplest call returns a plain
+(non-spatial) data frame:
 
 ```{r}
-balt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+balt <- ntdf(state = "MD", county = "Baltimore City")
 
 glimpse(balt)
 ```
 
-Two classification columns come back:
+Set `geometry = TRUE` to get back an `sf` object you can map directly:
 
-- **`NeighType`** — the full, fine-grained label (there are many possible
-  combinations).
-- **`nt_conc`** — a *concatenated* version that folds the rare multi-group
-  combinations into "3 Group Mixed" / "4 Group Mixed" and the single-group
-  variants into "Mostly …". It is an ordered factor with up to 19 levels and is
-  what you usually map.
+```{r}
+balt_sf <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+```
 
 `ntdf()` needs a Census API key (set once with
-`tidycensus::census_api_key("YOUR KEY", install = TRUE)`).
+`tidycensus::census_api_key("YOUR KEY", install = TRUE)`), so the tidycensus
+calls in this vignette are shown but not run.
+
+### Reading the output: `NeighType` vs `nt_conc`
+
+Two classification columns come back:
+
+- **`NeighType`** — the full, fine-grained label. Every group above the 10%
+  threshold appears in the name (e.g. `"Black-Latine-White"`), so there are many
+  possible combinations.
+- **`nt_conc`** — a *concatenated* version that folds the rare multi-group
+  combinations into "3 Group Mixed" / "4 Group Mixed" and the single-group
+  variants (the "All …" and "…-Shared" labels) into "Mostly …". It is an
+  ordered factor with 19 levels, and it is what you usually map.
+
+The **10% concentration threshold** is the heart of the method: a group has to
+be at least one-in-ten of a tract's population to "count" toward that tract's
+label. That is why a tract that is 95% White and 5% Black reads as "Mostly
+White" (via `"White-Shared"`), not "Black-White" — the Black share never clears
+the bar. The 19 ordered `nt_conc` levels run from the single-group "Mostly …"
+types, through the two-group pairs, up to the mixed and "Diverse" categories and
+finally "Unpopulated Tract":
+
+```{r}
+levels(balt$nt_conc)
+```
+
+### Every `ntdf()` argument
+
+| Argument | Default | What it does |
+|---|---|---|
+| `state` | *(required)* | One or more states (name, abbreviation, or FIPS), passed straight to tidycensus. |
+| `geography` | `"tract"` | Census geography to classify. Any tidycensus level works — `"block group"`, `"county"`, `"county subdivision"`, `"place"`, etc. |
+| `county` | `NULL` | Restrict to one or more counties (name or FIPS). `NULL` returns the whole state. |
+| `geometry` | `FALSE` | `TRUE` returns an `sf` object with polygons for mapping. |
+| `cache_table` | `TRUE` | Passed to tidycensus — cache the variable lookup table locally to speed up repeat calls. |
+| `output` | `"wide"` | `"wide"` (one row per geography, the classifier needs this) or `"tidy"`. |
+| `year` | `2019` | The ACS 5-year **endpoint** year (so `2019` = the 2015–2019 sample). |
+| `...` | — | Any other argument is forwarded to `tidycensus::get_acs()`. |
+
+A different geography — classify block groups instead of tracts:
+
+```{r}
+bg <- ntdf(state = "MD", county = "Baltimore City", geography = "block group")
+```
+
+A different year — the typology of the same place in an earlier ACS window:
+
+```{r}
+balt_2015 <- ntdf(state = "MD", county = "Baltimore City", year = 2015)
+```
+
+Because `...` reaches `tidycensus::get_acs()`, you can pass any of its arguments
+through. For example, request the 1-year survey instead of the 5-year default:
+
+```{r}
+balt_acs1 <- ntdf(state = "MD", county = "Baltimore City",
+                  year = 2022, survey = "acs1")
+```
+
+The `output = "tidy"` form returns one row per geography × variable (the long
+shape) rather than one wide row per geography:
+
+```{r}
+balt_tidy <- ntdf(state = "MD", county = "Baltimore City", output = "tidy")
+```
+
+Multiple states or counties are vectors:
+
+```{r}
+dmv <- ntdf(state = c("MD", "VA", "DC"))                       # whole region
+twocty <- ntdf(state = "MD", county = c("Baltimore City", "Howard"))
+```
 
 ## 2. Inspect with `ntcheck()`
 
-Before mapping, see how the types are distributed. `ntcheck()` returns a
-frequency table of `NeighType`, most common first — useful for deciding whether
-the default `nt_conc` concatenation is collapsed enough for your study area, or
-whether some rare types are worth merging further.
+Before mapping, see how the types are distributed. `ntcheck(df)` returns a plain
+data frame with one row per `NeighType` and a count `n`, sorted most common
+first — useful for deciding whether the default `nt_conc` concatenation is
+collapsed enough for your study area, or whether some rare fine-grained types
+are worth merging further. Its only argument is the `ntdf()`-created data frame;
+the `...` is an unused backward-compatibility slot, so anything you pass there is
+silently ignored.
 
 ```{r}
 ntcheck(balt)
 ```
 
-For a quick national reference, the package ships `us_nt_tracts2024`, a
-precomputed table of every U.S. tract built with this same `ntdf()` pipeline (it
-is **non-spatial** — see step 4 for mapping it):
+It tabulates the detailed `NeighType` column (not `nt_conc`), so it is the right
+tool for spotting which long labels are rare. To tabulate the collapsed
+`nt_conc` levels instead, a `count()` does the job:
 
 ```{r}
-ntcheck(us_nt_tracts2024)
+balt |> count(nt_conc, sort = TRUE)
+```
 
-# Or by state
+## 3. The bundled national table: `us_nt_tracts2024`
+
+For a national reference without an API call, the package ships
+`us_nt_tracts2024`: a precomputed table of every U.S. tract (plus DC and Puerto
+Rico) built with this same `ntdf()` pipeline, using the 5-year ACS centered on
+2024 (the 2020–2024 endpoint). It is **non-spatial** (no geometry column — see
+§5 for mapping it) and carries two extra columns the live `ntdf()` output does
+not: `state` (two-letter postal code) and `year` (2024).
+
+```{r, eval=TRUE}
+library(neighborhood)
+library(dplyr)
+dim(us_nt_tracts2024)
+names(us_nt_tracts2024)
+```
+
+`ntcheck()` works on it directly — this is the national frequency table:
+
+```{r, eval=TRUE}
+head(ntcheck(us_nt_tracts2024), 10)
+```
+
+Or slice to one state and tabulate the collapsed levels:
+
+```{r, eval=TRUE}
 us_nt_tracts2024 |>
   filter(state == "CA") |>
   count(nt_conc, sort = TRUE)
 ```
 
-## 3. Color and map
+## 4. Color and map
 
-For a **leaflet** map, `nt_pal()` returns the canonical color palette keyed to
-`nt_conc`:
+### Leaflet, via `nt_pal()`
+
+For a **leaflet** map, `nt_pal(df)` returns the canonical color palette — a
+`leaflet::colorFactor()` keyed to the 19 `nt_conc` levels, in the Eviction
+Research Network house colors, with grey (`#C0C0C0`) for `NA`. Pass it your
+`ntdf()` data frame (it reads the `nt_conc` column); like `ntcheck()`, its
+trailing `...` is an unused compatibility slot.
 
 ```{r}
-pal <- nt_pal(balt)
+pal <- nt_pal(balt_sf)
 
-leaflet::leaflet(balt) |>
+leaflet::leaflet(balt_sf) |>
   leaflet::addProviderTiles("CartoDB.Positron") |>
   leaflet::addPolygons(fillColor = ~pal(nt_conc), fillOpacity = 0.7,
                        weight = 0.3, color = "#ffffff") |>
   leaflet::addLegend(pal = pal, values = ~nt_conc, title = "Neighborhood type")
 ```
 
-For an interactive **MapLibre** map, you don't even need the palette —
-`nt_map()` applies the same colors automatically:
+### MapLibre, via `nt_map()`
+
+For an interactive **MapLibre** map you don't even need the palette — `nt_map()`
+applies the same color key automatically. When you omit `color` and the data has
+an `nt_conc` column, it maps the typologies; otherwise name a column to map.
 
 ```{r}
-nt_map(balt)   # see vignette("mapping-with-maplibre") for the full tour
+nt_map(balt_sf)                    # typologies (auto-detects nt_conc)
+nt_map(balt_sf, color = "pBlack")  # a numeric column instead
 ```
+
+`nt_map(data, color = NULL, ...)` is shorthand for `nt_maplibre()` piped into
+`nt_add_choropleth()`; the `...` forwards to `nt_add_choropleth()` (e.g. `type`,
+`breaks`, `legend`, `popup`). See `vignette("mapping-with-maplibre")` for the
+full tour.
 
 ```{r typology-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: Baltimore City tracts colored by neighborhood typology with the canonical ERN palette."}
-knitr::include_graphics("figures/map-typologies.png")
+fig("map-typologies.png")
 ```
 
-## 4. Mapping the bundled national table
+## 5. Mapping the bundled national table
 
 `us_nt_tracts2024` has no geometry, so join it to tract geometry first. For a
 single state this is quick; for the whole country, see the PMTiles section of
@@ -118,38 +241,101 @@ single state this is quick; for the whole country, see the PMTiles section of
 md_geo <- tigris::tracts(state = "MD", cb = TRUE, year = 2024) |>
   left_join(filter(us_nt_tracts2024, state == "MD"), by = "GEOID")
 
-nt_map(md_geo)
+nt_map(md_geo)   # nt_conc is present, so it colors typologies automatically
 ```
 
-## 5. Pairing typologies with affordability
+## 6. Pairing typologies with affordability
 
 Because both `ntdf()` output and `afford_index()` are keyed on the tract
-`GEOID`, you can join them and ask equity questions — for example, *is affordable
-housing concentrated in, or absent from, neighborhoods of color?* Map the
-affordability ratio and overlay or compare it against the typology.
+`GEOID`, you can join them and ask equity questions — for example, *is the
+housing affordable to low-income renters concentrated in, or absent from,
+neighborhoods of color?*
+
+`afford_index(state, counties, ...)` returns a **long** tibble with one row per
+tract × tenure × tier. Its tiers are the standardized ELI/VLI/LI/MI ceilings
+(Extremely-/Very-/Low-/Moderate-Income, as cumulative fractions of Area Median
+Income), and its tenures are `"rent"`, `"own_current"` (current owner cost), and
+`"own_buyin"` (the income needed to buy in today). The key takeaway for mapping:
+**filter to a single tenure and tier first**, otherwise each tract appears
+several times.
 
 ```{r}
-aff <- afford(state = "24", counties = "510", ami_limit = 0.5, year = 2024)
+idx <- afford_index("24", "510", year = 2024)   # Baltimore City, all tenures/tiers
 
-equity <- balt |>
-  left_join(aff, by = "GEOID")
+# Keep one slice: rental supply affordable to Very-Low-Income households
+vli_rent <- idx |>
+  filter(tenure == "rent", ami_tier == "VLI")
 
-# A choropleth of affordable-rental supply, readable next to the typology map
-nt_map(equity, color = "tr_rent_ratio", legend_title = "Affordable-rental ratio")
+equity <- balt_sf |>
+  left_join(vli_rent, by = "GEOID")
+
+# `ratio` is a location quotient: supply vs. the region's share of VLI households
+nt_map(equity, color = "ratio")
 ```
 
-For the standardized ELI/VLI/LI/MI tiers and owner/renter cost models, use
-`afford_index()` instead (it returns a tidy long table — filter to one
-tenure/tier before mapping).
+Per row, the most useful columns are `supply` (accessible units ÷ total units in
+the tract), `ratio` (that supply divided by the region's share of households in
+the tier — a location quotient, where 1 is parity), and `rate` (accessible units
+per 100,000 regional tier households). To attach polygons in one step instead of
+joining, pass `geometry = TRUE` — but still filter to one tenure/tier before
+mapping, since geometry duplicates across slices:
 
-See `vignette("affordability-index")` for the affordability methodology and
-`vignette("mapping-with-maplibre")` for the full mapping toolkit.
+```{r}
+idx_sf <- afford_index("24", "510", year = 2024, geometry = TRUE)
+idx_sf |>
+  filter(tenure == "rent", ami_tier == "VLI") |>
+  nt_map(color = "ratio")
+```
+
+`afford_index()` exposes the full cost model — the owner-buy-in mortgage
+assumptions (`interest_rate`, `term_years`, `down_pct`, `tax_ins_rate`), the AMI
+source (`ami_source`), the tier fractions (`ami_tiers`), and the household-size
+adjustment (`hud_hh_size`). See `vignette("affordability-index")` for the full
+methodology and every argument.
+
+## 7. Aside: PUMA ↔ county crosswalk with `get_co_puma()`
+
+Tract typologies cover the published ACS tables, but individual-level questions
+(household structure, age, tenure interactions) need **PUMS microdata**, which is
+geocoded to PUMAs (Public Use Microdata Areas), not tracts or counties. PUMAs and
+counties do not nest cleanly — in dense cities several PUMAs sit inside one
+county; in rural areas one PUMA spans several counties. `get_co_puma(st, yr)`
+builds the crosswalk by spatially joining PUMA polygons to county-tagged tract
+centroids, so you can attach a county to each PUMA.
+
+```{r}
+study_pumas <- get_co_puma("OR", 2021)   # st = state(s), yr = PUMA vintage year
+```
+
+It returns a data frame of PUMA and county FIPS, including a `PUMACE…` code
+column you can join to `tidycensus::get_pums()` output (Kyle Walker), plus
+`state`, `state_name`, and a cleaned `county` name. `st` and `yr` are vectorized
+(both are walked in parallel), and `...` forwards to `tigris::tracts()`.
+
+```{r}
+pums <- tidycensus::get_pums(
+  variables = c("PUMA", "TEN", "AGEP"),
+  state = "OR", survey = "acs5", year = 2021)
+
+study_pums <- left_join(study_pumas, pums, by = c("PUMACE10" = "PUMA"))
+```
+
+See `?get_co_puma` for a worked renter-by-race-and-sex example end to end.
+
+## Where to go next
+
+- `vignette("affordability-index")` — the `afford_index()` methodology and every
+  cost-model argument.
+- `vignette("mapping-with-maplibre")` — the full MapLibre toolkit
+  (`nt_maplibre()`, `nt_add_choropleth()`, `nt_add_labels()`, PMTiles for
+  national-scale maps).
 
 ## Acknowledgments
 
-Census data come from Kyle Walker's **tidycensus**. The MapLibre mapping
-functions used here were developed with the assistance of **Claude Opus 4.8**
-(Anthropic) for transparency; they are deterministic and require no AI to run.
+Census data come from Kyle Walker's **tidycensus** and **tigris**. The MapLibre
+mapping functions used here were developed with the assistance of **Claude Opus
+4.8** (Anthropic) for transparency; they are deterministic and require no AI to
+run.
 
 ## Issues and feedback
 

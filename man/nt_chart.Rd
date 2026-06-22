@@ -162,6 +162,17 @@ nt_chart(filings, "month", "filings", type = "line",
 \code{\link[echarts4r:e_charts]{echarts4r::e_charts()}} and \code{\link[echarts4r:e_tooltip]{echarts4r::e_tooltip()}} underneath.
 
 Other ern_charts:
-\code{\link[=nt_spark]{nt_spark()}}
+\code{\link[=ern_palette]{ern_palette()}},
+\code{\link[=nt_bar]{nt_bar()}},
+\code{\link[=nt_dumbbell]{nt_dumbbell()}},
+\code{\link[=nt_lollipop]{nt_lollipop()}},
+\code{\link[=nt_range]{nt_range()}},
+\code{\link[=nt_scatter]{nt_scatter()}},
+\code{\link[=nt_slope]{nt_slope()}},
+\code{\link[=nt_spark]{nt_spark()}},
+\code{\link[=nt_stacked_bar]{nt_stacked_bar()}},
+\code{\link[=nt_waffle]{nt_waffle()}},
+\code{\link{scale_ern}},
+\code{\link[=theme_ern]{theme_ern()}}
 }
 \concept{ern_charts}

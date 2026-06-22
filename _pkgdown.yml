@@ -29,11 +29,29 @@ reference:
       - nt_pmtiles
   - title: Charts (interactive)
     desc: >
-      Interactive editorial charts (trend lines, bars, sparklines) where hovering
-      reveals the y-axis. Built on John Coene's echarts4r.
+      Interactive editorial charts in the ERN "newspaper graphic" style where
+      hovering reveals the y-axis. Built on John Coene's echarts4r. From trend
+      lines and sparklines to ranked bars, disparity dumbbells, lollipops,
+      composition bars, slope charts, scatter, and Du Bois-style waffle units.
     contents:
       - nt_chart
       - nt_spark
+      - nt_bar
+      - nt_lollipop
+      - nt_dumbbell
+      - nt_range
+      - nt_stacked_bar
+      - nt_slope
+      - nt_scatter
+      - nt_waffle
+  - title: Static charts (ggplot2)
+    desc: >
+      A ggplot2 theme and color scales in the same ERN look, for reproducing the
+      static (print/PDF) report and paper figures.
+    contents:
+      - theme_ern
+      - scale_ern
+      - ern_palette
   - title: Crosswalks
     contents:
       - get_co_puma
@@ -48,6 +66,7 @@ articles:
     contents:
       - mapping-with-maplibre
       - interactive-charts
+      - chart-gallery
       - precarity-mapping
       - neighborhood-typologies
       - affordability-index

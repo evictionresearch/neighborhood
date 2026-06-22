@@ -9,6 +9,10 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
 ```
 
 The Eviction Research Network's flagship maps put a **housing-precarity measure**
@@ -22,6 +26,10 @@ threshold. This advanced tutorial rebuilds that whole experience with the
 The precarity score we build is **illustrative** — a transparent composite of a
 few ACS measures, meant to demonstrate the mapping tooling, not to stand in for a
 validated model. Swap in your own measure and every step below carries over.
+
+The functions on tour here are `nt_maplibre()` (the base map), `nt_add_choropleth()`
+(filled layers), `nt_layers_control()` (the measure switcher), `nt_popup()` (the
+rich click panel), and `nt_pmtiles()` (vector tiles for the at-scale version).
 
 ```{r setup}
 library(neighborhood)
@@ -80,6 +88,10 @@ prec <- tr |>
   )
 ```
 
+We **filter** out near-empty tracts here so percentiles aren't distorted by a
+20-person tract. Section 2.1 shows an alternative: keep them and **grey them out**
+on the map instead of dropping them.
+
 Join the bundled racial typologies on `GEOID` — we use the group shares for the
 popup bar chart and the typology label in the field table:
 
@@ -97,11 +109,16 @@ prec <- prec |>
 Add the composite and its two main components as separate layers — each with its
 own `id`, all but the first `visible = FALSE` — then wire a switcher with
 [nt_layers_control()]. Picking a measure shows that layer **and its legend**, and
-hides the others:
+hides the others.
 
 A 5-class sequential ramp reads well for a 0–100 percentile; pass it as `colors`
-(with matching `labels`) so every layer uses the same legend grammar. Each
-`breaks` vector has one fewer entry than `colors`:
+(with matching `labels`) so every layer uses the same legend grammar. For a
+`"step"` (binned) layer, each `breaks` vector normally has one fewer entry than
+`colors`. The third layer below leaves `colors` unset, so it falls back to the
+default 4-class ERN ramp, and shows the convenience case: if you pass *as many*
+breaks as colors (a leading floor — here `c(0, 0.25, 0.5, 0.75)` against the
+4-class ramp), `nt_add_choropleth()` drops the floor for you, so the same call
+works whether or not you include it.
 
 ```{r}
 ramp5 <- c("#ffffcc", "#fed976", "#fd8d3c", "#f03b20", "#bd0026")
@@ -118,7 +135,7 @@ m <- nt_maplibre(prec) |>
                     legend_title = "Renters paying 30%+ of income",
                     popup = "popup", opacity = 0.85, visible = FALSE) |>
   nt_add_choropleth(prec, "renter_share", id = "Renter share",
-                    breaks = c(0.25, 0.5, 0.75),
+                    breaks = c(0, 0.25, 0.5, 0.75),   # 4 breaks, leading floor dropped
                     labels = c("<25%", "25-50%", "50-75%", "75%+"),
                     legend_title = "Share of households renting",
                     popup = "popup", opacity = 0.85, visible = FALSE)
@@ -129,9 +146,77 @@ m <- nt_layers_control(m, layers = c("Precarity", "Rent burden", "Renter share")
 
 (We pass `popup = "popup"` ahead of building that column — that happens next.)
 
-```{r precarity-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="An illustrative precarity map for Hennepin County, MN: the composite percentile layer with the ERN sequential ramp, the measure switcher (Precarity / Rent burden / Renter share), and the legend that follows the chosen layer. Step 7 scales the same recipe to all US tracts via PMTiles."}
-knitr::include_graphics("figures/map-precarity.png")
+### Renaming and repositioning the switcher
+
+The `layers` argument names the layer `id`s to toggle, in order; the **first is
+shown initially** and the rest must have been added with `visible = FALSE`. By
+default the switcher prints those same ids as its option labels. Pass `labels` to
+show friendlier text without renaming the layers themselves (it must be the same
+length as `layers`), and `position` to move the control. `position` is one of
+`"bottom-right"` (the default), `"bottom-left"`, `"top-left"`, or `"top-right"`;
+the default keeps it clear of the legend (top-left) and the search/navigation
+controls (top-right).
+
+```{r}
+m <- nt_layers_control(
+  m,
+  layers   = c("Precarity", "Rent burden", "Renter share"),
+  labels   = c("Composite precarity", "Rent burden (30%+)", "Renters (%)"),
+  title    = "Measure",
+  position = "bottom-left"
+)
 ```
+
+For a raw multi-select **checkbox** toggle (several layers visible at once)
+instead of this one-at-a-time radio, drop to `mapgl::add_layers_control()`.
+
+```{r precarity-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="An illustrative precarity map for Hennepin County, MN: the composite percentile layer with the ERN sequential ramp, the measure switcher (Precarity / Rent burden / Renter share), and the legend that follows the chosen layer. Step 7 scales the same recipe to all US tracts via PMTiles."}
+fig("map-precarity.png")
+```
+
+### 2.1 Grey the filtered tracts instead of dropping them
+
+In step 1 we *removed* low-population tracts. Sometimes you want them on the map
+but visibly **not measured** — a neutral grey, so the reader sees coverage gaps
+instead of holes. Keep those tracts in the data with a missing (`NA`) measure,
+and `nt_add_choropleth()` fills them with `na_color` (default ERN grey
+`#C0C0C0`). `outline_color` sets the polygon border (default white); a faint grey
+border often reads better over a light basemap.
+
+```{r}
+prec_all <- prec |>
+  mutate(precarity = ifelse(pop < 500, NA_real_, precarity))   # keep tract, blank the score
+
+nt_maplibre(prec_all) |>
+  nt_add_choropleth(prec_all, "precarity", id = "Precarity",
+                    breaks = c(20, 40, 60, 80), colors = ramp5,
+                    labels = c("0-20", "20-40", "40-60", "60-80", "80-100"),
+                    legend_title = "Precarity percentile",
+                    na_color = "#d9d9d9",        # grey for the unmeasured tracts
+                    outline_color = "#9aa6b2",   # soft border instead of white
+                    opacity = 0.85)
+```
+
+### `nt_add_choropleth()` argument reference
+
+| Argument | What it does |
+|---|---|
+| `column` | Column to color by. Numeric → binned ERN ramp; factor/character → categorical (`nt_conc` gets the canonical typology palette). |
+| `type` | `"auto"` (default), `"categorical"`, `"continuous"` (smooth), or `"step"` (binned). |
+| `breaks` | Interior thresholds for `"step"`/`"continuous"`; one fewer than `colors`, or pass an equal-length leading-floor vector and the floor is dropped. Defaults to data quantiles. |
+| `colors` | Fill colors — one per category, or the numeric ramp (defaults to the 4-class ERN ramp). |
+| `labels` | Legend labels for binned numeric maps. |
+| `fill_color` | A raw MapLibre paint expression used verbatim (escape hatch); pass `colors` + `labels` too if you want a legend. |
+| `id` | Layer id (defaults from `column`); the handle the switcher and `setFilter()` use. |
+| `legend` | `TRUE` (default), `FALSE`, or `"interactive"` (clickable, filters the map). |
+| `legend_title` | Legend title (defaults to `column`). |
+| `popup` / `tooltip` | `TRUE` default, `FALSE`/`NULL`, a column name, or a length-`nrow(data)` vector. |
+| `opacity` | Fill opacity (default `0.7`). |
+| `outline_color` | Polygon border color (default white `#ffffff`). |
+| `na_color` | Fill for missing values (default ERN grey `#C0C0C0`). |
+| `visible` | Start visible? `FALSE` for all-but-one layer under a switcher. |
+| `tiles` / `max_inline` | `"auto"` (PMTiles past `max_inline` = `25000` features), `"inline"`, or `"pmtiles"`. |
+| `...` | Passed to `mapgl::add_fill_layer()`. |
 
 ## 3. The rich popup: race bars and "bubble tracks"
 
@@ -215,6 +300,25 @@ prec$popup <- nt_popup(
 With the `popup` column built, re-run the step-2 pipe (it already references
 `popup = "popup"`) and every layer gets the rich popup on click.
 
+### Title prefixing
+
+When `title` names a column (as `"GEOID"` does above), `nt_popup()` by default
+prefixes the label, so the popup header reads `GEOID: 27053026200`. That is handy
+for an ambiguous id, but for a value that already reads as a name you usually want
+the **bare value**. Set `prefix_title = FALSE`:
+
+```{r}
+# Header reads "27053026200" (bare) rather than "GEOID: 27053026200"
+nt_popup(prec, title = "GEOID", prefix_title = FALSE,
+         fields = c("Neighborhood type" = "nt_conc"))
+```
+
+`prefix_title` only applies when `title` matches a column name. A `title` that is
+**not** a column is treated as a literal string shared by every popup, and the
+prefix never applies — `title = "Hennepin tract"` is the same banner on every
+feature. Numeric `fields` are formatted automatically: values that all sit in
+`[0, 1]` render as percentages, other numerics get thousands separators.
+
 ## 4. A threshold slider
 
 The other piece of the flagship experience is a slider that filters the map to
@@ -251,6 +355,10 @@ the only filter on the layer — drag the slider and tracts below the threshold
 drop out. (To filter a *categorical* layer instead, swap the expression for
 `['in', ['get', 'measure'], ['literal', ['High', 'Extreme']]]`.)
 
+If you took the section-2.1 route and kept low-population tracts as `NA`, note
+that `['>=', ['get', 'precarity'], v]` already excludes them (a missing value
+fails the comparison), so the grey tracts stay out of the filtered view too.
+
 ## 5. Save it
 
 A map is an `htmlwidget`; write a standalone, shareable HTML file with
@@ -281,7 +389,15 @@ m |>
 A statewide or national precarity map is too many tracts to embed inline. Build
 the measure for every tract (loop the step-1 recipe over states, or pull national
 ACS at once), then tile it once with [nt_pmtiles()] (it shells out to
-`tippecanoe`), host the `.pmtiles`, and point a layer at it:
+`tippecanoe`), host the `.pmtiles`, and point a layer at it.
+
+`nt_pmtiles()` carries **all non-geometry columns** into the tiles as feature
+properties, so your `popup`/`tooltip` columns survive tiling. The `layer` name
+written into the archive (default `"nt"`) **must match** the `source_layer` you
+draw with. The default tippecanoe flags auto-select a zoom range and shed the
+densest features as needed; pass `tippecanoe_args` to replace them wholesale (the
+output `-o`, layer `-l`, and input are always set for you), and `quiet = TRUE` to
+silence tippecanoe's console output.
 
 ```{r}
 tiles <- nt_pmtiles(prec_us, path = "precarity_2022.pmtiles", layer = "precarity")
@@ -297,8 +413,17 @@ nt_maplibre() |>
                         fill_opacity = 0.85)
 ```
 
+`mapgl::step_expr()` is the tile-side equivalent of the `breaks`/`colors` you gave
+`nt_add_choropleth()` inline: `base` is the color below the first `values` break,
+and each subsequent `stops` color applies above its break. Keeping the same
+thresholds and ramp makes the tiled national map read identically to the inline
+county one.
+
 `nt_add_choropleth(..., tiles = "pmtiles")` will also do the tiling for you when a
-layer exceeds the inline threshold.
+layer exceeds the inline threshold (`max_inline`, default 25,000 features) — it
+calls `nt_pmtiles()` under the hood with `layer = "nt"` and wires the source for
+you, so you rarely need the explicit three-step form above unless you want to host
+the archive separately.
 
 ## Acknowledgments
 
@@ -314,3 +439,5 @@ deterministic and require no AI to run.
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
+</content>
+</invoke>

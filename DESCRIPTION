@@ -33,6 +33,8 @@ Imports:
     leaflet,
     mapgl (>= 0.4.0),
     echarts4r (>= 0.4.0),
+    ggplot2,
+    jsonlite,
     scales,
     stringr,
     purrr,
@@ -45,6 +47,7 @@ Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
+    tidyr,
     hudr
 SystemRequirements: tippecanoe (optional, for building PMTiles vector tiles)
 VignetteBuilder: knitr

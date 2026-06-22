@@ -189,6 +189,11 @@ nt_add_choropleth <- function(map, data, column,
 # Build the default popup HTML for a choropleth: a per-tract title plus the
 # mapped column (and county/place name when handy).
 .nt_default_popup <- function(data, column) {
+  # A numeric GEOID would otherwise be comma-formatted (27,053,026,200) by the
+  # generic field formatter; keep id-like titles as plain digit strings.
+  if ("GEOID" %in% names(data) && is.numeric(data$GEOID)) {
+    data$GEOID <- format(data$GEOID, scientific = FALSE, trim = TRUE)
+  }
   title <- if ("GEOID" %in% names(data)) "GEOID" else NULL
   flds <- stats::setNames(column, column)
   if ("county" %in% names(data) && column != "county") {

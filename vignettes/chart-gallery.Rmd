@@ -1,0 +1,650 @@
+---
+title: "Chart gallery: ranking, disparities, composition"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Chart gallery: ranking, disparities, composition}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+# Embed a pre-rendered figure only if it exists, so the vignette builds before
+# the interactive PNGs are regenerated (see data-raw/make_vignette_figures.R).
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
+```
+
+`vignette("interactive-charts")` covers the trend line — the chart at the heart
+of the Eviction Research Network state profiles. This companion gallery covers
+the rest of the family: the **ranked**, **disparity**, and **composition** forms
+the ERN publishes, built with the same one-line, opinionated wrappers over
+[echarts4r](https://echarts4r.john-coene.com/). They share the "newspaper
+graphic" grammar — minimal axes, an optional **`yaxis = "hover"`** reveal, an
+accented highlight, direct labels over legends, a dark tooltip, and a small
+`source` credit — and each returns the raw `echarts4r` widget so you can keep
+piping `e_*`.
+
+The design instinct throughout is the W.E.B. Du Bois one: spare, bold, let the
+comparison carry the message. That makes these charts a natural fit for the
+disparities the network specializes in.
+
+This gallery is **exhaustive**: every function below is documented from the
+basic one-call form up through each named argument. The interactive widgets are
+shown but not executed at build time (each chunk is `eval = FALSE`, with a
+pre-rendered PNG alongside), while the static **ggplot2** kit at the end runs
+live so its figures are real.
+
+Every interactive example is built from the bundled `mn_evictions` data, so you
+can run them yourself.
+
+```{r setup}
+library(neighborhood)
+library(dplyr)
+library(tidyr)
+```
+
+We reuse one derived table throughout — each county's filings, renter
+denominator, and race-imputed counts over the **latest complete 12 months** —
+and the annualized **filings per 1,000 renter households** the profiles
+headline:
+
+```{r}
+last_date <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  summarise(m = max(date)) |> pull(m)
+cutoff <- seq(last_date, by = "-12 months", length.out = 2)[2]
+
+county12 <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date > cutoff) |>
+  group_by(county) |>
+  summarise(filings = sum(filings), renters = first(renters),
+            fb = sum(filings_black), fw = sum(filings_white),
+            rb = first(renters_black), rw = first(renters_white),
+            .groups = "drop") |>
+  mutate(rate  = 1000 * filings / renters,   # annualized per 1,000 renters
+         black = 1000 * fb / rb,
+         white = 1000 * fw / rw,
+         share_black = rb / renters) |>
+  filter(is.finite(rate))
+```
+
+## Shared conventions
+
+A handful of arguments recur across every function, so they are documented once
+here and referenced below:
+
+| Argument | What it does |
+|---|---|
+| `value_fmt` | Formats the value axis, hover crosshair, tooltip, and direct labels. One of `"comma"` (default), `"percent"` (expects `[0,1]`), `"currency"`, `"multiple"` (`1.52×`), or `"none"`. |
+| `yaxis` | When the value-axis scale shows: `"always"`, `"hover"` (the newspaper style — hidden until the reader points at the chart), or `"none"`. |
+| `orientation` | `"horizontal"` (default for the ranked family) so long names read cleanly, or `"vertical"`. |
+| `value_labels` | Logical; print each value directly on the chart (default `TRUE`). |
+| `palette` | Series/segment colors. A **named** vector matches by category/group name. |
+| `title`, `subtext` | Optional bold navy title and muted subtitle. |
+| `source` | Small attribution in the lower-right. |
+| `height` | CSS height, e.g. `"420px"`. |
+
+Note one honesty rule baked into the kit: **filled bars (`nt_bar`,
+`nt_stacked_bar`) always start at zero** so bar *area* is never misleading,
+while dot/whisker charts (`nt_lollipop`, `nt_range`, `nt_dumbbell`) may scale to
+the data so small differences stay legible.
+
+## 1. Ranked bars — `nt_bar()`
+
+The workhorse "top counties" plate. `nt_bar()` sorts, keeps the top `n`, accents
+the leader, labels each bar, and (horizontal by default) lets long county names
+breathe. `yaxis = "hover"` keeps the scale hidden until the reader points at it.
+
+```{r}
+top <- county12 |> arrange(desc(rate)) |> head(10)
+
+nt_bar(top, "county", "rate", value_fmt = "comma",
+       yaxis = "hover", source = "lsc · acs")
+```
+
+```{r rank, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Top-10 counties by 12-month filing rate; the leader is accented and the value-axis scale appears on hover."}
+fig("chart-rank-counties.png")
+```
+
+### Every `nt_bar()` argument
+
+| Argument | Default | Notes |
+|---|---|---|
+| `group` | `NULL` | A column name turns single bars into **dodged** (side-by-side) bars, one series per group. Switches off `value_labels`, `sort`, and `highlight`. |
+| `orientation` | `"horizontal"` | `"vertical"` for upright bars. |
+| `sort` | `"desc"` | `"asc"` or `"none"` to keep input order. Ignored when `group` is set. |
+| `n` | `NULL` | Keep the top `n` categories after sorting. |
+| `highlight` | `NULL` | `NULL` accents the rank leader; `FALSE` accents none; a character vector accents categories by name; a numeric vector accents row positions. |
+| `diverging` | `FALSE` | Color bars by their sign relative to `baseline` (above = accent, below = soft navy) and draw a dashed reference line. |
+| `baseline` | `NULL` | A reference value: the divider for `diverging`, or just a dashed line otherwise. |
+| `baseline_label` | `NULL` | Text label on the reference line. |
+| `value_fmt` | `"comma"` | See shared conventions. |
+| `value_labels` | `TRUE` | Print each bar's value at its end. Suppressed for grouped bars. |
+| `legend` | `TRUE` | Series legend — only applies to grouped bars. |
+| `yaxis` | `"always"` | `"hover"` for the newspaper reveal. The value axis always starts at zero. |
+| `bar_width` | `NULL` | Bar width, e.g. `"62%"` (the default) or a pixel number. |
+| `palette` | `NULL` | Bar color(s); one per group for dodged bars. |
+| `...` | | Passed to `echarts4r::e_bar()`. |
+
+**Value labels and a custom bar width.** Direct labels read `42×`-style with
+`value_fmt = "multiple"`; `bar_width` and a `subtext` round out a headline:
+
+```{r}
+nt_bar(top, "county", "rate", value_fmt = "comma",
+       bar_width = "55%", value_labels = TRUE,
+       title = "Top counties by filing rate",
+       subtext = "Filings per 1,000 renter households · latest 12 months")
+```
+
+**Diverging above/below a baseline.** Color bars by whether they sit above or
+below a reference (here the statewide average), with a dashed divider:
+
+```{r}
+nt_bar(county12, "county", "rate", diverging = TRUE,
+       baseline = mean(county12$rate), baseline_label = "state avg",
+       sort = "desc", n = 15)
+```
+
+**Grouped + legend, vertical with `n`.** Pass `group` for dodged bars; combine
+`orientation = "vertical"` with `n` to keep the busiest counties only:
+
+```{r}
+race_long <- county12 |>
+  filter(county %in% top$county[1:5]) |>
+  transmute(county, Black = black, White = white) |>
+  pivot_longer(c(Black, White), names_to = "race", values_to = "rate")
+
+nt_bar(race_long, "county", "rate", group = "race",
+       orientation = "vertical", n = 5, legend = TRUE,
+       palette = c(Black = "#F9322B", White = "#8BA3BE"))
+```
+
+## 2. Lollipop / dot plot — `nt_lollipop()`
+
+A leaner ranking than bars — the Du Bois "less ink" instinct — and the natural
+form for a rate **indexed to the white rate**. With `value_fmt = "multiple"` the
+values read as `1.51×`, and a `baseline = 1` marks parity:
+
+```{r}
+sw <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date > cutoff) |>
+  summarise(across(c(filings_black, filings_white, filings_latine, filings_other,
+                     renters_black, renters_white, renters_latine, renters_other),
+                   sum)) |>
+  mutate(Black  = 1000 * filings_black  / renters_black,
+         White  = 1000 * filings_white  / renters_white,
+         Latine = 1000 * filings_latine / renters_latine,
+         Other  = 1000 * filings_other  / renters_other)
+
+idx <- data.frame(race  = c("Black", "Latine", "Other", "White"),
+                  index = c(sw$Black, sw$Latine, sw$Other, sw$White) / sw$White)
+
+nt_lollipop(idx, "race", "index", value_fmt = "multiple",
+            highlight = "Black", baseline = 1, baseline_label = "parity with white",
+            source = "lsc · acs · wru v2.0 · birdie")
+```
+
+```{r lollipop, eval=TRUE, echo=FALSE, out.width="80%", fig.cap="Statewide filing rate by race, expressed as a multiple of the white rate, with a parity line at 1×."}
+fig("chart-lollipop-race.png")
+```
+
+`nt_lollipop()` shares `sort`, `n`, `highlight`, `baseline`/`baseline_label`,
+`orientation`, `value_fmt`, `value_labels`, `yaxis`, `palette`, and the title /
+source extras with `nt_bar()`. Two arguments are its own:
+
+| Argument | Default | Notes |
+|---|---|---|
+| `stem` | `TRUE` | Draw the thin steel stem from the axis to the dot. `FALSE` gives a pure dot plot. |
+| `dot_size` | `13` | Dot diameter in pixels. |
+
+**Pure dots, bigger heads, vertical, no baseline.** Drop the stems for a clean
+Cleveland dot plot, and bump the dot size:
+
+```{r}
+nt_lollipop(top, "county", "rate", stem = FALSE, dot_size = 18,
+            orientation = "vertical", value_fmt = "comma",
+            yaxis = "hover", source = "lsc · acs")
+```
+
+## 3. Disparity dumbbell — `nt_dumbbell()`
+
+The network's core idiom for a *gap*: two dots joined by a connector, one row per
+county, sorted so the widest disparities rise to the top. Here, the Black vs.
+white filing rate:
+
+```{r}
+gap <- county12 |>
+  filter(is.finite(black), is.finite(white)) |>
+  mutate(g = black - white) |> arrange(desc(g)) |> head(10)
+
+nt_dumbbell(gap, "county", low = "white", high = "black",
+            low_label = "White", high_label = "Black",
+            source = "lsc · acs · wru v2.0 · birdie")
+```
+
+```{r dumbbell, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Black vs. white 12-month filing rate by county, sorted by the size of the gap."}
+fig("chart-dumbbell-race.png")
+```
+
+The same form reads as **change over time** if `low`/`high` are two periods
+(e.g. the 2019 and 2024 values) rather than two groups.
+
+### Every `nt_dumbbell()` argument
+
+`low`/`high` name the two ends — `high` is the focus/right end (accented),
+`low` the comparison/left end; `low_label`/`high_label` set the legend names.
+
+| Argument | Default | Notes |
+|---|---|---|
+| `sort` | `"gap"` | Order by `high - low`; also `"high"`, `"low"`, or `"none"`. |
+| `n` | `NULL` | Keep the top `n` after sorting. |
+| `orientation` | `"horizontal"` | `"vertical"` for upright dumbbells. |
+| `palette` | `NULL` | **Length-2** `c(low, high)` colors. Defaults to muted steel + ERN accent. |
+| `colors` | `NULL` | **Deprecated** alias for `palette` (warns; use `palette`). |
+| `legend` | `TRUE` | Show the two-end legend. |
+| `value_fmt`, `value_labels`, `yaxis` | | See shared conventions. |
+| `dot_size` | `12` | Dot diameter in pixels. |
+
+**Two-color `palette`, no legend, subtext, value labels off.** The two-color
+argument is now `palette` (the old `colors` still works but warns):
+
+```{r}
+nt_dumbbell(gap, "county", low = "white", high = "black",
+            low_label = "White", high_label = "Black",
+            palette = c("#8BA3BE", "#F9322B"),      # low, high
+            legend = FALSE, value_labels = FALSE,
+            subtext = "Black vs. white filing rate, latest 12 months",
+            sort = "gap", n = 8)
+```
+
+## 4. Composition — `nt_stacked_bar()`
+
+For part-of-whole comparisons: tenure by race, rent burden by AMI tier, racial
+composition. By default each bar is normalized to 100% and the segment shares are
+labelled inside. Here, the renter racial composition of the six highest-rate
+counties:
+
+```{r}
+sc <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date > cutoff) |>
+  group_by(county) |>
+  summarise(Black = first(renters_black), White = first(renters_white),
+            Latine = first(renters_latine), Other = first(renters_other),
+            .groups = "drop") |>
+  filter(county %in% top$county[1:6]) |>
+  pivot_longer(c(Black, White, Latine, Other), names_to = "race", values_to = "renters")
+
+nt_stacked_bar(sc, "county", "renters", group = "race",
+               palette = c(White = "#9fb6c4", Black = "#19222C",
+                           Latine = "#F9322B", Other = "#6c7a89"),
+               source = "acs")
+```
+
+```{r stacked, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Renter racial composition (100% stacked) for the highest-rate counties."}
+fig("chart-stacked-renters.png")
+```
+
+### Every `nt_stacked_bar()` argument
+
+| Argument | Default | Notes |
+|---|---|---|
+| `group` | (required) | The column whose levels stack within each bar. |
+| `proportional` | `TRUE` | Normalize each bar to 100%. `FALSE` plots absolute stacked counts, which then honor `value_fmt`. |
+| `orientation` | `"horizontal"` | `"vertical"` for upright stacks. |
+| `palette` | `NULL` | Defaults to a **neutral accent-free ramp** (the accent is reserved for a single highlight, not a whole band). A **named** vector matches groups — recommended for race compositions. |
+| `value_labels` | `TRUE` | Print each segment's share/value inside it. |
+| `label_min` | `0.05` | Minimum segment share (of its bar) to label, so slivers stay clean. Applies when `proportional = TRUE`. |
+| `value_fmt` | `"comma"` | Applies only when `proportional = FALSE`; proportional segments are always percentages. |
+| `legend` | `TRUE` | Show the group legend. |
+| `yaxis` | | See shared conventions. |
+
+The neutral default palette keeps a composition from flooding one band with red.
+Compare passing nothing (neutral) versus a named race palette:
+
+```{r}
+nt_stacked_bar(sc, "county", "renters", group = "race")   # neutral default ramp
+```
+
+**Absolute counts (`proportional = FALSE`) with `value_fmt` and `label_min`.**
+Raw stacked households instead of shares, labelling only the larger segments:
+
+```{r}
+nt_stacked_bar(sc, "county", "renters", group = "race",
+               proportional = FALSE, value_fmt = "comma",
+               label_min = 50, legend = TRUE,
+               palette = c(Black = "#F9322B", White = "#aab4be",
+                           Latine = "#223754", Other = "#6c7a89"))
+```
+
+## 5. Slope chart — `nt_slope()`
+
+The spare before/after form: one line per series across two periods, with the
+value at each end labelled directly. Here, the annual filing rate in 2019 vs.
+2024 for the counties that moved most:
+
+```{r}
+ann <- mn_evictions |>
+  filter(year %in% c(2019, 2024)) |>
+  group_by(county, year) |>
+  summarise(filings = sum(filings), renters = first(renters), .groups = "drop") |>
+  mutate(rate = 1000 * filings / renters) |> filter(is.finite(rate))
+
+movers <- ann |>
+  pivot_wider(id_cols = county, names_from = year, values_from = rate, names_prefix = "y") |>
+  mutate(d = y2024 - y2019) |> arrange(desc(abs(d))) |> head(6) |> pull(county)
+
+nt_slope(filter(ann, county %in% movers), "year", "rate", group = "county",
+         value_fmt = "comma", source = "lsc · acs")
+```
+
+```{r slope, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Annual filing rate per 1,000 renters, 2019 to 2024, for the biggest movers."}
+fig("chart-slope-counties.png")
+```
+
+### Every `nt_slope()` argument
+
+`x` is the period column (2+ ordered values), `y` the value, `group` the series.
+
+| Argument | Default | Notes |
+|---|---|---|
+| `highlight` | `NULL` | Accent specific `group` values by **name** or numeric position; the rest go muted steel. `NULL`/`FALSE` applies the full ERN palette to every line (unlike the ranked charts, a slope has no single leader to accent). |
+| `palette` | `NULL` | A **named** vector matched to group names takes precedence over `highlight`. |
+| `value_fmt`, `value_labels` | | End labels and hover. |
+| `yaxis` | `"none"` | Defaults to hidden — the values live in the direct end labels, so the scale is usually redundant. |
+
+**Highlight named series, named-vector palette, `yaxis` shown.** Accent two
+counties and recede the rest, or override colors per name:
+
+```{r}
+nt_slope(filter(ann, county %in% movers), "year", "rate", group = "county",
+         highlight = c("Hennepin", "Ramsey"), value_fmt = "comma",
+         yaxis = "hover")
+
+nt_slope(filter(ann, county %in% movers[1:3]), "year", "rate", group = "county",
+         palette = c(Hennepin = "#F9322B", Ramsey = "#223754"),  # others fall back
+         value_labels = TRUE)
+```
+
+## 6. Scatter — `nt_scatter()`
+
+A relationship between two continuous measures, with an optional linear trend
+line. Does a county's filing rate track the share of its renters who are Black?
+
+```{r}
+nt_scatter(county12, "share_black", "rate", trend = TRUE,
+           x_fmt = "percent", value_fmt = "comma",
+           yaxis = "hover", source = "lsc · acs")
+```
+
+```{r scatter, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="County filing rate against the Black share of renters, with an OLS trend line."}
+fig("chart-scatter-share.png")
+```
+
+### Every `nt_scatter()` argument
+
+| Argument | Default | Notes |
+|---|---|---|
+| `group` | `NULL` | A column gives one colored series per group, with a legend. |
+| `trend` | `FALSE` | Add an OLS trend line (one per group when grouped). Skipped (with a warning) for a Date x. |
+| `point_size` | `10` | Point diameter in pixels. |
+| `palette` | `NULL` | Point colors. |
+| `value_fmt` | `"comma"` | Formats the y axis / tooltip. |
+| `x_fmt` | `"comma"` | Formats the x axis / tooltip x. Ignored when `x` is a Date (a time axis is used). |
+| `yaxis` | `"always"` | See shared conventions. |
+| `legend` | `TRUE` | Shown only when `group` is set. |
+
+`x` may be **numeric** (a value axis) or a **`Date`/`POSIXct`** (a time axis); a
+bare category column is rejected.
+
+**Multi-series with a legend and a fit per group:**
+
+```{r}
+two <- county12 |>
+  mutate(grp = if_else(rate > median(rate), "Higher rate", "Lower rate"))
+
+nt_scatter(two, "share_black", "rate", group = "grp", trend = TRUE,
+           x_fmt = "percent", value_fmt = "comma", point_size = 12,
+           palette = c("Higher rate" = "#F9322B", "Lower rate" = "#8BA3BE"))
+```
+
+**A Date x (time axis).** Statewide monthly filings over time — `trend` is
+skipped on a time axis, so leave it off:
+
+```{r}
+monthly <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  group_by(date) |> summarise(filings = sum(filings), .groups = "drop")
+
+nt_scatter(monthly, "date", "filings", value_fmt = "comma",
+           point_size = 6, yaxis = "always", source = "lsc")
+```
+
+## 7. Estimate + error bar — `nt_range()`
+
+Almost everything we publish rests on survey estimates that carry a margin of
+error. `nt_range()` draws the estimate as a dot with a whisker for its
+uncertainty, so a gap between groups (or counties) can't be over-read when the
+intervals overlap. The whiskers now stay inside the axis — the scale is widened
+to contain them, since the overlapping extremes are exactly what you want to
+judge.
+
+There are two ways to supply the uncertainty. The **explicit low/high** form,
+with a count-based (Poisson) 95% interval:
+
+```{r}
+ci <- top |>
+  mutate(se = 1000 * sqrt(filings) / renters,
+         lo = pmax(0, rate - 1.96 * se), hi = rate + 1.96 * se)
+
+nt_range(ci, "county", value = "rate", low = "lo", high = "hi",
+         value_fmt = "comma", yaxis = "hover", source = "lsc · acs")
+```
+
+```{r range, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Top counties by filing rate with a 95% interval; wider whiskers flag less-certain low-count rates."}
+fig("chart-range-counties.png")
+```
+
+And the **symmetric `error`** form, which is how ACS data arrives — pass the
+published margin of error and the bar becomes `value ± error`:
+
+```{r}
+moe <- ci |> mutate(margin = 1.96 * se)
+
+nt_range(moe, "county", value = "rate", error = "margin",
+         value_fmt = "comma", highlight = "Hennepin",
+         dot_size = 14, orientation = "horizontal", source = "lsc · acs")
+```
+
+You must supply **either** `error` **or** both `low`/`high`, never both. The
+remaining arguments (`sort`, `n`, `highlight`, `value_fmt`, `value_labels`,
+`yaxis`, `palette`, `dot_size`, title/source) behave as in `nt_lollipop()`.
+
+## 8. Waffle / unit chart — `nt_waffle()`
+
+The most Du Bois-flavored form in the kit: a 10 × 10 grid where each square is one
+percent of the whole. A clean "data portrait" of a single composition — here, the
+racial breakdown of filings. Pass an explicit race palette so the focus group
+carries the accent and White stays recessive:
+
+```{r}
+comp <- c(Black  = sw$filings_black, White  = sw$filings_white,
+          Latine = sw$filings_latine, Other = sw$filings_other)
+
+nt_waffle(comp,
+          palette = c(Black = "#F9322B", White = "#aab4be",
+                      Latine = "#223754", Other = "#6c7a89"),
+          title = "Share of eviction filings by race, last 12 months",
+          source = "lsc · acs · wru v2.0 · birdie")
+```
+
+```{r waffle, eval=TRUE, echo=FALSE, out.width="70%", fig.cap="Each square is one percent of statewide filings, colored by race."}
+fig("chart-waffle-race.png")
+```
+
+### Every `nt_waffle()` argument
+
+`data` is **either** a named numeric vector (as above) **or** a data frame, in
+which case you name the `category` and `value` columns.
+
+| Argument | Default | Notes |
+|---|---|---|
+| `category`, `value` | `NULL` | Column names when `data` is a data frame. |
+| `squares` | `100` | Grid resolution (total squares); shares are apportioned by largest remainder to sum exactly to this. Note this is *grid resolution*, not a top-`n` filter. |
+| `n` | `NULL` | **Deprecated** alias for `squares` (warns; use `squares`). |
+| `ncol` | `10` | Columns in the grid. |
+| `flow` | `"row"` | Fill row-by-row from the bottom, or `"column"` (left to right). |
+| `palette` | `NULL` | One color per category; a **named** vector emphasizes a group. Defaults to the neutral ramp. |
+| `square_size` | `18` | Square size in pixels. |
+| `legend` | `TRUE` | Show the category legend. |
+
+**Data-frame input, finer grid, square columns, no legend.** Same composition
+fed as a data frame, at 200-square resolution, filling by column:
+
+```{r}
+comp_df <- data.frame(race = names(comp), n = as.numeric(comp))
+
+nt_waffle(comp_df, category = "race", value = "n",
+          squares = 200, ncol = 20, flow = "column",
+          square_size = 12, legend = FALSE,
+          palette = c(Black = "#F9322B", White = "#aab4be",
+                      Latine = "#223754", Other = "#6c7a89"),
+          title = "Eviction filings by race")
+```
+
+## 9. The static (print) kit — `theme_ern()` and the ERN scales
+
+The interactive widgets are for the web. For a paper, a PDF report, or a slide,
+reproduce the same look in **ggplot2** with `theme_ern()` and the ERN color
+scales. Everything in this section runs live, so the figures below are real.
+
+```{r ggsetup, eval=TRUE, message=FALSE}
+library(neighborhood)
+library(dplyr)
+library(ggplot2)
+
+# The data prep above is shown but not executed (eval = FALSE), so rebuild the
+# small `top` table here for the live static figures.
+top <- mn_evictions |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date > seq(max(as.Date(sprintf("%d-%02d-01", year, month))),
+                    by = "-12 months", length.out = 2)[2]) |>
+  group_by(county) |>
+  summarise(filings = sum(filings), renters = first(renters), .groups = "drop") |>
+  mutate(rate = 1000 * filings / renters) |>
+  filter(is.finite(rate)) |>
+  arrange(desc(rate)) |> head(10)
+```
+
+### The ranked bar, in ggplot2
+
+The same "top counties" plate as `nt_bar()`, rendered statically with
+`theme_ern()`, `ern_palette()` for the raw house tokens, and the `grid =`
+control that keeps only the guides you want:
+
+```{r ggbar, eval=TRUE, fig.width=7, fig.height=4.2, out.width="100%", fig.cap="The ranked bar as a static ggplot2 figure via theme_ern() and the ERN palette."}
+top |>
+  mutate(hl = rate == max(rate)) |>
+  ggplot(aes(reorder(county, rate), rate, fill = hl)) +
+  geom_col(width = 0.68) +
+  geom_text(aes(label = round(rate, 1)), hjust = -0.15, size = 3.3,
+            color = ern_palette("brand")[["navy"]]) +
+  scale_fill_manual(values = c(`FALSE` = ern_palette("brand")[["navy"]],
+                               `TRUE`  = ern_palette("brand")[["accent"]]),
+                    guide = "none") +
+  coord_flip(clip = "off") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(title = "Eviction filing rate by county",
+       subtitle = "Filings per 1,000 renter households · latest 12 months",
+       x = NULL, y = NULL, caption = "Source: ERN · LSC court records") +
+  theme_ern(grid = "x") +
+  theme(axis.text.x = element_blank(), panel.grid.major.x = element_blank())
+```
+
+### `theme_ern()` arguments
+
+| Argument | Default | Notes |
+|---|---|---|
+| `base_size` | `12` | Base font size in points. |
+| `base_family` | `""` | Device-default font (so it works with no fonts installed); set to e.g. `"Inter"` if available. |
+| `grid` | `"y"` | Which faint dashed guides to keep: `"y"`, `"x"`, `"both"`, or `"none"`. |
+| `legend` | `"bottom"` | Legend placement: `"bottom"`, `"right"`, `"top"`, `"left"`, or `"none"`. |
+
+### Discrete scales — `scale_fill_ern()` / `scale_color_ern()`
+
+The discrete scales default to the qualitative chart palette. Their headline
+feature is `palette = "typology"`, which colors the 19 neighborhood typologies
+by their canonical key — exactly the legend the maps use. Here, the typology
+composition of a few states from `us_nt_tracts2024`:
+
+```{r ggtypology, eval=TRUE, fig.width=7, fig.height=4, out.width="100%", fig.cap="Tract typology counts colored by the canonical 19-color key via scale_fill_ern(palette = 'typology')."}
+ty <- us_nt_tracts2024 |>
+  filter(state %in% c("CA", "TX", "NY")) |>
+  count(state, NeighType) |>
+  filter(NeighType %in% c("Asian-White", "Black-Latine", "Black-White",
+                          "Latine-White", "Other-White", "Diverse"))
+
+ggplot(ty, aes(state, n, fill = NeighType)) +
+  geom_col(position = "stack", width = 0.6) +
+  scale_fill_ern(palette = "typology") +
+  labs(title = "Tract typologies by state", x = NULL, y = "Tracts", fill = NULL) +
+  theme_ern(grid = "y", legend = "right")
+```
+
+A British spelling alias is provided: **`scale_colour_ern()`** is identical to
+`scale_color_ern()` (and `scale_colour_ern_c()` to `scale_color_ern_c()`).
+
+### Continuous scales — `scale_fill_ern_c()` / `scale_color_ern_c()`
+
+The continuous variants apply the 4-class sequential risk ramp
+(yellow → orange → red → purple) over a numeric aesthetic:
+
+```{r ggcont, eval=TRUE, fig.width=7, fig.height=4, out.width="100%", fig.cap="A continuous risk surface colored with scale_color_ern_c() over the ERN ramp."}
+set.seed(1)
+risk <- data.frame(x = runif(200), y = runif(200))
+risk$score <- with(risk, pmin(1, pmax(0, 0.6 * x + 0.4 * y + rnorm(200, 0, 0.08))))
+
+ggplot(risk, aes(x, y, color = score)) +
+  geom_point(size = 2.6) +
+  scale_color_ern_c() +
+  labs(title = "Composite risk score", x = NULL, y = NULL, color = "Risk") +
+  theme_ern(grid = "none", legend = "right")
+```
+
+### Raw colors — `ern_palette()`
+
+When you need the hex values directly (base graphics, tables, a bespoke scale),
+`ern_palette()` exposes every house palette. `n` recycles or interpolates the
+`"qualitative"` and `"ramp"` palettes; `reverse` flips any of them:
+
+```{r ggpal, eval=TRUE}
+ern_palette("qualitative", n = 3)   # three series colors
+ern_palette("ramp")                 # the 4-class risk ramp
+ern_palette("brand")                # named editorial tokens: navy, accent, muted, …
+ern_palette("ramp", reverse = TRUE) # purple → yellow
+```
+
+The four names are `"qualitative"` (the multi-series chart ramp), `"typology"`
+(the 19 named neighborhood-typology colors), `"ramp"` (the sequential risk
+ramp), and `"brand"` (the named editorial tokens). For the typology maps' full
+key in a static plot, use `scale_fill_ern(palette = "typology")`; for a
+continuous risk surface, `scale_fill_ern_c()`.
+
+## Acknowledgments
+
+Charts are built on **echarts4r** (John Coene) and Apache ECharts; the static
+theme on **ggplot2**. Minnesota data are from the Eviction Research Network. For
+transparency, these chart functions were developed with the assistance of
+**Claude Opus 4.8** (Anthropic); they are deterministic R code and require no AI
+to run. See `vignette("interactive-charts")` for the trend line and the
+"newspaper graphic" hover behavior in depth.
+
+## Issues and feedback
+
+Found a bug, or a chart form the kit is missing? Please open an issue at the
+[neighborhood repository](https://github.com/evictionresearch/neighborhood).

@@ -9,6 +9,10 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+fig <- function(f) {
+  p <- file.path("figures", f)
+  if (file.exists(p)) knitr::include_graphics(p)
+}
 ```
 
 This tutorial rebuilds the charts from the
@@ -17,7 +21,9 @@ using `nt_chart()` and the bundled `mn_evictions` data — a monthly eviction tr
 with a pre-pandemic baseline and a moratorium band, yearly totals, and rolling
 rates by race. Along the way it shows the **"newspaper graphic" hover behavior**
 (the y-axis appears only when you hover) and finishes with a real-world example:
-pulling Apartment List rent data from a URL to chart regional rents.
+pulling Apartment List rent data from a URL to chart regional rents. The second
+half is an **"every lever" reference** — one small example per argument — so the
+whole surface of `nt_chart()` and its axis-free sibling `nt_spark()` is covered.
 
 The charts are a thin, deterministic wrapper over
 [echarts4r](https://echarts4r.john-coene.com/) (John Coene) / Apache ECharts;
@@ -28,6 +34,60 @@ functions for anything it doesn't expose.
 library(neighborhood)
 library(dplyr)
 ```
+
+## The two functions at a glance
+
+`nt_chart()` is the full editorial chart; `nt_spark()` is its axis-free sibling
+for inline "trend at a glance" graphics. Their complete signatures:
+
+```{r}
+nt_chart(
+  data, x, y, group = NULL,
+  type = c("line", "area", "bar"),
+  stack = NULL,
+  baseline = NULL, baseline_label = NULL,
+  band = NULL, band_label = NULL,
+  palette = NULL,
+  value_fmt = c("comma", "percent", "currency", "multiple", "none"),
+  smooth = NULL,
+  crosshair = TRUE,
+  yaxis = c("always", "hover", "none"),
+  highlight_last = FALSE,
+  end_label = FALSE,
+  line_styles = NULL,
+  source = NULL,
+  legend = !is.null(group),
+  title = NULL, subtext = NULL,
+  x_title = NULL, y_title = NULL,
+  height = NULL, ...
+)
+
+nt_spark(values, type = c("line", "bar"),
+         color = "#19222C", height = "40px", width = "120px")
+```
+
+| Argument | What it does |
+|---|---|
+| `data`, `x`, `y` | data frame and the x / y column **names** (strings) |
+| `group` | column name for one series per group (race, county, …) |
+| `type` | `"line"`, `"area"`, or `"bar"` |
+| `stack` | group key string to stack areas/bars into a composition |
+| `baseline`, `baseline_label` | dashed horizontal reference line + its label |
+| `band`, `band_label` | shaded vertical region `c(start, end)` + its label |
+| `palette` | series colors; **named** vector matches colors to groups |
+| `value_fmt` | `"comma"` / `"percent"` / `"currency"` / `"multiple"` / `"none"` |
+| `smooth` | curve lines/areas (default `TRUE` for line/area, `FALSE` for bar) |
+| `crosshair` | the hover crosshair + on-axis value (default `TRUE`) |
+| `yaxis` | `"always"` / `"hover"` / `"none"` — when the y-scale shows |
+| `highlight_last` | accent the latest point (leading series, if grouped) |
+| `end_label` | direct "name · value" label at each line end (replaces legend) |
+| `line_styles` | per-series dash patterns for print/grayscale |
+| `source` | small attribution credit, lower-right |
+| `legend` | show a legend (default `TRUE` when `group` set, `FALSE` when `end_label`) |
+| `title`, `subtext` | chart title and subtitle |
+| `x_title`, `y_title` | axis titles |
+| `height` | CSS height, e.g. `"380px"` |
+| `...` | passed to `echarts4r::e_line()` / `e_area()` / `e_bar()` |
 
 ## The data: `mn_evictions`
 
@@ -41,6 +101,8 @@ dplyr::glimpse(neighborhood::mn_evictions)
 A note on the rate: `rate` is the raw monthly proportion `filings / renters`.
 The profiles headline an **annualized rate per 1,000 renter households**, which
 you compute over a window as `1000 * sum(filings) * 12 / n_months / renters`.
+
+# Part I — Replicating the profile plates
 
 ## 1. The monthly trend (Figure 1)
 
@@ -74,7 +136,7 @@ nt_chart(
 ```
 
 ```{r mn-trend, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Statewide monthly eviction filings (shown mid-hover): the y-axis and gridlines appear only on hover, with the dashed pre-pandemic baseline, the shaded moratorium band, and the accented latest month."}
-knitr::include_graphics("figures/chart-mn-trend.png")
+fig("chart-mn-trend.png")
 ```
 
 `yaxis = "hover"` is the option to make the y-axis **disappear while you are not
@@ -83,6 +145,9 @@ newspaper look. The default is `"always"` (labels always shown); `"none"` hides
 them entirely and relies on the hover crosshair value.
 
 ## 2. Yearly totals (Figure 2)
+
+Bars start at zero (the honest baseline for a magnitude), so `type = "bar"`
+ignores `smooth` and draws from the axis up:
 
 ```{r}
 yearly <- mn_evictions |>
@@ -94,8 +159,12 @@ nt_chart(yearly, "year", "filings", type = "bar",
 ```
 
 ```{r mn-bars, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Yearly eviction-filing totals; the latest (partial) year is accented and the y-axis reveals on hover."}
-knitr::include_graphics("figures/chart-mn-bars.png")
+fig("chart-mn-bars.png")
 ```
+
+A discrete numeric x like `year` is automatically coerced to an ordered category
+axis (otherwise ECharts would put it on a 0-based value axis and bunch the bars
+up), so the years stay in order and evenly spaced.
 
 ## 3. Rates by race — the published plate (Plate V)
 
@@ -145,7 +214,7 @@ nt_chart(
 ```
 
 ```{r mn-race, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Filing rate by race, rolling annualized per 1,000 renter households (shown mid-hover). Direct end-labels replace the legend, each series has its own line style, and the y-axis appears only on hover."}
-knitr::include_graphics("figures/chart-mn-race.png")
+fig("chart-mn-race.png")
 ```
 
 ## 4. The disparity ratio (Plate VI)
@@ -176,19 +245,256 @@ nt_chart(
 ```
 
 ```{r mn-ratio, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Black, Latine, and Other filing rates as a ratio of the white filing rate, with a dashed parity line at 1.0 and end-labels in multiples (shown mid-hover)."}
-knitr::include_graphics("figures/chart-mn-ratio.png")
+fig("chart-mn-ratio.png")
 ```
 
-## 5. Sparklines
+# Part II — Every lever, one at a time
 
-For the small "trend at a glance" graphic beside a headline number, `nt_spark()`
-makes an axis-free line or bar:
+This section walks each argument with a minimal, correct example. Run any of
+them to see the live behavior; the prose is the documentation.
+
+## Chart types: `line`, `area`, `bar`
+
+`type` is the basic choice. Lines and areas curve by default; bars start at zero.
 
 ```{r}
-nt_spark(yearly$filings, type = "bar")
+nt_chart(statewide, "date", "filings", type = "line")   # default
+nt_chart(statewide, "date", "filings", type = "area")   # line + soft fill below
+nt_chart(yearly,    "year", "filings", type = "bar")    # zero-based magnitude bars
 ```
 
-## 6. Pulling data from a URL: Apartment List regional rents
+## `smooth` — curved vs. straight
+
+`smooth` defaults to `TRUE` for `line`/`area` and `FALSE` for `bar`. Set
+`smooth = FALSE` for a literal polyline (each month-to-month step is a straight
+segment), which can be the more honest read for a volatile series:
+
+```{r}
+nt_chart(statewide, "date", "filings", type = "line", smooth = FALSE)
+```
+
+## `stack` — areas and bars as a composition
+
+Pass `stack` (any shared string key) to stack the series so they sum into a total
+band — the right read when the parts make up a whole. Here the four race counts
+stack into total monthly filings:
+
+```{r}
+race_counts <- mn_evictions |>
+  group_by(year, month) |>
+  summarise(across(c(filings_black, filings_white, filings_latine, filings_other), sum),
+            .groups = "drop") |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  tidyr::pivot_longer(starts_with("filings_"),
+                      names_to = "race", values_to = "filings") |>
+  filter(date >= as.Date("2022-01-01"))
+
+# Stacked AREA: composition over time
+nt_chart(race_counts, "date", "filings", group = "race", type = "area",
+         stack = "total")
+
+# Stacked BAR works the same way
+nt_chart(race_counts, "date", "filings", group = "race", type = "bar",
+         stack = "total")
+```
+
+## `value_fmt` — all five formats
+
+`value_fmt` formats the y-axis ticks, the hover crosshair box, and the tooltip,
+keeping them all in agreement. The five styles:
+
+| `value_fmt` | Input → rendered | Note |
+|---|---|---|
+| `"comma"` (default) | `12345` → `12,345` | thousands separator |
+| `"percent"` | `0.25` → `25%` | **expects a proportion in `[0, 1]`** |
+| `"currency"` | `1800` → `$1,800`; `-100` → `-$100` | signs negatives as `-$100` |
+| `"multiple"` | `1.52` → `1.52×` | ratio / parity charts |
+| `"none"` | `1800` → `1800` | raw number, no formatting |
+
+```{r}
+# comma (default) — already used above; explicit for completeness
+nt_chart(statewide, "date", "filings", value_fmt = "comma")
+
+# percent — note the input must be a proportion in [0, 1]
+share <- statewide |>
+  mutate(share = filings / max(filings))          # 0..1
+nt_chart(share, "date", "share", value_fmt = "percent")
+
+# currency — negatives render as -$100 (e.g. a year-over-year change)
+nt_chart(statewide, "date", "filings", value_fmt = "currency")
+
+# multiple — 1.52x (used in the disparity ratio plate above)
+nt_chart(ratio, "date", "ratio", group = "race", value_fmt = "multiple")
+
+# none — show the raw number with no separators or symbols
+nt_chart(yearly, "year", "filings", type = "bar", value_fmt = "none")
+```
+
+## `yaxis` and `crosshair` — the no-axis read
+
+`yaxis` controls when the y-scale appears, and `crosshair` supplies the value on
+hover. Together they make the "newspaper graphic" look: with `yaxis = "none"`
+there is **no permanent y-axis at all** — the only way to read a value is the
+crosshair, which prints the formatted number in a box where the cursor's
+horizontal line meets the axis.
+
+```{r}
+# always (default): labels always visible
+nt_chart(statewide, "date", "filings", yaxis = "always")
+
+# hover: labels + dashed gridlines hidden until you hover (the profile look)
+nt_chart(statewide, "date", "filings", yaxis = "hover")
+
+# none: no y-axis ever; the crosshair value is the only readout
+nt_chart(statewide, "date", "filings", yaxis = "none")
+```
+
+Turning the crosshair off (`crosshair = FALSE`) drops the dashed cross and the
+boxed on-axis value, leaving just the tooltip bubble. Pair it with
+`yaxis = "none"` only if you don't need readers to read exact values:
+
+```{r}
+nt_chart(statewide, "date", "filings", crosshair = FALSE)
+```
+
+## A generic multi-series palette
+
+For a non-race comparison (counties, regions, anything), pass `group` and an
+unnamed `palette` — colors are applied in series order. The package ships an
+8-color default if you pass none:
+
+```{r}
+counties <- mn_evictions |>
+  filter(county %in% c("Hennepin", "Ramsey", "Dakota", "Anoka")) |>
+  group_by(county, year) |>
+  summarise(filings = sum(filings), .groups = "drop")
+
+nt_chart(counties, "year", "filings", group = "county", type = "line",
+         palette = c("#19222C", "#F9322B", "#223754", "#8BA3BE"))
+```
+
+A **named** palette (`c(Hennepin = "#19222C", ...)`) instead pins each color to a
+specific group regardless of order — the technique used in the race plates.
+
+## `legend`
+
+A legend appears automatically when `group` is set (and is suppressed when
+`end_label = TRUE`, since the direct labels replace it). Override either way:
+
+```{r}
+nt_chart(counties, "year", "filings", group = "county", legend = TRUE)   # explicit on
+nt_chart(counties, "year", "filings", group = "county", legend = FALSE)  # hide it
+```
+
+## Titles: `title`, `subtext`, `x_title`, `y_title`
+
+`title`/`subtext` set the heading and sub-heading; `x_title`/`y_title` label the
+axes:
+
+```{r}
+nt_chart(statewide, "date", "filings", type = "line",
+         title   = "Minnesota eviction filings",
+         subtext = "Statewide, monthly",
+         x_title = "Month",
+         y_title = "Filings")
+```
+
+## `height`
+
+`height` takes any CSS length string for the widget's drawn height:
+
+```{r}
+nt_chart(statewide, "date", "filings", height = "260px")
+```
+
+## Reference marks: `baseline` / `band`
+
+`baseline` draws a dashed horizontal line at a y value (an average, a target, a
+`1.0` parity line); `band` shades a vertical region between two x values (a
+moratorium window, a recession). Each takes an optional label:
+
+```{r}
+nt_chart(
+  statewide, "date", "filings", type = "line",
+  baseline = prepan, baseline_label = "pre-pandemic avg",
+  band = c(as.Date("2020-03-01"), as.Date("2021-06-01")), band_label = "moratorium"
+)
+```
+
+On a category axis (years, not dates) the `band` edges are matched as category
+values, so pass them in the same form as the x values, e.g.
+`band = c(2020, 2021)` for a year axis.
+
+## Editorial direct labels: `highlight_last`, `end_label`, `line_styles`
+
+These three replace chart-junk with editorial cues. `highlight_last` puts an
+accent dot on the most recent point (the leading series when grouped);
+`end_label` writes "name · value" at the end of each line *instead of* a legend;
+`line_styles` gives each series a dash pattern so the chart survives grayscale
+printing. They are line/area features:
+
+```{r}
+nt_chart(
+  counties, "year", "filings", group = "county", type = "line",
+  highlight_last = TRUE,
+  end_label      = TRUE,
+  line_styles    = c("solid", "dashed", "dotted", "solid")  # recycled in series order
+)
+```
+
+`line_styles` can be **named** to pin a pattern to a group
+(`c(Hennepin = "solid", Ramsey = "dashed")`); an unnamed vector is recycled in
+series order. Valid values are `"solid"`, `"dashed"`, `"dotted"`.
+
+## `source`
+
+`source` prints a small attribution in the lower-right — the credit line on the
+profile plates:
+
+```{r}
+nt_chart(statewide, "date", "filings", source = "Eviction Research Network")
+```
+
+## `...` — drop through to echarts4r, and the return value
+
+Anything in `...` is forwarded to the underlying series function
+(`echarts4r::e_line()` / `e_area()` / `e_bar()`). And because `nt_chart()`
+returns the **raw echarts4r widget**, you can keep piping any `e_*` function for
+features it doesn't expose — a data-zoom slider, a second title, animations:
+
+```{r}
+nt_chart(statewide, "date", "filings", type = "line", yaxis = "hover") |>
+  echarts4r::e_datazoom(x_index = 0) |>           # draggable zoom slider
+  echarts4r::e_title("Minnesota eviction filings")
+```
+
+# Part III — Sparklines (`nt_spark`)
+
+`nt_spark()` is the axis-free sibling of `nt_chart()`: a tiny line or bar for a
+stat card or a table cell, with no axes, legend, or labels — just the shape. It
+takes a bare numeric **vector** (not a data frame) and four styling arguments:
+
+| Argument | Default | What it does |
+|---|---|---|
+| `values` | — | numeric vector to plot |
+| `type` | `"line"` | `"line"` (smoothed, soft fill) or `"bar"` |
+| `color` | `"#19222C"` | line/bar color (ERN navy) |
+| `height` | `"40px"` | CSS height |
+| `width` | `"120px"` | CSS width |
+
+```{r}
+# default smoothed line
+nt_spark(yearly$filings)
+
+# bar variant
+nt_spark(yearly$filings, type = "bar")
+
+# recolor and resize for a wide stat-card slot
+nt_spark(yearly$filings, type = "line", color = "#F9322B",
+         height = "48px", width = "200px")
+```
+
+# Part IV — Pulling data from a URL: Apartment List regional rents
 
 A common workflow is to pull a public dataset straight from the web, reshape it,
 and chart it. Here we use [Apartment List's Rent
@@ -233,7 +539,7 @@ nt_chart(mpls, "date", "rent", type = "line", value_fmt = "currency",
 ```
 
 ```{r apt-rent, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Median new-lease rent for the Minneapolis-St. Paul metro from Apartment List Rent Estimates, pulled live from the URL (shown mid-hover). Data: Apartment List."}
-knitr::include_graphics("figures/chart-apartmentlist.png")
+fig("chart-apartmentlist.png")
 ```
 
 To define your own **region** (a set of cities, or several metros), filter to
@@ -256,17 +562,14 @@ nt_chart(area, "date", "rent", type = "line", value_fmt = "currency", yaxis = "h
 Always **attribute** Apartment List on the chart, read the CSV at runtime rather
 than redistributing it, and review their terms of use.
 
-## 7. Saving and dropping to echarts4r
+## Saving a chart
 
 A chart is an `htmlwidget`; save a standalone file with
-`htmlwidgets::saveWidget()`. And since `nt_chart()` returns the underlying
-`echarts4r` widget, keep piping `e_*` for anything else — a data-zoom slider, a
-second axis, animations:
+`htmlwidgets::saveWidget()`:
 
 ```{r}
-nt_chart(statewide, "date", "filings", type = "line", yaxis = "hover") |>
-  echarts4r::e_datazoom(x_index = 0) |>
-  echarts4r::e_title("Minnesota eviction filings")
+chart <- nt_chart(statewide, "date", "filings", type = "line", yaxis = "hover")
+htmlwidgets::saveWidget(chart, "mn-trend.html")
 ```
 
 ## Acknowledgments

@@ -64,6 +64,24 @@
 .nt_chart_palette <- c("#19222C", "#F9322B", "#223754", "#8BA3BE",
                        "#C95123", "#33a02c", "#9b66b0", "#1f78b4")
 
+# Neutral, accent-free ramp for COMPOSITION charts (stacked bars, waffles) where
+# every series is a recurring segment — the qualitative palette would otherwise
+# flood one whole band with the accent red.
+.nt_seq_palette <- c("#19222C", "#223754", "#8BA3BE", "#6c7a89", "#aab4be")
+
+# Interpolate that neutral ramp to exactly n distinct tones, so a 6-7 category
+# race/ethnicity composition stays on-brand and legible instead of recycling
+# colors (US race compositions routinely run past the 5 base tones).
+.nt_seq_ramp <- function(n) {
+  if (n <= length(.nt_seq_palette)) return(.nt_seq_palette[seq_len(n)])
+  grDevices::colorRampPalette(.nt_seq_palette)(n)
+}
+
+# Canonical race/ethnicity colors (the Minnesota/Washington plate convention):
+# the focus group (Black) carries the accent; White is the lightest/recessive.
+.nt_race_palette <- c(Black = "#F9322B", Latine = "#223754", Asian = "#33a02c",
+                      Other = "#6c7a89", White = "#aab4be")
+
 # Null-coalescing helper (avoids importing rlang's %||% just for this).
 `%nt||%` <- function(x, y) if (is.null(x) || length(x) == 0L) y else x
 
@@ -198,7 +216,13 @@
   if (length(values) == 0L) return(numeric(0))
   probs <- seq_len(n_classes - 1L) / n_classes
   brks <- unname(stats::quantile(values, probs = probs, na.rm = TRUE, names = FALSE))
-  brks <- round(brks, 2)
+  # Round to a precision derived from the data spread so low-variance columns —
+  # proportions and rates in [0, 1], exactly the eviction data this targets —
+  # keep distinct breaks instead of collapsing to a constant at 2 decimals.
+  spread <- diff(range(values))
+  if (is.finite(spread) && spread > 0) {
+    brks <- round(brks, max(2L, 2L - floor(log10(spread))))
+  }
   unique(brks)
 }
 
@@ -244,9 +268,19 @@
   if (type == "auto") {
     type <- if (is.numeric(x)) "step" else "categorical"
   }
+  # Fail loud and clear on a column with nothing to map (a common post-join
+  # miss) rather than emitting a malformed expression or a cryptic break error.
+  if (is.numeric(x) && !any(is.finite(x))) {
+    stop(sprintf("Column \"%s\" has no non-missing values to map; check the join/source.",
+                 column), call. = FALSE)
+  }
 
   if (type == "categorical") {
     cc <- .nt_categorical_colors(x, colors)
+    if (length(cc$values) == 0L) {
+      stop(sprintf("Column \"%s\" has no non-NA categories to color.", column),
+           call. = FALSE)
+    }
     na_col <- na_color %nt||% .nt_na_color
     expr <- mapgl::match_expr(
       column = column, values = cc$values, stops = cc$colors, default = na_col
@@ -265,15 +299,32 @@
   n_classes <- length(colors)
   if (is.null(breaks)) {
     breaks <- .nt_quantile_breaks(as.numeric(x), n_classes)
+    # Heavy ties or a tiny spread can collapse quantile breaks below the count
+    # the colors need; fall back to equal-interval breaks over the data range
+    # before giving up (only a genuinely all-equal column has no spread).
+    if (length(breaks) != (n_classes - 1L)) {
+      rng <- range(as.numeric(x), na.rm = TRUE)
+      if (diff(rng) > 0) {
+        breaks <- seq(rng[1], rng[2], length.out = n_classes + 1L)[-c(1L, n_classes + 1L)]
+      }
+    }
+    if (length(breaks) != (n_classes - 1L)) {
+      stop(sprintf(
+        "Column \"%s\" is constant (or nearly so): cannot derive %d break(s) for %d colors. Pass `breaks`, or fewer `colors`.",
+        column, n_classes - 1L, n_classes), call. = FALSE)
+    }
   } else {
     # drop an explicit leading floor if the caller passed n_classes breaks
     if (length(breaks) == n_classes) breaks <- breaks[-1L]
-  }
-  if (length(breaks) != (n_classes - 1L)) {
-    stop(sprintf(
-      "Expected %d interior break(s) for %d colors, got %d. Pass `breaks` of length %d (or %d with an explicit floor).",
-      n_classes - 1L, n_classes, length(breaks), n_classes - 1L, n_classes
-    ), call. = FALSE)
+    if (length(breaks) > 1L && is.unsorted(breaks, strictly = TRUE)) {
+      stop("`breaks` must be strictly increasing.", call. = FALSE)
+    }
+    if (length(breaks) != (n_classes - 1L)) {
+      stop(sprintf(
+        "Expected %d interior break(s) for %d colors, got %d. Pass `breaks` of length %d (or %d with an explicit floor).",
+        n_classes - 1L, n_classes, length(breaks), n_classes - 1L, n_classes
+      ), call. = FALSE)
+    }
   }
 
   if (type == "continuous") {

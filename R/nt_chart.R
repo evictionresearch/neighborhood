@@ -148,7 +148,9 @@ nt_chart <- function(data, x, y, group = NULL,
   e <- switch(
     type,
     line = echarts4r::e_line_(e, y, smooth = smooth, symbol = "none", ...),
-    area = echarts4r::e_area_(e, y, smooth = smooth, symbol = "none", ...),
+    area = if (!is.null(stack))
+             echarts4r::e_area_(e, y, smooth = smooth, symbol = "none", stack = stack, ...)
+           else echarts4r::e_area_(e, y, smooth = smooth, symbol = "none", ...),
     bar  = if (!is.null(stack)) echarts4r::e_bar_(e, y, stack = stack, ...)
            else echarts4r::e_bar_(e, y, ...)
   )
@@ -412,7 +414,7 @@ nt_spark <- function(values, type = c("line", "bar"),
   switch(
     value_fmt,
     comma    = sprintf("(+%s).toLocaleString()", var_name),
-    currency = sprintf("'$' + (+%s).toLocaleString()", var_name),
+    currency = sprintf("((+%1$s)<0?'-':'')+'$'+Math.abs(+%1$s).toLocaleString()", var_name),
     percent  = sprintf("(+%s * 100).toFixed(1) + '%%'", var_name),
     multiple = sprintf("(+%s).toFixed(2) + '\\u00d7'", var_name),
     none     = var_name,
