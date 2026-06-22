@@ -46,6 +46,7 @@ nt_map(md, color = "pBlack")     # a numeric column instead
 Other ern_maps:
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_layers_control]{nt_layers_control()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}}
 }

@@ -34,7 +34,7 @@ Assembles a character vector of HTML — one entry per row of \code{data} — su
 for use as the \code{popup} (or \code{tooltip}) argument of \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} or any
 \code{mapgl} layer function. MapLibre renders whatever HTML the popup column
 contains, so this is the seam where a map grows from a plain label into the
-rich, multi-panel popups used in the HPRM and state-profile maps.
+rich, multi-panel popups used in the precarity and state-profile maps.
 
 The output is fully \strong{deterministic}: the same data in produces byte-for-byte
 identical HTML out (no timestamps, no random ids), so popups are reproducible
@@ -80,5 +80,6 @@ nt_map(md) # picks up the `popup` column automatically
 }
 \seealso{
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}, which calls this to build a default popup;
-the \emph{Mapping with MapLibre} vignette for the full HPRM-style recipe.
+the \emph{Mapping with MapLibre} and \emph{precarity-mapping} vignettes for the full
+race-bar / bubble-track popup recipe.
 }

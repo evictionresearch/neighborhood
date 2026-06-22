@@ -150,3 +150,9 @@ See `vignette("affordability-index")` for the affordability methodology and
 Census data come from Kyle Walker's **tidycensus**. The MapLibre mapping
 functions used here were developed with the assistance of **Claude Opus 4.8**
 (Anthropic) for transparency; they are deterministic and require no AI to run.
+
+## Issues and feedback
+
+Hit a bug, or have a feature request or feedback? Please
+[open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
+problem reports and suggestions are always welcome.

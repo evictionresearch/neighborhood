@@ -1,0 +1,316 @@
+---
+title: "Advanced: an interactive precarity map"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced: an interactive precarity map}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+The Eviction Research Network's flagship maps put a **housing-precarity measure**
+on the map and let the reader explore it — switch between related measures, read
+a tract's standing in a rich popup, and filter to the places that clear a
+threshold. This advanced tutorial rebuilds that whole experience with the
+`neighborhood` mapping functions, using **only public data you can pull yourself**
+(the ACS via [tidycensus](https://walker-data.com/tidycensus/), plus the bundled
+`us_nt_tracts2024` typologies). Nothing here depends on a proprietary index.
+
+The precarity score we build is **illustrative** — a transparent composite of a
+few ACS measures, meant to demonstrate the mapping tooling, not to stand in for a
+validated model. Swap in your own measure and every step below carries over.
+
+```{r setup}
+library(neighborhood)
+library(dplyr)
+library(sf)
+library(tigris)
+library(tidycensus)
+options(tigris_use_cache = TRUE)
+```
+
+## 1. Build a precarity measure from the ACS
+
+We work one county at a time so the map stays inline and quick to iterate; step 7
+scales the same recipe to the whole country with vector tiles. Here: Hennepin
+County, Minnesota (Minneapolis). Pull a handful of renter-precarity ingredients
+in one call — renter share, rent burden, median rent and income, and population
+(to drop near-empty tracts):
+
+```{r}
+acs_vars <- c(
+  renters  = "B25003_003", occ_hh   = "B25003_001",   # renter / occupied households
+  rb_30_35 = "B25070_007", rb_35_40 = "B25070_008",    # gross rent as a share of income
+  rb_40_50 = "B25070_009", rb_50p   = "B25070_010",
+  rb_total = "B25070_001", rb_na    = "B25070_011",
+  med_rent = "B25064_001", med_inc  = "B19013_001",
+  pop      = "B01003_001"
+)
+
+tr <- get_acs(geography = "tract", state = "MN", county = "Hennepin",
+              variables = acs_vars, year = 2022, output = "wide",
+              geometry = TRUE) |>
+  st_transform(4326)
+```
+
+Derive the component measures, then a composite. Each component is turned into a
+**percentile rank** (0–100) within the county and averaged, so the composite
+reads as "this tract is more precarious than X% of the county." Lower income
+means *higher* precarity, so we rank its negative:
+
+```{r}
+pctl <- function(x) dplyr::percent_rank(x) * 100
+
+prec <- tr |>
+  transmute(
+    GEOID,
+    pop          = popE,
+    med_rent     = med_rentE,
+    med_inc      = med_incE,
+    renter_share = rentersE / occ_hhE,
+    rent_burden  = (rb_30_35E + rb_35_40E + rb_40_50E + rb_50pE) /
+                     pmax(rb_totalE - rb_naE, 1)            # share of renters paying >= 30%
+  ) |>
+  filter(pop >= 500, !is.na(renter_share), !is.na(rent_burden)) |>
+  mutate(
+    precarity = rowMeans(cbind(pctl(rent_burden), pctl(renter_share), pctl(-med_inc)))
+  )
+```
+
+Join the bundled racial typologies on `GEOID` — we use the group shares for the
+popup bar chart and the typology label in the field table:
+
+```{r}
+prec <- prec |>
+  left_join(
+    us_nt_tracts2024 |>
+      select(GEOID, nt_conc, totraceE, pWhite, pBlack, pAsian, pLatine, pOther),
+    by = "GEOID"
+  )
+```
+
+## 2. Three switchable layers (the legend follows the layer)
+
+Add the composite and its two main components as separate layers — each with its
+own `id`, all but the first `visible = FALSE` — then wire a switcher with
+[nt_layers_control()]. Picking a measure shows that layer **and its legend**, and
+hides the others:
+
+A 5-class sequential ramp reads well for a 0–100 percentile; pass it as `colors`
+(with matching `labels`) so every layer uses the same legend grammar. Each
+`breaks` vector has one fewer entry than `colors`:
+
+```{r}
+ramp5 <- c("#ffffcc", "#fed976", "#fd8d3c", "#f03b20", "#bd0026")
+
+m <- nt_maplibre(prec) |>
+  nt_add_choropleth(prec, "precarity", id = "Precarity",
+                    breaks = c(20, 40, 60, 80), colors = ramp5,
+                    labels = c("0-20", "20-40", "40-60", "60-80", "80-100"),
+                    legend_title = "Precarity percentile",
+                    popup = "popup", opacity = 0.85) |>
+  nt_add_choropleth(prec, "rent_burden", id = "Rent burden",
+                    breaks = c(0.35, 0.45, 0.55, 0.65), colors = ramp5,
+                    labels = c("<35%", "35-45%", "45-55%", "55-65%", "65%+"),
+                    legend_title = "Renters paying 30%+ of income",
+                    popup = "popup", opacity = 0.85, visible = FALSE) |>
+  nt_add_choropleth(prec, "renter_share", id = "Renter share",
+                    breaks = c(0.25, 0.5, 0.75),
+                    labels = c("<25%", "25-50%", "50-75%", "75%+"),
+                    legend_title = "Share of households renting",
+                    popup = "popup", opacity = 0.85, visible = FALSE)
+
+m <- nt_layers_control(m, layers = c("Precarity", "Rent burden", "Renter share"),
+                       title = "Measure")
+```
+
+(We pass `popup = "popup"` ahead of building that column — that happens next.)
+
+```{r precarity-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="An illustrative precarity map for Hennepin County, MN: the composite percentile layer with the ERN sequential ramp, the measure switcher (Precarity / Rent burden / Renter share), and the legend that follows the chosen layer. Step 7 scales the same recipe to all US tracts via PMTiles."}
+knitr::include_graphics("figures/map-precarity.png")
+```
+
+## 3. The rich popup: race bars and "bubble tracks"
+
+The signature popup shows two things beyond a field table: a small **bar chart**
+of racial composition, and **bubble tracks** that place the tract on a scale
+between its county and the nation. Both are just HTML strings you build with
+`sprintf()`, so they stay fully deterministic. Pass them to [nt_popup()] via
+`html =`.
+
+First the racial-composition bars from the typology shares:
+
+```{r}
+race_bars <- function(d) {
+  groups <- c(White = "pWhite", Black = "pBlack", Asian = "pAsian",
+              Latine = "pLatine", Other = "pOther")
+  cols   <- c("#4575b4", "#d73027", "#fc8d59", "#fee090", "#91bfdb")
+  rows <- vapply(seq_len(nrow(d)), function(i) {
+    bars <- vapply(seq_along(groups), function(g) {
+      val <- d[[groups[g]]][i]
+      pct <- round(100 * ifelse(is.na(val), 0, val))
+      sprintf(paste0("<div style='display:flex;align-items:center;gap:6px;margin:1px 0'>",
+                     "<span style='width:46px;font-size:10px;color:#586573'>%s</span>",
+                     "<span style='flex:1;background:#eef1f4;border-radius:2px'>",
+                     "<span style='display:block;height:7px;width:%d%%;background:%s;border-radius:2px'></span>",
+                     "</span><span style='width:30px;font-size:10px;text-align:right'>%d%%</span></div>"),
+              names(groups)[g], pct, cols[g], pct)
+    }, character(1))
+    paste(bars, collapse = "")
+  }, character(1))
+  rows
+}
+```
+
+Then a bubble track — a colored rail with a marker for the tract and a tick for
+the county reference:
+
+```{r}
+bubble <- function(value, county, lo, hi, fmt) {
+  pct <- function(x) pmax(0, pmin(100, (x - lo) / (hi - lo) * 100))
+  sprintf(
+    paste0("<div style='position:relative;height:20px;margin:4px 0'>",
+           "<div style='position:absolute;top:8px;left:0;right:0;height:6px;",
+           "background:linear-gradient(to right,#d1e5f0,#4393c3,#2166ac);border-radius:3px'></div>",
+           "<div style='position:absolute;top:5px;left:%s%%;width:11px;height:11px;",
+           "background:#fff;border:2px solid #333;border-radius:50%%;transform:translateX(-50%%)'></div>",
+           "<div style='position:absolute;top:4px;left:%s%%;width:2px;height:13px;background:#c0392b'></div>",
+           "</div><div style='font-size:10px;color:#586573'>Tract %s &middot; County %s</div>"),
+    pct(value), pct(county), fmt(value), fmt(county))
+}
+```
+
+The bubble tracks need county and national reference values. Pull the county
+medians from the ACS and use the published national medians:
+
+```{r}
+co <- get_acs(geography = "county", state = "MN", county = "Hennepin",
+              variables = c(inc = "B19013_001", rent = "B25064_001"),
+              year = 2022, output = "wide")
+co_inc <- co$incE; co_rent <- co$rentE
+us_inc <- 75149; us_rent <- 1348   # 2022 ACS 1-year national medians
+
+dollars <- function(x) paste0("$", format(round(x), big.mark = ","))
+
+prec$popup <- nt_popup(
+  prec,
+  title  = "GEOID",
+  fields = c("Neighborhood type" = "nt_conc",
+             "Precarity percentile" = "precarity",
+             "Population" = "pop"),
+  html = paste0(
+    "<div style='font-size:11px;font-weight:600;margin-top:6px'>Racial composition</div>",
+    race_bars(prec),
+    "<div style='font-size:11px;font-weight:600;margin-top:6px'>Median gross rent</div>",
+    bubble(prec$med_rent, co_rent, 0, 3000, dollars),
+    "<div style='font-size:11px;font-weight:600;margin-top:4px'>Median household income</div>",
+    bubble(prec$med_inc, co_inc, 0, 200000, dollars)
+  )
+)
+```
+
+With the `popup` column built, re-run the step-2 pipe (it already references
+`popup = "popup"`) and every layer gets the rich popup on click.
+
+## 4. A threshold slider
+
+The other piece of the flagship experience is a slider that filters the map to
+the places above a chosen precarity level. mapgl doesn't ship one for a static
+widget, but it is a few lines of deterministic JavaScript over the standard
+MapLibre API — the same way [nt_layers_control()] is built. It adds a range input
+and calls `setFilter()` on the `Precarity` layer as you drag:
+
+```{r}
+m <- htmlwidgets::onRender(m, "
+function(el, x) {
+  var map = el.map || (window.HTMLWidgets && HTMLWidgets.getInstance(el) ?
+                       HTMLWidgets.getInstance(el).getMap() : null);
+  if (!map) return;
+  var box = document.createElement('div');
+  box.style.cssText = 'position:absolute;z-index:3;left:10px;bottom:28px;background:#fff;' +
+    'padding:8px 11px;border-radius:4px;box-shadow:0 1px 4px rgba(25,34,44,.25);' +
+    'font:13px Inter,system-ui,sans-serif;color:#19222C';
+  box.innerHTML = '<div style=\"font-weight:600\">Min precarity: <span id=\"pv\">0</span></div>' +
+    '<input id=\"ps\" type=\"range\" min=\"0\" max=\"100\" value=\"0\" step=\"5\" style=\"width:170px\">';
+  function apply(v) {
+    document.getElementById('pv').textContent = v;
+    if (map.getLayer('Precarity'))
+      map.setFilter('Precarity', ['>=', ['get', 'precarity'], +v]);
+  }
+  box.querySelector('#ps').addEventListener('input', function(e) { apply(e.target.value); });
+  if (map.getLayer('Precarity')) el.appendChild(box); else map.on('load', function(){ el.appendChild(box); });
+}
+")
+```
+
+Because we filtered the data in R rather than on the map, `setFilter()` here is
+the only filter on the layer — drag the slider and tracts below the threshold
+drop out. (To filter a *categorical* layer instead, swap the expression for
+`['in', ['get', 'measure'], ['literal', ['High', 'Extreme']]]`.)
+
+## 5. Save it
+
+A map is an `htmlwidget`; write a standalone, shareable HTML file with
+`htmlwidgets::saveWidget()` — the same delivery format as the live state-profile
+maps:
+
+```{r}
+htmlwidgets::saveWidget(m, "precarity-hennepin.html", selfcontained = TRUE)
+```
+
+## 6. Dropping to mapgl
+
+Every `nt_*` function returns an ordinary `mapgl` map, so anything the wrappers
+don't expose is one more pipe to a `mapgl::` function — a dot/hatch
+`fill_pattern` overlay for a flagged subset, a second basemap, `add_image()`,
+custom controls, and so on:
+
+```{r}
+m |>
+  mapgl::add_fill_layer(
+    id = "high_burden_hatch", source = prec, fill_pattern = "dot-9",
+    filter = list(">=", list("get", "rent_burden"), 0.6)
+  )
+```
+
+## 7. The full map at scale: PMTiles
+
+A statewide or national precarity map is too many tracts to embed inline. Build
+the measure for every tract (loop the step-1 recipe over states, or pull national
+ACS at once), then tile it once with [nt_pmtiles()] (it shells out to
+`tippecanoe`), host the `.pmtiles`, and point a layer at it:
+
+```{r}
+tiles <- nt_pmtiles(prec_us, path = "precarity_2022.pmtiles", layer = "precarity")
+
+nt_maplibre() |>
+  mapgl::add_pmtiles_source("precarity", url = tiles, promote_id = "GEOID") |>
+  mapgl::add_fill_layer(id = "Precarity", source = "precarity",
+                        source_layer = "precarity",
+                        fill_color = mapgl::step_expr(
+                          column = "precarity", base = "#ffffcc",
+                          values = c(20, 40, 60, 80),
+                          stops  = c("#fed976", "#fd8d3c", "#f03b20", "#bd0026")),
+                        fill_opacity = 0.85)
+```
+
+`nt_add_choropleth(..., tiles = "pmtiles")` will also do the tiling for you when a
+layer exceeds the inline threshold.
+
+## Acknowledgments
+
+Mapping is built on Kyle Walker's **mapgl** and **tidycensus**; tiles use
+**tippecanoe**. The bundled typologies come from the Eviction Research Network.
+The precarity composite here is illustrative — a teaching device, not a validated
+model. For transparency, the `neighborhood` mapping functions used here were
+developed with the assistance of **Claude Opus 4.8** (Anthropic); they are
+deterministic and require no AI to run.
+
+## Issues and feedback
+
+Hit a bug, or have a feature request or feedback? Please
+[open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
+problem reports and suggestions are always welcome.

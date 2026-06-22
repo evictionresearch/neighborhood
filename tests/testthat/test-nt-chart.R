@@ -104,6 +104,82 @@ test_that("band stays a Date on a time axis", {
   expect_false(is.null(ma))
 })
 
+test_that("yaxis = 'hover' hides the y-axis labels and attaches a reveal hook", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(trend_df(), "month", "filings", yaxis = "hover")
+  expect_false(isTRUE(m$x$opts$yAxis[[1]]$axisLabel$show))
+  expect_false(is.null(m$jsHooks$render))
+  expect_match(paste(unlist(m$jsHooks$render), collapse = " "), "setOption")
+})
+
+test_that("yaxis = 'always' (default) shows labels with no reveal hook", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(trend_df(), "month", "filings")
+  expect_true(isTRUE(m$x$opts$yAxis[[1]]$axisLabel$show))
+  expect_null(m$jsHooks$render)
+})
+
+test_that("end_label attaches a direct end label per series and hides the legend", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(race_df(), "year", "rate", group = "race", type = "line",
+                end_label = TRUE)
+  shows <- vapply(m$x$opts$series, function(s) isTRUE(s$endLabel$show), logical(1))
+  expect_true(all(shows))
+  expect_false(isTRUE(m$x$opts$legend$show))   # labels replace the legend
+})
+
+test_that("line_styles set the dash pattern per series, matched by name", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(race_df(), "year", "rate", group = "race", type = "line",
+                line_styles = c(Black = "solid", Latine = "dotted", White = "dashed"))
+  byname <- vapply(m$x$opts$series, function(s) s$lineStyle$type %||% NA_character_,
+                   character(1))
+  names(byname) <- vapply(m$x$opts$series, function(s) s$name, character(1))
+  expect_identical(byname[["Black"]], "solid")
+  expect_identical(byname[["Latine"]], "dotted")
+  expect_identical(byname[["White"]], "dashed")
+})
+
+test_that("a named palette colors series by group name", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(race_df(), "year", "rate", group = "race", type = "line",
+                palette = c(Black = "#111111", Latine = "#222222", White = "#cccccc"))
+  cols <- vapply(m$x$opts$series, function(s) s$lineStyle$color %||% NA_character_,
+                 character(1))
+  names(cols) <- vapply(m$x$opts$series, function(s) s$name, character(1))
+  expect_identical(cols[["White"]], "#cccccc")
+})
+
+test_that("source adds a lower-right attribution title", {
+  skip_if_not_installed("echarts4r")
+  m <- nt_chart(trend_df(), "month", "filings", source = "src · credit")
+  titles <- m$x$opts$title
+  texts <- vapply(titles, function(t) t$text %||% "", character(1))
+  expect_true("src · credit" %in% texts)
+})
+
+test_that("value_fmt = 'multiple' formats values with a multiplication sign", {
+  skip_if_not_installed("echarts4r")
+  js <- neighborhood:::.nt_js_number_expr("multiple", "v")
+  expect_match(js, "toFixed", fixed = TRUE)
+  expect_match(js, "u00d7", fixed = TRUE)   # the × glyph
+})
+
+test_that("highlight_last accents the leading series on a grouped chart", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(
+    year = rep(2016:2020, 2),
+    race = rep(c("Black", "White"), each = 5),
+    rate = c(10, 12, 14, 16, 30,    9, 9, 9, 9, 12)   # Black leads at the end
+  )
+  m <- nt_chart(d, "year", "rate", group = "race", type = "line",
+                highlight_last = TRUE)
+  mp <- vapply(m$x$opts$series, function(s) !is.null(s$markPoint), logical(1))
+  names(mp) <- vapply(m$x$opts$series, function(s) s$name, character(1))
+  expect_true(mp[["Black"]])
+  expect_false(mp[["White"]])
+})
+
 test_that("nt_spark returns an echarts htmlwidget", {
   skip_if_not_installed("echarts4r")
   s <- nt_spark(c(1, 3, 2, 5, 4), type = "bar")

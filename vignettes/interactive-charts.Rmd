@@ -1,8 +1,8 @@
 ---
-title: "Interactive charts in the ERN style"
+title: "Interactive charts: replicating the Minnesota profile"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Interactive charts in the ERN style}
+  %\VignetteIndexEntry{Interactive charts: replicating the Minnesota profile}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,158 +11,277 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 ```
 
-This tutorial builds the "newspaper graphic" charts used in the
-[Eviction Research Network](https://evictionresearch.net) state profiles
-(Washington, Minnesota) — clean trend and bar charts where **hovering reveals
-the scale**: a crosshair tracks the cursor and prints the value right on the
-y-axis, next to a tooltip. Like the mapping functions, the charts are a thin,
-deterministic wrapper — here over [echarts4r](https://echarts4r.john-coene.com/)
-(John Coene), which bundles Apache ECharts — and `nt_chart()` returns the raw
-`echarts4r` widget, so you can keep piping `e_*` functions for anything it
-doesn't expose.
+This tutorial rebuilds the charts from the
+[Eviction Research Network Minnesota profile](https://evictionresearch.net/minnesota/)
+using `nt_chart()` and the bundled `mn_evictions` data — a monthly eviction trend
+with a pre-pandemic baseline and a moratorium band, yearly totals, and rolling
+rates by race. Along the way it shows the **"newspaper graphic" hover behavior**
+(the y-axis appears only when you hover) and finishes with a real-world example:
+pulling Apartment List rent data from a URL to chart regional rents.
+
+The charts are a thin, deterministic wrapper over
+[echarts4r](https://echarts4r.john-coene.com/) (John Coene) / Apache ECharts;
+`nt_chart()` returns the raw `echarts4r` widget, so you can keep piping `e_*`
+functions for anything it doesn't expose.
 
 ```{r setup}
 library(neighborhood)
+library(dplyr)
 ```
 
-## 1. A trend line in one call
+## The data: `mn_evictions`
 
-Give `nt_chart()` a data frame, the x and y column names, and a type:
+`mn_evictions` is the public county-month eviction data behind the Minnesota
+profile — 87 counties, 2017-01 through 2026-03, with race-imputed counts:
+
+```{r, eval=TRUE}
+dplyr::glimpse(neighborhood::mn_evictions)
+```
+
+A note on the rate: `rate` is the raw monthly proportion `filings / renters`.
+The profiles headline an **annualized rate per 1,000 renter households**, which
+you compute over a window as `1000 * sum(filings) * 12 / n_months / renters`.
+
+## 1. The monthly trend (Figure 1)
+
+Roll the counties up to a statewide monthly series, then chart it. The hallmark
+ERN touches — a dashed pre-pandemic baseline, a shaded eviction-moratorium band,
+and an accented latest point — are each one argument. Set `yaxis = "hover"` so
+the y-axis is hidden until the reader hovers, exactly like the live page:
 
 ```{r}
-filings <- data.frame(
-  month   = seq(as.Date("2019-01-01"), by = "month", length.out = 72),
-  filings = round(1000 + 250 * sin(seq_len(72) / 6) + seq_len(72) * 3)
-)
+statewide <- mn_evictions |>
+  group_by(year, month) |>
+  summarise(filings = sum(filings), .groups = "drop") |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month))) |>
+  filter(date >= as.Date("2019-01-01"))
 
-nt_chart(filings, "month", "filings", type = "line")
+prepan <- mn_evictions |>            # 2017-2019 monthly average = the baseline
+  filter(year <= 2019) |>
+  group_by(year, month) |>
+  summarise(filings = sum(filings), .groups = "drop") |>
+  pull(filings) |>
+  mean()
+
+nt_chart(
+  statewide, "date", "filings", type = "line",
+  yaxis          = "hover",                                   # y-axis appears on hover
+  baseline       = prepan, baseline_label = "2017-2019 avg",
+  band           = c(as.Date("2020-03-01"), as.Date("2021-06-01")),
+  band_label     = "Moratorium",
+  highlight_last = TRUE
+)
 ```
 
-Hover the line: a red dashed crosshair snaps to the nearest month, the filing
-count is printed on the y-axis at that height, and a dark tooltip shows the month
-and value. That hover-reveals-the-axis behavior is the signature ERN interaction,
-on by default (`crosshair = TRUE`).
+```{r mn-trend, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Statewide monthly eviction filings (shown mid-hover): the y-axis and gridlines appear only on hover, with the dashed pre-pandemic baseline, the shaded moratorium band, and the accented latest month."}
+knitr::include_graphics("figures/chart-mn-trend.png")
+```
 
-Dates become a time axis automatically; integer years or text categories become a
-category axis. `y` values format as thousands by default — switch with
-`value_fmt = "percent"` or `"currency"`.
+`yaxis = "hover"` is the option to make the y-axis **disappear while you are not
+hovering** and reappear (with dashed gridlines) when you are — the minimalist
+newspaper look. The default is `"always"` (labels always shown); `"none"` hides
+them entirely and relies on the hover crosshair value.
 
-## 2. Editorial touches: baseline, band, focal point
+## 2. Yearly totals (Figure 2)
 
-The state-profile trend charts mark a **pre-pandemic baseline**, shade the
-**eviction-moratorium window**, and highlight the **latest point**. Each is one
-argument:
+```{r}
+yearly <- mn_evictions |>
+  group_by(year) |>
+  summarise(filings = sum(filings), .groups = "drop")
+
+nt_chart(yearly, "year", "filings", type = "bar",
+         yaxis = "hover", highlight_last = TRUE)   # 2026 is year-to-date
+```
+
+```{r mn-bars, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Yearly eviction-filing totals; the latest (partial) year is accented and the y-axis reveals on hover."}
+knitr::include_graphics("figures/chart-mn-bars.png")
+```
+
+## 3. Rates by race — the published plate (Plate V)
+
+The race chart is a rolling **annualized rate per 1,000 renter households** for
+each group. Build the 12-month rolling rate from the imputed counts and the
+matching ACS denominators, reshape to long, and pass `group`:
+
+```{r}
+roll12 <- function(x) as.numeric(stats::filter(x, rep(1, 12), sides = 1))  # trailing 12-mo sum
+
+race <- mn_evictions |>
+  arrange(year, month) |>
+  group_by(year, month) |>
+  summarise(across(c(filings_black, filings_white, filings_latine, filings_other,
+                     renters_black, renters_white, renters_latine, renters_other),
+                   sum),          # statewide totals (sum across all 87 counties)
+            .groups = "drop") |>
+  mutate(date = as.Date(sprintf("%d-%02d-01", year, month)),
+         Black  = 1000 * roll12(filings_black)  / renters_black,
+         White  = 1000 * roll12(filings_white)  / renters_white,
+         Latine = 1000 * roll12(filings_latine) / renters_latine,
+         Other  = 1000 * roll12(filings_other)  / renters_other) |>
+  tidyr::pivot_longer(c(Black, White, Latine, Other),
+                      names_to = "race", values_to = "rate") |>
+  filter(!is.na(rate))
+```
+
+To match the published plate, lean on the editorial arguments: `end_label` writes
+each group's name and latest value at the line end (so no legend is needed),
+`line_styles` gives each series a print-legible dash pattern, a mostly-ink
+`palette` keeps the comparison group (White) light, `highlight_last` accents the
+leading line, and `source` prints the data credit. `yaxis = "hover"` keeps the
+scale hidden until the reader hovers:
 
 ```{r}
 nt_chart(
-  filings, "month", "filings", type = "line",
-  baseline       = mean(filings$filings[1:12]),               # dashed reference line
-  baseline_label = "2019 average",
-  band           = c(as.Date("2020-03-01"), as.Date("2021-06-01")),  # shaded window
-  band_label     = "Moratorium",
-  highlight_last = TRUE                                        # accent the latest month
+  race, "date", "rate", group = "race", type = "line",
+  yaxis          = "hover",
+  end_label      = TRUE,                       # "Black · 33.5" at each line end
+  highlight_last = TRUE,                       # red dot on the leading series
+  line_styles    = c(Black = "solid", Latine = "dotted",
+                     Other = "dashed", White = "solid"),
+  palette        = c(Black = "#19222C", Latine = "#19222C",
+                     Other = "#3f4b57", White = "#9fb6c4"),
+  source         = "lsc · acs · wru v2.0 · birdie"
 )
 ```
 
-```{r trend-chart, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output (shown mid-hover): the crosshair tracks the cursor and prints the value on the y-axis, with the dashed baseline, shaded moratorium band, and the accented latest point."}
-knitr::include_graphics("figures/chart-trend.png")
+```{r mn-race, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Filing rate by race, rolling annualized per 1,000 renter households (shown mid-hover). Direct end-labels replace the legend, each series has its own line style, and the y-axis appears only on hover."}
+knitr::include_graphics("figures/chart-mn-race.png")
 ```
 
-## 3. Bar charts (yearly totals)
+## 4. The disparity ratio (Plate VI)
+
+The companion plate expresses each group's rate as a **ratio to the white rate** —
+above `1.0` means filed against at a higher rate than white renters. Reshape to
+wide, divide by `White`, and chart it with a `1.0` parity baseline and
+`value_fmt = "multiple"` so values read as `1.52×`:
 
 ```{r}
-yearly <- data.frame(
-  year    = 2019:2025,
-  filings = c(13200, 9800, 8100, 11500, 13900, 14600, 6200)  # last year partial
+ratio <- race |>
+  select(date, race, rate) |>
+  tidyr::pivot_wider(names_from = race, values_from = rate) |>
+  mutate(Black = Black / White, Latine = Latine / White, Other = Other / White) |>
+  tidyr::pivot_longer(c(Black, Latine, Other), names_to = "race", values_to = "ratio") |>
+  filter(!is.na(ratio))
+
+nt_chart(
+  ratio, "date", "ratio", group = "race", type = "line",
+  yaxis          = "hover",
+  value_fmt      = "multiple",                 # 1.52x
+  end_label      = TRUE, highlight_last = TRUE,
+  baseline       = 1, baseline_label = "parity with white renters",
+  line_styles    = c(Black = "solid", Latine = "dotted", Other = "dashed"),
+  palette        = c(Black = "#19222C", Latine = "#19222C", Other = "#9fb6c4"),
+  source         = "lsc · acs · wru v2.0 · birdie"
 )
-
-nt_chart(yearly, "year", "filings", type = "bar", highlight_last = TRUE)
 ```
 
-```{r bar-chart, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: yearly totals with the latest (partial) year accented; hovering reveals the value on the y-axis."}
-knitr::include_graphics("figures/chart-bars.png")
-```
-
-`highlight_last` colors the most recent (often partial) year in the accent red,
-exactly as the state profiles flag the year-to-date bar.
-
-## 4. Multi-series: race/ethnicity trends
-
-Pass `group` to draw one line per category — the rolling race-rate chart from the
-Minnesota profile. Each series gets a color from the ERN palette, the legend
-appears automatically, and the tooltip lists every series at the hovered x:
-
-```{r}
-race <- expand.grid(year = 2016:2025, race = c("Black", "Latine", "White"))
-race$rate <- c(seq(28, 40, length = 10),
-               seq(22, 31, length = 10),
-               seq(12, 15, length = 10))
-
-nt_chart(race, "year", "rate", group = "race", type = "line",
-         y_title = "filings per 1,000 renters",
-         baseline = 20, baseline_label = "State avg")
-```
-
-```{r race-chart, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output (shown mid-hover): one line per group with the ERN palette, an automatic legend, and a tooltip listing every series at the hovered year."}
-knitr::include_graphics("figures/chart-race.png")
-```
-
-Stack bars or areas with `stack`:
-
-```{r}
-nt_chart(race, "year", "rate", group = "race", type = "bar", stack = "total")
+```{r mn-ratio, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Black, Latine, and Other filing rates as a ratio of the white filing rate, with a dashed parity line at 1.0 and end-labels in multiples (shown mid-hover)."}
+knitr::include_graphics("figures/chart-mn-ratio.png")
 ```
 
 ## 5. Sparklines
 
-For the small "trend at a glance" graphic beside a headline number, use
-`nt_spark()` — a tiny, axis-free line or bar chart:
+For the small "trend at a glance" graphic beside a headline number, `nt_spark()`
+makes an axis-free line or bar:
 
 ```{r}
-nt_spark(c(3, 5, 4, 6, 8, 7, 9, 12, 11, 14), type = "bar")
-nt_spark(yearly$filings, type = "line")
+nt_spark(yearly$filings, type = "bar")
 ```
 
-## 6. Pairing charts with the data functions
+## 6. Pulling data from a URL: Apartment List regional rents
 
-The charts take any data frame, so they pair naturally with the package's data
-functions. For example, count neighborhood typologies by state and chart them:
+A common workflow is to pull a public dataset straight from the web, reshape it,
+and chart it. Here we use [Apartment List's Rent
+Estimates](https://www.apartmentlist.com/research/category/data-rent-estimates) —
+median new-lease rents by metro/city/county — to chart a metro's rent over time.
+
+The download links are content-hashed and change with each monthly release, so we
+scrape the current link off the data page, then read the CSV directly:
 
 ```{r}
-library(dplyr)
+library(readr); library(tidyr); library(stringr); library(lubridate)
 
-by_type <- us_nt_tracts2024 |>
-  filter(state == "MN") |>
-  count(nt_conc, name = "tracts") |>
-  arrange(desc(tracts))
+# 1. Resolve the current CSV link off the data page. The hash in the path
+#    changes each monthly release, so scrape the link rather than hard-coding it
+#    (and keep a pinned fallback in case the page serves bot-filtered content).
+page <- "https://www.apartmentlist.com/research/category/data-rent-estimates"
+html <- paste(readLines(url(page), warn = FALSE), collapse = "\n")
+csv_url <- str_extract(
+  html,
+  "https://assets\\.ctfassets\\.net/[^\"\\\\]*Apartment_List_Rent_Estimates_2[0-9_]+\\.csv"
+)
+if (is.na(csv_url)) {
+  csv_url <- paste0("https://assets.ctfassets.net/jeox55pd4d8n/2nz8cro1T1bopNPDG6Sbsf/",
+                    "54e7e1745db655de15aaa99c5570e6ea/Apartment_List_Rent_Estimates_2026_05.csv")
+}
 
-nt_chart(by_type, "nt_conc", "tracts", type = "bar")
+# 2. Read it (keep FIPS as character to preserve leading zeros)
+rent <- read_csv(csv_url, col_types = cols(location_fips_code = col_character()))
+
+# 3. Pick a metro (by CBSA code) and bed size, reshape wide -> long
+mpls <- rent |>
+  filter(location_type == "Metro",
+         location_fips_code == "33460",   # Minneapolis-St. Paul-Bloomington, MN-WI
+         bed_size == "overall") |>
+  pivot_longer(matches("^\\d{4}_\\d{2}$"), names_to = "month", values_to = "rent") |>
+  mutate(date = ym(month)) |>
+  filter(!is.na(rent))
+
+# 4. Chart it
+nt_chart(mpls, "date", "rent", type = "line", value_fmt = "currency",
+         yaxis = "hover", title = "Median new-lease rent — Minneapolis metro")
 ```
 
-## 7. Saving and customizing
-
-A chart is an `htmlwidget`, so saving a standalone, shareable HTML file is one
-call:
-
-```{r}
-chart <- nt_chart(filings, "month", "filings", type = "line")
-htmlwidgets::saveWidget(chart, "filings_trend.html", selfcontained = TRUE)
+```{r apt-rent, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Median new-lease rent for the Minneapolis-St. Paul metro from Apartment List Rent Estimates, pulled live from the URL (shown mid-hover). Data: Apartment List."}
+knitr::include_graphics("figures/chart-apartmentlist.png")
 ```
 
-Because `nt_chart()` returns the underlying `echarts4r` widget, keep piping
-`e_*` functions for anything it doesn't expose — a data zoom slider, a second
-y-axis, animations, a title, and so on:
+To define your own **region** (a set of cities, or several metros), filter to
+those rows and aggregate per month — population-weighting is the defensible
+choice since each row is already a median:
 
 ```{r}
-nt_chart(filings, "month", "filings", type = "line") |>
+area <- rent |>
+  filter(location_type == "City", bed_size == "overall",
+         location_fips_code %in% c("2743000", "2758000")) |>   # Minneapolis, St. Paul
+  pivot_longer(matches("^\\d{4}_\\d{2}$"), names_to = "month", values_to = "rent") |>
+  mutate(date = ym(month)) |>
+  filter(!is.na(rent)) |>
+  group_by(date) |>
+  summarise(rent = weighted.mean(rent, population), .groups = "drop")
+
+nt_chart(area, "date", "rent", type = "line", value_fmt = "currency", yaxis = "hover")
+```
+
+Always **attribute** Apartment List on the chart, read the CSV at runtime rather
+than redistributing it, and review their terms of use.
+
+## 7. Saving and dropping to echarts4r
+
+A chart is an `htmlwidget`; save a standalone file with
+`htmlwidgets::saveWidget()`. And since `nt_chart()` returns the underlying
+`echarts4r` widget, keep piping `e_*` for anything else — a data-zoom slider, a
+second axis, animations:
+
+```{r}
+nt_chart(statewide, "date", "filings", type = "line", yaxis = "hover") |>
   echarts4r::e_datazoom(x_index = 0) |>
-  echarts4r::e_title("Monthly eviction filings")
+  echarts4r::e_title("Minnesota eviction filings")
 ```
 
 ## Acknowledgments
 
-The charts are built on **echarts4r** (John Coene) and Apache ECharts. For
-transparency, the `nt_chart()`/`nt_spark()` functions were designed and
-implemented with the assistance of **Claude Opus 4.8** (Anthropic); they are
-deterministic R code and require no AI to run. See
-`vignette("mapping-with-maplibre")` for the companion mapping toolkit.
+Charts are built on **echarts4r** (John Coene) and Apache ECharts. Minnesota data
+are from the Eviction Research Network; Apartment List rent data are pulled from
+[apartmentlist.com](https://www.apartmentlist.com/research/category/data-rent-estimates).
+For transparency, the `nt_chart()`/`nt_spark()` functions were developed with the
+assistance of **Claude Opus 4.8** (Anthropic); they are deterministic R code and
+require no AI to run. See `vignette("mapping-with-maplibre")` for the mapping
+toolkit and `vignette("precarity-mapping")` for an advanced interactive
+precarity map.
+
+## Issues and feedback
+
+Hit a bug, or have a feature request or feedback? Please
+[open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
+problem reports and suggestions are always welcome.

@@ -65,6 +65,74 @@ test_that("popup accepts an existing column name", {
   expect_identical(m$x$layers[[1]]$popup, "mypopup")
 })
 
+test_that("visible = FALSE adds a hidden layer", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  m <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc", id = "A") |>
+    nt_add_choropleth(d, "pBlack", id = "B", visible = FALSE)
+  vis <- vapply(m$x$layers, function(z) z$layout$visibility %||% "visible", character(1))
+  ids <- vapply(m$x$layers, function(z) z$id, character(1))
+  expect_identical(vis[ids == "A"], "visible")
+  expect_identical(vis[ids == "B"], "none")
+})
+
+test_that("a named column does not corrupt the fill expression (regression)", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  demos <- c(Black = "pBlack")          # named, as from demos[i] in a loop
+  m <- nt_maplibre(d) |> nt_add_choropleth(d, demos[1], id = "Black")
+  fc <- unlist(m$x$layers[[1]]$paint[["fill-color"]])
+  expect_true("pBlack" %in% fc)          # plain column name present
+  expect_false(any(names(fc) %in% "Black"))  # not serialized as a named object
+})
+
+test_that("a second choropleth appends its legend tied to its layer", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  m <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc", id = "A") |>
+    nt_add_choropleth(d, "pBlack", id = "B")
+  lh <- paste(m$x$legend_html, collapse = "")
+  expect_true(grepl("A", lh) && grepl("B", lh))   # both legends present, tied to layers
+})
+
+test_that("nt_layers_control attaches a switcher referencing the layers", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  m <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc", id = "Typology") |>
+    nt_add_choropleth(d, "pBlack", id = "Share", visible = FALSE) |>
+    nt_layers_control(layers = c("Typology", "Share"), title = "Show")
+  expect_s3_class(m, "htmlwidget")
+  js <- paste(unlist(m$jsHooks$render), collapse = " ")
+  expect_match(js, "setLayoutProperty")        # toggles layer visibility
+  expect_match(js, "Typology")
+  expect_match(js, "Share")
+})
+
+test_that("fill_color passthrough uses the custom expression + a manual legend", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  d$flag <- c(TRUE, FALSE, FALSE, FALSE)
+  fc <- list("case", list("==", list("get", "flag"), TRUE), "#c9c9c9",
+             mapgl::interpolate(column = "pBlack", values = c(0, 0.5, 0.9),
+                                stops = c("#fed976", "#fd8d3c", "#54278f")))
+  m <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "pBlack", fill_color = fc, id = "custom",
+                      colors = c("#fed976", "#54278f"), labels = c("Low", "High"))
+  expect_identical(m$x$layers[[1]]$paint[["fill-color"]][[1]], "case")
+  expect_gt(nchar(paste(m$x$legend_html, collapse = "")), 0L)   # legend from colors/labels
+})
+
+test_that("nt_layers_control validates inputs", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  m <- nt_maplibre(d) |> nt_add_choropleth(d, "nt_conc", id = "A")
+  expect_error(nt_layers_control(m, layers = "A", labels = c("x", "y")),
+               "same length")
+})
+
 test_that("map functions reject non-spatial data with guidance", {
   d <- sf::st_drop_geometry(nt_test_sf())
   expect_error(nt_map(d), "not spatial|could not be converted")

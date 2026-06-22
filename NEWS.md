@@ -2,6 +2,35 @@
 
 ## New features
 
+* **Bundled dataset.** `mn_evictions` (Minnesota county-month eviction filings,
+  the public data behind the state profile, with race breakdowns) — documented
+  and ready to plot.
+
+* **`nt_chart(yaxis = )`.** A new option controlling the y-axis: `"always"`
+  (default), `"hover"` (the ERN newspaper style — the y-axis labels and dashed
+  gridlines are hidden until the reader hovers the chart, then appear), or
+  `"none"`.
+
+* **Editorial chart styling.** `nt_chart()` gains the touches that reproduce the
+  published profile plates: `end_label` writes a direct label at the end of each
+  line (e.g. `"Black · 33.5"`, the alternative to a legend); `line_styles` varies
+  the dash pattern per series for print/grayscale legibility; `source` prints a
+  small attribution in the lower-right; `value_fmt = "multiple"` formats a ratio
+  as `1.52×` (for parity/disparity charts); and `highlight_last` now accents the
+  leading series on a grouped chart.
+
+* **`nt_add_choropleth(fill_color = )`.** Pass a MapLibre paint expression to
+  take full control of a layer's coloring (e.g. a flag-based `case` wrapping an
+  `interpolate`), while still getting the popup/tooltip/legend/visibility wiring.
+  This makes it possible to reproduce bespoke, multi-layer maps exactly.
+
+* New articles: `interactive-charts` (refreshed — replicates the Minnesota
+  profile charts from `mn_evictions`, demonstrates `yaxis = "hover"` and the
+  editorial end-label/line-style/source touches, and pulls Apartment List rent
+  data from a URL to chart regional rents) and `precarity-mapping` (an advanced
+  tutorial that builds a precarity-style interactive map — switchable risk
+  layers, a threshold slider, and rich popups — entirely from public data).
+
 * **Interactive MapLibre mapping.** A new, deterministic toolkit for building
   interactive MapLibre GL maps of neighborhood data — the same kind of maps used
   in the Eviction Research Network state profiles (HPRM, Minnesota, Washington),
@@ -45,6 +74,15 @@
   pre-built `sf` object: a path to a shapefile / GeoJSON / GeoPackage, a bare
   `sfc` geometry, or an `sp`/`terra` object — all normalized to `sf` (the
   canonical representation) and re-projected to WGS84 as needed.
+
+* **Multiple layers on one map.** `nt_add_choropleth()` gains a `visible`
+  argument, and the new `nt_layers_control()` adds a radio switcher that shows
+  one layer at a time and reveals only that layer's legend — e.g. neighborhood
+  typology plus the share of each demographic group on a single map. Legends
+  from repeated `nt_add_choropleth()` calls now append and tie to their layer.
+  (`nt_add_choropleth()` also now strips a name attribute from `column`, so
+  passing a named element like `demos[i]` in a loop no longer corrupts the
+  layer.)
 
 * New vignettes: `mapping-with-maplibre` (a full tutorial from a one-line map up
   to HPRM-style rich popups and full-US PMTiles), `interactive-charts`, and

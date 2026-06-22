@@ -172,3 +172,9 @@ requested, comes from `tigris::tracts()`.
 - `evictionresearch/library/code/d_calc_ami_incomplete.R` — the organization's HUD-style AMI tier
   engine (county AMI + within-bracket interpolation) that future versions should build on.
 - `ntdf()` — neighborhood racial typologies, joinable to the index on `GEOID` for equity analysis.
+
+## Issues and feedback
+
+Hit a bug, or have a feature request or feedback? Please
+[open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
+problem reports and suggestions are always welcome.

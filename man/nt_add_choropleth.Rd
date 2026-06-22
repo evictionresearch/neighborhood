@@ -12,6 +12,7 @@ nt_add_choropleth(
   breaks = NULL,
   colors = NULL,
   labels = NULL,
+  fill_color = NULL,
   id = NULL,
   legend = TRUE,
   legend_title = NULL,
@@ -20,6 +21,7 @@ nt_add_choropleth(
   opacity = 0.7,
   outline_color = "#ffffff",
   na_color = NULL,
+  visible = TRUE,
   tiles = c("auto", "inline", "pmtiles"),
   max_inline = 25000,
   ...
@@ -50,6 +52,14 @@ floor is dropped. Defaults to data quantiles.}
 \code{c("Lower","Moderate","High","Extreme")} for a 4-class ramp, otherwise
 range labels like \code{"15–25"}).}
 
+\item{fill_color}{Optional MapLibre paint expression (built with
+\code{mapgl::interpolate()}/\code{step_expr()}/\code{match_expr()} or a raw list) to use
+verbatim as the layer fill, taking full control of coloring. This is the
+escape hatch for reproducing bespoke maps — e.g. a no-renter (or
+missing-data) override wrapping an \code{interpolate}. When supplied, pass \code{colors}
+and \code{labels} if you also want a legend (one can't be inferred from a raw
+expression); the column is still used for the popup, tooltip, and \code{id}.}
+
 \item{id}{Layer id. Defaults to a name derived from \code{column}.}
 
 \item{legend}{\code{TRUE} (default), \code{FALSE}, or \code{"interactive"} for a clickable
@@ -69,6 +79,12 @@ data; \code{FALSE}/\code{NULL} for none; a column name to use an existing HTML c
 \item{outline_color}{Polygon outline color (default white).}
 
 \item{na_color}{Color for missing values (default ERN grey \verb{#C0C0C0}).}
+
+\item{visible}{Logical; whether the layer starts visible (default \code{TRUE}).
+Set \code{FALSE} for all-but-one layer when building a multi-layer map with a
+layer switcher (\code{\link[mapgl:add_layers_control]{mapgl::add_layers_control()}}), so only the first layer
+shows initially. Each layer's legend is tied to its layer and toggles with
+it.}
 
 \item{tiles}{\code{"auto"} (default; inline if \code{nrow(data) <= max_inline}, else
 PMTiles), \code{"inline"}, or \code{"pmtiles"}. The PMTiles path needs the
@@ -112,6 +128,19 @@ nt_maplibre(md) |> nt_add_choropleth(md, "nt_conc")
 nt_maplibre(md) |>
   nt_add_choropleth(md, "pBlack", breaks = c(0.25, 0.5, 0.75),
                     legend = "interactive", legend_title = "\% Black")
+
+# Multiple switchable layers: typology + each demographic share. All but the
+# first start hidden; a layer control switches between them (legends follow).
+demos <- c(White = "pWhite", Black = "pBlack",
+           Asian = "pAsian", Latine = "pLatine")
+m <- nt_maplibre(md) |>
+  nt_add_choropleth(md, "nt_conc", id = "Typology")
+for (i in seq_along(demos)) {
+  m <- nt_add_choropleth(m, md, demos[i], id = names(demos)[i],
+                         legend_title = paste("Share", names(demos)[i]),
+                         visible = FALSE)
+}
+m |> mapgl::add_layers_control(layers = c("Typology", names(demos)))
 \dontshow{\}) # examplesIf}
 }
 \seealso{
@@ -120,6 +149,7 @@ nt_maplibre(md) |>
 
 Other ern_maps:
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_layers_control]{nt_layers_control()}},
 \code{\link[=nt_map]{nt_map()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}}

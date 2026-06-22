@@ -36,6 +36,13 @@
 #' @param labels Legend labels for binned numeric maps (defaults to
 #'   `c("Lower","Moderate","High","Extreme")` for a 4-class ramp, otherwise
 #'   range labels like `"15–25"`).
+#' @param fill_color Optional MapLibre paint expression (built with
+#'   `mapgl::interpolate()`/`step_expr()`/`match_expr()` or a raw list) to use
+#'   verbatim as the layer fill, taking full control of coloring. This is the
+#'   escape hatch for reproducing bespoke maps — e.g. a no-renter (or
+#'   missing-data) override wrapping an `interpolate`. When supplied, pass `colors`
+#'   and `labels` if you also want a legend (one can't be inferred from a raw
+#'   expression); the column is still used for the popup, tooltip, and `id`.
 #' @param id Layer id. Defaults to a name derived from `column`.
 #' @param legend `TRUE` (default), `FALSE`, or `"interactive"` for a clickable
 #'   legend that filters the map.
@@ -48,6 +55,11 @@
 #' @param opacity Fill opacity (default `0.7`).
 #' @param outline_color Polygon outline color (default white).
 #' @param na_color Color for missing values (default ERN grey `#C0C0C0`).
+#' @param visible Logical; whether the layer starts visible (default `TRUE`).
+#'   Set `FALSE` for all-but-one layer when building a multi-layer map with a
+#'   layer switcher ([mapgl::add_layers_control()]), so only the first layer
+#'   shows initially. Each layer's legend is tied to its layer and toggles with
+#'   it.
 #' @param tiles `"auto"` (default; inline if `nrow(data) <= max_inline`, else
 #'   PMTiles), `"inline"`, or `"pmtiles"`. The PMTiles path needs the
 #'   `tippecanoe` command-line tool; see [nt_pmtiles()].
@@ -67,23 +79,51 @@
 #' nt_maplibre(md) |>
 #'   nt_add_choropleth(md, "pBlack", breaks = c(0.25, 0.5, 0.75),
 #'                     legend = "interactive", legend_title = "% Black")
+#'
+#' # Multiple switchable layers: typology + each demographic share. All but the
+#' # first start hidden; a layer control switches between them (legends follow).
+#' demos <- c(White = "pWhite", Black = "pBlack",
+#'            Asian = "pAsian", Latine = "pLatine")
+#' m <- nt_maplibre(md) |>
+#'   nt_add_choropleth(md, "nt_conc", id = "Typology")
+#' for (i in seq_along(demos)) {
+#'   m <- nt_add_choropleth(m, md, demos[i], id = names(demos)[i],
+#'                          legend_title = paste("Share", names(demos)[i]),
+#'                          visible = FALSE)
+#' }
+#' m |> mapgl::add_layers_control(layers = c("Typology", names(demos)))
 #' @export
 nt_add_choropleth <- function(map, data, column,
                               type = c("auto", "categorical", "continuous", "step"),
                               breaks = NULL, colors = NULL, labels = NULL,
+                              fill_color = NULL,
                               id = NULL, legend = TRUE, legend_title = NULL,
                               popup = TRUE, tooltip = TRUE,
                               opacity = 0.7, outline_color = "#ffffff",
-                              na_color = NULL,
+                              na_color = NULL, visible = TRUE,
                               tiles = c("auto", "inline", "pmtiles"),
                               max_inline = 25000, ...) {
   type  <- match.arg(type)
   tiles <- match.arg(tiles)
   data <- .nt_ensure_wgs84(.nt_as_sf(data))
+  # Strip any name attribute: a named column (e.g. from `demos[i]` in a loop)
+  # would otherwise serialize into the MapLibre ["get", column] expression as an
+  # object and the layer would be silently rejected by the browser.
+  column <- unname(as.character(column))[1]
   if (is.null(id)) id <- paste0("nt_", gsub("[^A-Za-z0-9]", "_", column))
+  vis <- if (isTRUE(visible)) "visible" else "none"
 
-  spec <- .nt_fill_spec(data, column, type = type, breaks = breaks,
-                        colors = colors, labels = labels, na_color = na_color)
+  # Fill: a caller-supplied `fill_color` expression takes full control (used to
+  # reproduce bespoke maps — e.g. a no-renter `case` wrapping an `interpolate`).
+  # Otherwise build the ERN-styled expression from the column.
+  if (!is.null(fill_color)) {
+    layer_fill <- fill_color
+    spec <- NULL
+  } else {
+    spec <- .nt_fill_spec(data, column, type = type, breaks = breaks,
+                          colors = colors, labels = labels, na_color = na_color)
+    layer_fill <- spec$fill_color
+  }
 
   # --- Resolve popup / tooltip into column names on a working copy ----------
   pt <- .nt_resolve_popup_tooltip(data, column, popup, tooltip)
@@ -116,22 +156,32 @@ nt_add_choropleth <- function(map, data, column,
                                      promote_id = if ("GEOID" %in% names(data)) "GEOID" else NULL)
     map <- mapgl::add_fill_layer(
       map, id = id, source = src_id, source_layer = "nt",
-      fill_color = spec$fill_color, fill_opacity = opacity,
-      fill_outline_color = outline_color,
+      fill_color = layer_fill, fill_opacity = opacity,
+      fill_outline_color = outline_color, visibility = vis,
       popup = pt$popup, tooltip = pt$tooltip, ...
     )
   } else {
     map <- mapgl::add_fill_layer(
       map, id = id, source = data,
-      fill_color = spec$fill_color, fill_opacity = opacity,
-      fill_outline_color = outline_color,
+      fill_color = layer_fill, fill_opacity = opacity,
+      fill_outline_color = outline_color, visibility = vis,
       popup = pt$popup, tooltip = pt$tooltip, ...
     )
   }
 
   # --- Legend ----------------------------------------------------------------
   if (!is.null(legend) && !isFALSE(legend)) {
-    map <- .nt_add_legend(map, spec, column, legend, legend_title)
+    if (is.null(spec)) {
+      # custom fill_color: build a legend only if the caller supplied the
+      # colors + labels to describe it (we can't infer one from a raw expression)
+      if (!is.null(colors) && !is.null(labels)) {
+        spec_leg <- list(legend_type = "categorical",
+                         legend_values = labels, legend_colors = colors)
+        map <- .nt_add_legend(map, spec_leg, column, legend, legend_title, id)
+      }
+    } else {
+      map <- .nt_add_legend(map, spec, column, legend, legend_title, id)
+    }
   }
   map
 }
@@ -177,15 +227,22 @@ nt_add_choropleth <- function(map, data, column,
 }
 
 # Add the legend that matches a fill spec.
-.nt_add_legend <- function(map, spec, column, legend, legend_title) {
+.nt_add_legend <- function(map, spec, column, legend, legend_title, id = NULL) {
   lt <- legend_title %nt||% column
   interactive <- identical(legend, "interactive")
+
+  # If the map already carries a legend (i.e. this is a 2nd+ choropleth layer),
+  # APPEND rather than replace, and tie each legend to its layer via layer_id so
+  # it shows/hides with the layer when a layers control toggles it.
+  has_legend <- !is.null(map$x$legend_html) &&
+    any(nzchar(unlist(map$x$legend_html)))
 
   if (identical(spec$legend_type, "continuous")) {
     return(mapgl::add_continuous_legend(
       map, legend_title = lt,
       values = .nt_fmt(spec$legend_values),
-      colors = spec$legend_colors
+      colors = spec$legend_colors,
+      add = has_legend, layer_id = id
     ))
   }
 
@@ -193,7 +250,7 @@ nt_add_choropleth <- function(map, data, column,
   args <- list(
     map, legend_title = lt,
     values = spec$legend_values, colors = spec$legend_colors,
-    interactive = interactive
+    interactive = interactive, add = has_legend, layer_id = id
   )
   if (interactive) {
     args$filter_column <- column

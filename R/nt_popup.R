@@ -5,7 +5,7 @@
 #' for use as the `popup` (or `tooltip`) argument of [nt_add_choropleth()] or any
 #' `mapgl` layer function. MapLibre renders whatever HTML the popup column
 #' contains, so this is the seam where a map grows from a plain label into the
-#' rich, multi-panel popups used in the HPRM and state-profile maps.
+#' rich, multi-panel popups used in the precarity and state-profile maps.
 #'
 #' The output is fully **deterministic**: the same data in produces byte-for-byte
 #' identical HTML out (no timestamps, no random ids), so popups are reproducible
@@ -41,7 +41,8 @@
 #' @return A character vector of length `nrow(data)` containing one HTML string
 #'   per feature.
 #' @seealso [nt_add_choropleth()], which calls this to build a default popup;
-#'   the *Mapping with MapLibre* vignette for the full HPRM-style recipe.
+#'   the *Mapping with MapLibre* and *precarity-mapping* vignettes for the full
+#'   race-bar / bubble-track popup recipe.
 #' @examples
 #' \dontrun{
 #' md <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)

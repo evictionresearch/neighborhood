@@ -22,10 +22,17 @@
 #' arguments:
 #'
 #' * `baseline` draws a dashed horizontal reference line (e.g. a pre-pandemic
-#'   average), like the state-profile charts.
+#'   average, or a `1.0` parity line on a ratio chart), like the state-profile
+#'   charts.
 #' * `band` shades a vertical region between two x values (e.g. an eviction
 #'   moratorium window).
-#' * `highlight_last` marks the most recent point in the accent color.
+#' * `highlight_last` marks the most recent point in the accent color (for a
+#'   grouped chart, the leading series — the one with the largest latest value).
+#' * `end_label` writes a direct label at the end of each line ("Black · 33.5"),
+#'   the editorial alternative to a legend.
+#' * `line_styles` varies the dash pattern per series for print/grayscale
+#'   legibility, and `source` prints a small attribution in the lower-right —
+#'   together these reproduce the look of the published profile plates.
 #'
 #' @param data A data frame (one row per x value, or per x × group).
 #' @param x Name of the column for the x-axis (a date, year, or category).
@@ -42,14 +49,33 @@
 #' @param palette Series colors; defaults to the ERN palette.
 #' @param value_fmt How to format values on the y-axis, the hover crosshair, and
 #'   the tooltip (all kept in agreement): one of `"comma"` (default), `"percent"`,
-#'   `"currency"`, or `"none"`. **`"percent"` expects proportions in `[0, 1]`**
-#'   (e.g. `0.25` renders as `25%`), matching [nt_popup()] and `scales::percent()`.
+#'   `"currency"`, `"multiple"`, or `"none"`. **`"percent"` expects proportions in
+#'   `[0, 1]`** (e.g. `0.25` renders as `25%`), matching [nt_popup()] and
+#'   `scales::percent()`. `"multiple"` renders a ratio as e.g. `1.52×` (useful for
+#'   a parity/disparity chart).
 #' @param smooth Logical; smooth lines/areas (default `TRUE` for line/area,
 #'   `FALSE` for bars).
 #' @param crosshair Logical; the hover crosshair + on-axis value (default
 #'   `TRUE`).
+#' @param yaxis When the y-axis scale is shown: `"always"` (default; labels
+#'   always visible), `"hover"` (the "newspaper graphic" style used in the ERN
+#'   state profiles — the y-axis labels and dashed gridlines are hidden until the
+#'   reader hovers the chart, then appear), or `"none"` (never; rely on the
+#'   hover crosshair value alone).
 #' @param highlight_last Logical; mark the most recent point in the accent color.
-#' @param legend Logical; show a legend (defaults to `TRUE` when `group` is set).
+#'   With a `group`, the leading series (largest latest value) is accented.
+#' @param end_label Logical; draw a direct label at the end of each line — the
+#'   series name and its latest value (e.g. `"Black · 33.5"`) in the series color.
+#'   This is the editorial alternative to a legend, so the legend is hidden by
+#'   default when `end_label = TRUE`. Line/area charts only.
+#' @param line_styles Optional character vector of dash styles recycled across
+#'   series — any of `"solid"`, `"dashed"`, `"dotted"` — for print- and
+#'   grayscale-friendly differentiation. If the vector is named, names are matched
+#'   to series (group) names; otherwise styles are applied in series order.
+#' @param source Optional short attribution string shown small in the lower-right
+#'   corner (e.g. a data-source credit line).
+#' @param legend Logical; show a legend (defaults to `TRUE` when `group` is set,
+#'   and to `FALSE` when `end_label = TRUE`).
 #' @param title,subtext Optional chart title and subtitle.
 #' @param x_title,y_title Optional axis titles.
 #' @param height Optional CSS height (e.g. `"380px"`).
@@ -77,16 +103,24 @@ nt_chart <- function(data, x, y, group = NULL,
                      baseline = NULL, baseline_label = NULL,
                      band = NULL, band_label = NULL,
                      palette = NULL,
-                     value_fmt = c("comma", "percent", "currency", "none"),
+                     value_fmt = c("comma", "percent", "currency", "multiple", "none"),
                      smooth = NULL,
                      crosshair = TRUE,
+                     yaxis = c("always", "hover", "none"),
                      highlight_last = FALSE,
+                     end_label = FALSE,
+                     line_styles = NULL,
+                     source = NULL,
                      legend = !is.null(group),
                      title = NULL, subtext = NULL,
                      x_title = NULL, y_title = NULL,
                      height = NULL, ...) {
   type <- match.arg(type)
   value_fmt <- match.arg(value_fmt)
+  yaxis <- match.arg(yaxis)
+  # Direct end-labels replace the legend, so hide it unless the caller asked for
+  # one explicitly.
+  if (isTRUE(end_label) && missing(legend)) legend <- FALSE
   if (!is.data.frame(data)) {
     stop("`data` must be a data frame.", call. = FALSE)
   }
@@ -120,7 +154,8 @@ nt_chart <- function(data, x, y, group = NULL,
   )
 
   e <- .nt_ern_chart_style(e, pal, value_fmt, crosshair, legend,
-                           x_title, y_title, !is.null(baseline) || !is.null(band))
+                           x_title, y_title, !is.null(baseline) || !is.null(band),
+                           yaxis = yaxis, end_label = isTRUE(end_label))
 
   if (!is.null(baseline)) {
     e <- echarts4r::e_mark_line(
@@ -150,18 +185,47 @@ nt_chart <- function(data, x, y, group = NULL,
       silent = TRUE
     )
   }
-  if (isTRUE(highlight_last) && is.null(group)) {
-    last_row <- data[nrow(data), , drop = FALSE]
-    e <- echarts4r::e_mark_point(
-      e, data = list(coord = list(last_row[[x]], last_row[[y]])),
-      itemStyle = list(color = .ern_brand$accent), symbol = "circle",
-      symbolSize = 8, label = list(show = FALSE)
-    )
+  if (isTRUE(highlight_last)) {
+    if (is.null(group)) {
+      last_row <- data[nrow(data), , drop = FALSE]
+      e <- echarts4r::e_mark_point(
+        e, data = list(coord = list(last_row[[x]], last_row[[y]])),
+        itemStyle = list(color = .ern_brand$accent), symbol = "circle",
+        symbolSize = 8, label = list(show = FALSE)
+      )
+    } else {
+      # Accent the leading series: the group whose latest value is largest.
+      last_by <- dplyr::ungroup(dplyr::slice_tail(
+        dplyr::group_by(dplyr::arrange(data, .data[[x]]), .data[[group]]), n = 1))
+      if (nrow(last_by)) {
+        lead <- last_by[which.max(last_by[[y]]), , drop = FALSE]
+        e <- echarts4r::e_mark_point(
+          e, serie = as.character(lead[[group]]),
+          data = list(coord = list(lead[[x]], lead[[y]])),
+          itemStyle = list(color = .ern_brand$accent), symbol = "circle",
+          symbolSize = 8, label = list(show = FALSE)
+        )
+      }
+    }
   }
   if (!is.null(title)) {
     e <- echarts4r::e_title(e, text = title, subtext = subtext %nt||% "",
                             textStyle = list(fontFamily = .ern_font,
                                              color = .ern_brand$navy, fontWeight = 600))
+  }
+  if (!is.null(source)) e <- .nt_add_source(e, source)
+  # Editorial per-series touches: varied dash patterns, named-palette colors,
+  # and direct end-of-line labels. Applied last so the mark functions above
+  # don't clobber them.
+  if (type %in% c("line", "area") &&
+      (!is.null(line_styles) || isTRUE(end_label) ||
+       (!is.null(names(pal)) && any(nzchar(names(pal)))))) {
+    e <- .nt_style_series(e, line_styles, pal, isTRUE(end_label), value_fmt)
+  }
+  # "hover" y-axis: reveal the labels + dashed gridlines only while the cursor is
+  # over the chart (the ERN newspaper-graphic style).
+  if (identical(yaxis, "hover")) {
+    e <- htmlwidgets::onRender(e, .nt_yaxis_hover_js())
   }
   e
 }
@@ -210,8 +274,12 @@ nt_spark <- function(values, type = c("line", "bar"),
 # colors, grid). Kept here so nt_chart() and future chart functions agree.
 # ---------------------------------------------------------------------------
 .nt_ern_chart_style <- function(e, pal, value_fmt, crosshair, legend,
-                                x_title, y_title, has_marks) {
+                                x_title, y_title, has_marks, yaxis = "always",
+                                end_label = FALSE) {
   axis_label <- list(color = .ern_brand$muted, fontFamily = .ern_font, fontSize = 11)
+  # y-axis labels start hidden for "hover" (revealed on hover via onRender) and
+  # for "none"; always shown for "always".
+  y_label <- c(axis_label, list(show = identical(yaxis, "always")))
 
   e <- echarts4r::e_color(e, pal, background = "rgba(0,0,0,0)")
 
@@ -232,13 +300,20 @@ nt_spark <- function(values, type = c("line", "bar"),
     splitLine = list(show = FALSE),
     axisLine  = list(show = FALSE),
     axisTick  = list(show = FALSE),
-    axisLabel = axis_label,
+    axisLabel = y_label,
     scale = TRUE,
     name = y_title %nt||% "", nameLocation = "end", nameGap = 12,
     nameTextStyle = list(color = .ern_brand$muted, fontFamily = .ern_font, align = "left")
   )
   if (value_fmt != "none") {
-    y_args$formatter <- echarts4r::e_axis_formatter(.nt_fmt_style(value_fmt))
+    # "multiple" has no Intl style, so format it with a small JS function;
+    # everything else uses echarts4r's Intl-backed axis formatter.
+    y_args$formatter <- if (value_fmt == "multiple") {
+      htmlwidgets::JS(sprintf("function(v){ return %s; }",
+                              .nt_js_number_expr("multiple", "v")))
+    } else {
+      echarts4r::e_axis_formatter(.nt_fmt_style(value_fmt))
+    }
     # format the boxed value the crosshair prints on the y-axis
     y_args$axisPointer <- list(label = list(formatter = .nt_pointer_js(value_fmt)))
   }
@@ -262,9 +337,10 @@ nt_spark <- function(values, type = c("line", "bar"),
   e <- do.call(echarts4r::e_tooltip, tip_args)
 
   e <- echarts4r::e_legend(e, show = isTRUE(legend), textStyle = list(fontFamily = .ern_font))
-  # leave room on the right so baseline/series labels are not clipped
-  e <- echarts4r::e_grid(e, left = 58, right = if (has_marks) 84 else 28,
-                         top = 30, bottom = 40)
+  # leave room on the right so baseline / end-of-line / series labels are not
+  # clipped (end labels like "Black · 33.5" need the most).
+  right <- if (isTRUE(end_label)) 124 else if (has_marks) 84 else 28
+  e <- echarts4r::e_grid(e, left = 58, right = right, top = 30, bottom = 40)
   e
 }
 
@@ -308,6 +384,25 @@ nt_spark <- function(values, type = c("line", "bar"),
   ))
 }
 
+# JS (htmlwidgets::onRender) that reveals the y-axis labels + dashed gridlines
+# only while the cursor is over the chart, then hides them again on leave.
+.nt_yaxis_hover_js <- function() {
+  paste0(
+    "function(el, x){\n",
+    "  var inst = (window.echarts && echarts.getInstanceByDom) ? echarts.getInstanceByDom(el) : null;\n",
+    "  if(!inst){ var c = el.querySelector('div'); if(c && window.echarts) inst = echarts.getInstanceByDom(c); }\n",
+    "  if(!inst) return;\n",
+    "  var on = false;\n",
+    "  function reveal(show){ if(show===on) return; on=show;\n",
+    "    inst.setOption({ yAxis: { axisLabel: { show: show },\n",
+    "      splitLine: { show: show, lineStyle: { color: '#19222C', type: 'dashed', opacity: 0.22 } } } });\n",
+    "  }\n",
+    "  el.addEventListener('mouseenter', function(){ reveal(true); });\n",
+    "  el.addEventListener('mouseleave', function(){ reveal(false); });\n",
+    "}"
+  )
+}
+
 # A JS expression (string) formatting the numeric variable `var_name` per fmt.
 # NOTE: "percent" expects a proportion in [0, 1] and multiplies by 100, to match
 # echarts4r::e_axis_formatter("percent") (Intl percent style) used on the y-axis
@@ -319,7 +414,77 @@ nt_spark <- function(values, type = c("line", "bar"),
     comma    = sprintf("(+%s).toLocaleString()", var_name),
     currency = sprintf("'$' + (+%s).toLocaleString()", var_name),
     percent  = sprintf("(+%s * 100).toFixed(1) + '%%'", var_name),
+    multiple = sprintf("(+%s).toFixed(2) + '\\u00d7'", var_name),
     none     = var_name,
     sprintf("(+%s).toLocaleString()", var_name)
   )
+}
+
+# Add a small lower-right attribution. ECharts stores `title` as an array of
+# title objects, so a source credit is just one more title positioned bottom-right.
+.nt_add_source <- function(e, source) {
+  src <- list(
+    text = source, right = 10, bottom = 8,
+    textStyle = list(color = .ern_brand$muted, fontFamily = .ern_font,
+                     fontSize = 10, fontWeight = "normal")
+  )
+  t <- e$x$opts$title
+  if (is.null(t)) {
+    e$x$opts$title <- list(src)
+  } else {
+    e$x$opts$title[[length(t) + 1L]] <- src
+  }
+  e
+}
+
+# Editorial per-series styling, applied by post-processing the serialized series
+# (echarts4r has no per-series API for grouped charts). For each line series:
+#   * line_styles  -> the dash pattern (recycled, or matched by series name)
+#   * a named palette -> the line/marker color for that group
+#   * end_label    -> a direct "<name> · <value>" label at the line end
+.nt_style_series <- function(e, line_styles, palette, end_label, value_fmt) {
+  series <- e$x$opts$series
+  if (is.null(series) || !length(series)) return(e)
+  styles    <- if (is.null(line_styles)) NULL else as.character(line_styles)
+  st_names  <- names(line_styles)
+  named_pal <- if (!is.null(names(palette)) && any(nzchar(names(palette)))) palette else NULL
+  end_js <- htmlwidgets::JS(sprintf(
+    paste0("function(p){ var v = Array.isArray(p.value) ? p.value[p.value.length-1] : p.value;",
+           " if(v===null||v===undefined||isNaN(+v)) return p.seriesName||'';",
+           " var fv = (%s); return (p.seriesName ? p.seriesName + ' \\u00b7 ' : '') + fv; }"),
+    .nt_js_number_expr(value_fmt, "v")))
+
+  li <- 0L
+  for (i in seq_along(series)) {
+    s <- series[[i]]
+    if (!identical(s$type, "line")) next   # echarts4r area series are also type "line"
+    li <- li + 1L
+    nm  <- s$name %nt||% ""
+    col <- if (!is.null(named_pal) && nzchar(nm) && nm %in% names(named_pal)) {
+      unname(named_pal[[nm]])
+    } else NULL
+    ls <- s$lineStyle %nt||% list()
+    if (!is.null(styles)) {
+      key <- if (!is.null(st_names) && nzchar(nm) && nm %in% st_names) {
+        styles[[which(st_names == nm)[1]]]
+      } else styles[[((li - 1L) %% length(styles)) + 1L]]
+      ls$type <- key
+    }
+    if (!is.null(col)) ls$color <- col
+    if (length(ls)) s$lineStyle <- ls
+    if (!is.null(col)) {
+      it <- s$itemStyle %nt||% list()
+      it$color <- col
+      s$itemStyle <- it
+    }
+    if (isTRUE(end_label)) {
+      s$endLabel <- list(show = TRUE, formatter = end_js,
+                         color = col %nt||% "inherit", fontFamily = .ern_font,
+                         fontSize = 12, fontWeight = 600)
+      s$labelLayout <- list(moveOverlap = "shiftY")  # nudge crowded end labels apart
+    }
+    series[[i]] <- s
+  }
+  e$x$opts$series <- series
+  e
 }

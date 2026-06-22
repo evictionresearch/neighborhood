@@ -121,7 +121,10 @@ typology workflow.
 `nt_chart()` builds the editorial trend/bar charts from the state profiles, where
 **hovering reveals the y-axis** (a crosshair prints the value on the axis at the
 cursor) plus a tooltip — with one-argument baselines, shaded bands, and a
-highlighted latest point. `nt_spark()` makes inline sparklines.
+highlighted latest point. For the published-plate look it also does direct
+end-of-line labels (`"Black · 33.5"`), print-friendly per-series line styles, and
+a source-credit footer; `yaxis = "hover"` makes the y-axis appear only on hover.
+`nt_spark()` makes inline sparklines.
 
 ``` r
 filings <- data.frame(month = seq(as.Date("2019-01-01"), by = "month", length.out = 72),
@@ -133,7 +136,19 @@ nt_chart(filings, "month", "filings", type = "line",
 
 ![An editorial trend line shown mid-hover: a red crosshair tracks the cursor and prints the value on the y-axis, alongside a tooltip, the dashed baseline, and the accented latest point.](man/figures/README-chart.png)
 
-See `vignette("interactive-charts")` for the full tour.
+See `vignette("interactive-charts")` for the full tour, which also replicates the
+Minnesota state-profile charts and pulls live Apartment List rent data from a URL.
+
+## Bundled data
+
+| Dataset | What |
+|---|---|
+| `us_nt_tracts2024` | Neighborhood racial typologies for every US tract (2020–2024 ACS) |
+| `mn_evictions` | Minnesota county-month eviction filings (the public state-profile data, with race breakdowns) |
+
+The advanced `vignette("precarity-mapping")` walks through building a precarity-style
+interactive map — switchable risk layers, a threshold slider, and rich popups (race
+bars and tract-vs-county-vs-US "bubble tracks") — entirely from public data.
 
 ## Credits
 

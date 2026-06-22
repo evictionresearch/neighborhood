@@ -16,10 +16,14 @@ nt_chart(
   band = NULL,
   band_label = NULL,
   palette = NULL,
-  value_fmt = c("comma", "percent", "currency", "none"),
+  value_fmt = c("comma", "percent", "currency", "multiple", "none"),
   smooth = NULL,
   crosshair = TRUE,
+  yaxis = c("always", "hover", "none"),
   highlight_last = FALSE,
+  end_label = FALSE,
+  line_styles = NULL,
+  source = NULL,
   legend = !is.null(group),
   title = NULL,
   subtext = NULL,
@@ -56,8 +60,10 @@ shade a vertical band.}
 
 \item{value_fmt}{How to format values on the y-axis, the hover crosshair, and
 the tooltip (all kept in agreement): one of \code{"comma"} (default), \code{"percent"},
-\code{"currency"}, or \code{"none"}. \strong{\code{"percent"} expects proportions in \verb{[0, 1]}}
-(e.g. \code{0.25} renders as \verb{25\%}), matching \code{\link[=nt_popup]{nt_popup()}} and \code{scales::percent()}.}
+\code{"currency"}, \code{"multiple"}, or \code{"none"}. \strong{\code{"percent"} expects proportions in
+\verb{[0, 1]}} (e.g. \code{0.25} renders as \verb{25\%}), matching \code{\link[=nt_popup]{nt_popup()}} and
+\code{scales::percent()}. \code{"multiple"} renders a ratio as e.g. \verb{1.52×} (useful for
+a parity/disparity chart).}
 
 \item{smooth}{Logical; smooth lines/areas (default \code{TRUE} for line/area,
 \code{FALSE} for bars).}
@@ -65,9 +71,30 @@ the tooltip (all kept in agreement): one of \code{"comma"} (default), \code{"per
 \item{crosshair}{Logical; the hover crosshair + on-axis value (default
 \code{TRUE}).}
 
-\item{highlight_last}{Logical; mark the most recent point in the accent color.}
+\item{yaxis}{When the y-axis scale is shown: \code{"always"} (default; labels
+always visible), \code{"hover"} (the "newspaper graphic" style used in the ERN
+state profiles — the y-axis labels and dashed gridlines are hidden until the
+reader hovers the chart, then appear), or \code{"none"} (never; rely on the
+hover crosshair value alone).}
 
-\item{legend}{Logical; show a legend (defaults to \code{TRUE} when \code{group} is set).}
+\item{highlight_last}{Logical; mark the most recent point in the accent color.
+With a \code{group}, the leading series (largest latest value) is accented.}
+
+\item{end_label}{Logical; draw a direct label at the end of each line — the
+series name and its latest value (e.g. \code{"Black · 33.5"}) in the series color.
+This is the editorial alternative to a legend, so the legend is hidden by
+default when \code{end_label = TRUE}. Line/area charts only.}
+
+\item{line_styles}{Optional character vector of dash styles recycled across
+series — any of \code{"solid"}, \code{"dashed"}, \code{"dotted"} — for print- and
+grayscale-friendly differentiation. If the vector is named, names are matched
+to series (group) names; otherwise styles are applied in series order.}
+
+\item{source}{Optional short attribution string shown small in the lower-right
+corner (e.g. a data-source credit line).}
+
+\item{legend}{Logical; show a legend (defaults to \code{TRUE} when \code{group} is set,
+and to \code{FALSE} when \code{end_label = TRUE}).}
 
 \item{title, subtext}{Optional chart title and subtitle.}
 
@@ -103,10 +130,17 @@ enabled by \code{crosshair = TRUE} (the default). Editorial touches map to
 arguments:
 \itemize{
 \item \code{baseline} draws a dashed horizontal reference line (e.g. a pre-pandemic
-average), like the state-profile charts.
+average, or a \code{1.0} parity line on a ratio chart), like the state-profile
+charts.
 \item \code{band} shades a vertical region between two x values (e.g. an eviction
 moratorium window).
-\item \code{highlight_last} marks the most recent point in the accent color.
+\item \code{highlight_last} marks the most recent point in the accent color (for a
+grouped chart, the leading series — the one with the largest latest value).
+\item \code{end_label} writes a direct label at the end of each line ("Black · 33.5"),
+the editorial alternative to a legend.
+\item \code{line_styles} varies the dash pattern per series for print/grayscale
+legibility, and \code{source} prints a small attribution in the lower-right —
+together these reproduce the look of the published profile plates.
 }
 }
 \examples{

@@ -9,7 +9,6 @@ reference:
       - ntdf
       - ntcheck
       - nt_pal
-      - us_nt_tracts2024
   - title: Affordability index
     desc: Tract-level housing affordability relative to area median income.
     contents:
@@ -25,6 +24,7 @@ reference:
       - nt_maplibre
       - nt_add_choropleth
       - nt_add_labels
+      - nt_layers_control
       - nt_popup
       - nt_pmtiles
   - title: Charts (interactive)
@@ -37,6 +37,10 @@ reference:
   - title: Crosswalks
     contents:
       - get_co_puma
+  - title: Datasets
+    contents:
+      - us_nt_tracts2024
+      - mn_evictions
 
 articles:
   - title: Articles
@@ -44,5 +48,6 @@ articles:
     contents:
       - mapping-with-maplibre
       - interactive-charts
+      - precarity-mapping
       - neighborhood-typologies
       - affordability-index

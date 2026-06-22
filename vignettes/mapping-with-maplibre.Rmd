@@ -150,20 +150,38 @@ popup with no extra work:
 nt_map(aff, color = "tr_rent_ratio", popup = "popup", legend_title = "Affordable-rental ratio")
 ```
 
-You can layer measures by joining several tables and adding a layer per measure,
-then letting `mapgl::add_layers_control()` toggle between them — the same pattern
-the HPRM map uses for its eviction-risk / displacement-risk / composite layers:
+### Multiple layers with a switcher
+
+A single map can carry several layers and let the reader switch between them.
+Give each layer its own `id`, hide all but the first with `visible = FALSE`, then
+add `nt_layers_control()` — it shows **one layer at a time** and reveals only that
+layer's legend. Here we put the neighborhood typology and the share of each
+demographic group on one map:
 
 ```{r}
-tracts <- balt |>
-  left_join(sf::st_drop_geometry(aff), by = "GEOID")
+demos <- c(White = "pWhite", Black = "pBlack", Asian = "pAsian", Latine = "pLatine")
 
-nt_maplibre(tracts) |>
-  nt_add_choropleth(tracts, "nt_conc",       id = "typology") |>
-  nt_add_choropleth(tracts, "tr_rent_ratio", id = "afford",
-                    legend_title = "Afford. ratio") |>
-  mapgl::add_layers_control()
+m <- nt_maplibre(balt) |>
+  nt_add_choropleth(balt, "nt_conc", id = "Typology", legend_title = "Neighborhood type")
+
+# Add a hidden layer for each demographic share
+for (i in seq_along(demos)) {
+  m <- nt_add_choropleth(m, balt, demos[[i]], id = names(demos)[i],
+                         legend_title = paste("Share", names(demos)[i]),
+                         visible = FALSE)
+}
+
+nt_layers_control(m, layers = c("Typology", names(demos)), title = "Show layer")
 ```
+
+```{r layers-map, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Example output: typology plus a hidden layer for each demographic share, with a switcher (bottom-right) that shows one layer — and only its legend — at a time."}
+knitr::include_graphics("figures/map-layers.png")
+```
+
+The same pattern works for any set of measures — it is how the HPRM map toggles
+its eviction-risk, displacement-risk, and composite layers (just give each its
+own `id`). For a raw multi-select (checkbox) toggle instead of a one-at-a-time
+switcher, drop to `mapgl::add_layers_control()`.
 
 ## 5. Labels
 
@@ -311,3 +329,9 @@ and **mapgl** for the MapLibre engine. For transparency, the design and
 implementation of the `neighborhood` mapping functions were developed with the
 assistance of **Claude Opus 4.8** (Anthropic). The functions themselves are
 deterministic R code and require no AI to run.
+
+## Issues and feedback
+
+Hit a bug, or have a feature request or feedback? Please
+[open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
+problem reports and suggestions are always welcome.
