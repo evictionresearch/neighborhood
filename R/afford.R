@@ -1,5 +1,13 @@
-#' @title Tract-level housing affordability index
+#' @title Tract-level housing affordability index (legacy v1 — superseded)
 #' @description
+#' \strong{Superseded by [afford_index()].} `afford()` is the original v1 engine,
+#' retained for backward compatibility (e.g. existing maps). Prefer
+#' [afford_index()] for new work: it fixes v1's documented defects -- most
+#' importantly the hard-coded `price * 0.188` ownership factor (a ~3.8%, 0%-down
+#' mortgage baked in, which overstates ownership affordability ~30-40% at 2024
+#' rates) and the median-of-tract-medians AMI. See the v1->v2 crosswalk in
+#' `vignette("affordability-index")`.
+#'
 #' `afford()` identifies, for a given income group, how much of each census tract's
 #' housing stock is affordable, and compares that supply to the region's share of
 #' households in the same income group. It returns a per-tract supply measure, a

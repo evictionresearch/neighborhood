@@ -33,8 +33,9 @@ where that affordable housing is — and, by comparing supply to the regional co
 same-income households, where it is scarce relative to need.
 
 In the larger design (`dev/affordability-index-design.md`) affordability is **Gate 1** of a
-three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette documents Gate 1, the
-supply engine, which is the part that ships today.
+three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette documents Gate 1 (the
+supply engine) plus the first availability measures of **Gate 2** (`availability = TRUE`); the
+*Allowed* gate (discrimination, voucher rejection, eviction-record screening) is future work.
 
 > **Note — two implementations, lead with the new one.** `afford_index()` is the rebuilt **v2
 > engine** and the recommended entry point. `afford()` is the original v1 implementation, kept for
@@ -59,7 +60,8 @@ code chunks are shown but **not executed** at build time.
 ## Quick start
 
 The very simplest call needs only `state` and `counties` (FIPS codes or names both work). Everything
-else has a default: `year = 2024`, all three tenures, all four tiers, the pure-ACS AMI source.
+else has a default: `year = 2024`, all three tenures, all four tiers, `demand = "matched"`,
+availability on, and `ami_source = "auto"` (the most exact AMI source available).
 
 ```{r}
 library(neighborhood)
@@ -96,13 +98,16 @@ lower block only affect the `"own_buyin"` tenure.
 | `counties` | — (required) | One or more 3-digit county FIPS or names. |
 | `year` | `2024` | ACS 5-year endpoint year. |
 | `tenure` | `c("rent","own_current","own_buyin")` | Which tenures to compute (any subset; see below). |
-| `ami_source` | `"acs"` | `"acs"`, `"hud"`, or `"hud_acs"` (the last not yet implemented). |
+| `demand` | `"matched"` | Household universe the supply is compared to: `"matched"` (rent↔renters, own↔owners), `"all"`, `"renter"`, `"owner"`, `"likelihood"`. |
+| `ami_source` | `"auto"` | `"auto"`/`"hud"`/`"hud_acs"`/`"acs_fmr"`/`"acs"` — see below. |
 | `ami_tiers` | `c(ELI=.30, VLI=.50, LI=.80, MI=1.20)` | Named tier fractions of AMI. |
 | `hud_hh_size` | `4` | Household size 1–8 for the family-size adjustment; `NULL` = unadjusted. |
 | `interest_rate` | `NULL` | Annual mortgage rate for `own_buyin`; `NULL` = built-in by-year value. |
 | `term_years` | `30` | `own_buyin` mortgage term. |
 | `down_pct` | `0.10` | `own_buyin` down payment fraction. |
 | `tax_ins_rate` | `0.0125` | `own_buyin` annual taxes + insurance as a fraction of value. |
+| `buyin_stock` | `"owned_value"` | `own_buyin` price universe: `"owned_value"` (`B25075`) or `"for_sale"` (`B25085`). |
+| `availability` | `TRUE` | Attach Gate-2 vacancy + turnover availability columns. |
 | `geometry` | `FALSE` | If `TRUE`, attach tract polygons (an `sf` tibble). |
 
 ### `tenure` — three housing-cost models
@@ -122,32 +127,73 @@ afford_index("06", "075", tenure = c("rent", "own_buyin"))
 |---|---|---|---|
 | `"rent"` | `B25063` (gross rent) | affordable if `rent <= income_cutoff * 0.30 / 12` | What share of *rentals* is affordable to the tier? |
 | `"own_current"` (basis A) | `B25094` (selected monthly owner cost) | same 30%-of-income rule as rent | Affordability of the *existing* owned stock as currently financed (most owners locked in old, low payments). |
-| `"own_buyin"` (basis B) | `B25075` (home value) | value → required income via an explicit mortgage model | Could a *mover* afford to **buy in here today** at this year's rate? |
+| `"own_buyin"` (basis B) | `B25075` value, or `B25085` for-sale (see `buyin_stock`) | price → required income via an explicit mortgage model | Could a *mover* afford to **buy in here today** at this year's rate? |
 
 The distinction matters: `own_current` describes who could carry the homes people already own
 (often very affordable thanks to old mortgages), while `own_buyin` describes the true barrier facing
 someone trying to move in now. Reports about *displacement* and *migration* almost always want
 `own_buyin`.
 
+### `demand` — whose need is the supply compared to?
+
+`ratio` and `rate` divide affordable supply by a count of households "in the tier." `demand` sets
+*which* households — and it materially moves the headline, because renters skew lower-income than
+owners.
+
+```{r}
+# Default: rent vs RENTERS, ownership vs OWNERS (matches the deployed reports)
+afford_index("06", "075", tenure = "rent", demand = "matched")
+
+# Compare against ALL households (everyone as a potential mover)
+afford_index("06", "075", tenure = "rent", demand = "all")
+```
+
+| `demand` value | Rent index compared to… | Source |
+|---|---|---|
+| `"matched"` (default) | **renter** households (ownership → **owner** households) | `B25118` |
+| `"all"` | all households (the full potential-mover pool) | `B19001` |
+| `"renter"` / `"owner"` | that universe, for every tenure | `B25118` |
+| `"likelihood"` | all households split by the ACS tenure propensity per income tier | `B19001` × `B25118` |
+
+`"matched"` is the default because the SLC/San Diego reports — and the figure caption below — frame
+rental scarcity against *renter* households. In San Francisco (62% renters), VLI rental supply runs
+a median `ratio ≈ 0.90` against renters versus `≈ 1.08` against all households: the renter universe
+correctly shows supply *below* parity. `"likelihood"` is the hook for modeling cross-tenure
+mobility (an owner who could rent, and vice versa); with realized ACS shares it tracks `"matched"`.
+
 ### `ami_source` — where the income limits come from
 
 ```{r}
-# Pure ACS (default): AMI = county median FAMILY income (B19113)
-afford_index("06", "075", ami_source = "acs")
+# Default: most exact available (HUD if reachable, else Census reproduction)
+afford_index("06", "075", ami_source = "auto")
 
-# Official HUD published limits (needs hudr + HUD_API_KEY)
+# Official HUD published limits, verbatim (needs a snapshot or hudr + HUD_API_KEY)
 afford_index("06", "075", ami_source = "hud")
 ```
 
-- **`"acs"`** (default): AMI is the county median **family** income (ACS `B19113`), and each tier is
-  a simple fraction of it. Fully reproducible from Census alone.
-- **`"hud"`**: ELI/VLI/LI come straight from HUD's *published* per-household-size limits (so HUD's
-  caps, floors, and high-cost adjustments are baked in); any tier without a HUD limit (e.g.
-  `MI = 120%`) is *derived* as fraction × area median × size factor. Requires the `hudr` package and
-  a `HUD_API_KEY` (register free at huduser.gov; e.g. in `~/.Renviron`), unless a HUD snapshot is
-  bundled with the package.
-- **`"hud_acs"`**: the full HUD-cascade reproduction; **not yet implemented** — calling it errors
-  with a pointer to `dev/hud-income-limits-architecture.md`.
+Five sources, ordered most-exact to most-transparent:
+
+- **`"auto"`** (default): tries `hud → hud_acs → acs_fmr → acs` and uses the first that succeeds,
+  printing a message when it falls back from exact HUD. Best default: exact where HUD is reachable,
+  reproducible everywhere.
+- **`"hud"`**: ELI/VLI/LI straight from HUD's *published* per-household-size limits (caps, floors,
+  high-cost adjustments baked in); non-HUD tiers (e.g. `MI = 120%`) are derived. Reads a bundled
+  snapshot first (offline, exact — build it with `data-raw/build_hud_il.R`), then the live HUD API
+  (`hudr` + a free `HUD_API_KEY`). **Use this for reports that must match HUD.**
+- **`"hud_acs"`**: a Census-only reproduction of HUD's cascade (median family income trended from the
+  FY−2 ACS, FMR high-cost bump, ELI poverty floor, LI cap, family sizes). Reproduces HUD in ordinary
+  areas, but **overstates the limits in high-cost areas** where HUD's year-over-year increase cap
+  binds — that cap depends on HUD's own publication history and is not reproducible from public data
+  (e.g. San Diego FY2024 VLI is 75,750 from HUD vs ~82,600 here), and it uses *county* rather than
+  *metro* median income. Longevity insurance for years HUD never published — not for high-cost
+  reports.
+- **`"acs_fmr"`**: naive fractions of `B19113` plus HUD's FMR high-cost bump. Census + live FMR.
+- **`"acs"`**: pure fractions of county median **family** income (`B19113`). Fully Census-reproducible
+  and transparent, but understates thresholds in high-cost areas (no high-cost bump).
+
+> **High-cost regions (Bay Area, San Diego, coastal Utah):** `acs` can understate the VLI/LI
+> thresholds by ~20% because it omits HUD's FMR bump. Prefer `"hud"` (or `"auto"`) there. See
+> `dev/hud-income-limits-architecture.md` for the validation.
 
 ### `ami_tiers` — which income tiers to compute
 
@@ -215,6 +261,46 @@ The built-in `interest_rate = NULL` default looks up a rough 30-year average for
 `year` (e.g. ~3.1% for 2020, ~6.9% for 2024), so even the bare call is rate-aware — but for a report,
 state the rate explicitly so the assumption is auditable.
 
+### `buyin_stock` — which homes count for `own_buyin`
+
+`own_buyin` converts a home *price* into the income needed to buy in. `buyin_stock` picks the price
+universe:
+
+```{r}
+# Default: the value distribution of owner-occupied homes (stable, B25075)
+afford_index("06", "075", tenure = "own_buyin", buyin_stock = "owned_value")
+
+# The for-sale flow only — "what a mover could actually buy now" (B25085, noisier)
+afford_index("06", "075", tenure = "own_buyin", buyin_stock = "for_sale")
+```
+
+`"owned_value"` (default) uses the full distribution of what homes are *worth* in the tract — stable
+at tract level. `"for_sale"` uses only vacant-for-sale price-asked units — closer to the migration
+question of what a mover could buy *today*, but small-count and noisy. (Whether anything is actually
+for sale is handled separately by `availability`, below.)
+
+### `availability` — Gate 2: affordable *and* attainable
+
+Affordability of *occupied* stock is not the same as being able to move in. With `availability = TRUE`
+(default) the index attaches two openness measures per tract, tenure-matched:
+
+```{r}
+afford_index("06", "075", tenure = "rent")          # availability on by default
+afford_index("06", "075", tenure = "rent", availability = FALSE)  # price-only Gate 1
+```
+
+| Column | Meaning | Source |
+|---|---|---|
+| `vacancy_rate` | point-in-time openings (rental vacancy / for-sale rate) | `B25004` + `B25003` |
+| `turnover_rate` | past-year move-out rate (annual flow of openings) | `B07013` |
+| `available_vacancy` | `accessible × vacancy_rate` — affordable **and** currently open | — |
+| `available_turnover` | `accessible × turnover_rate` — affordable **and** turning over per year | — |
+
+This is **Gate 2** of the choice funnel: `accessible` is what a tier can *afford*; `available_*` is
+what they can plausibly *move into*. Both assume open/turnover units share the occupied affordability
+mix (report them alongside the price-only `accessible`, never instead of it). Vacancy is a noisy
+snapshot; turnover (a one-year flow) is usually the better "highway capacity" measure.
+
 ### `geometry` — attach polygons for mapping
 
 ```{r}
@@ -235,7 +321,7 @@ tenure × tier combination. Always filter to **one** tenure and **one** tier bef
 | `GEOID` | 11-digit tract FIPS |
 | `county` | 5-digit county FIPS |
 | `year` | ACS endpoint year used |
-| `ami_source` | `"acs"` / `"hud"` |
+| `ami_source` | `"auto"` / `"hud"` / `"hud_acs"` / `"acs_fmr"` / `"acs"` (the source actually used) |
 | `tenure` | `"rent"` / `"own_current"` / `"own_buyin"` |
 | `ami_tier` | factor: `ELI`/`VLI`/`LI`/`MI` (or your custom names) |
 | `ami` | the county's AMI (median family income basis) |
@@ -248,6 +334,8 @@ tenure × tier combination. Always filter to **one** tenure and **one** tier bef
 | `class_prop` | `reg_hh_tier / reg_hh_total` — region's share of households in the tier |
 | `ratio` | `supply / class_prop` — **location quotient** (>1 = more than fair share) |
 | `rate` | `accessible / reg_hh_tier * 100000` — accessible units per 100k tier households |
+| `vacancy_rate`, `turnover_rate` | Gate-2 openness rates (only when `availability = TRUE`) |
+| `available_vacancy`, `available_turnover` | `accessible ×` each rate — affordable *and* open / turning over |
 
 A quick read of the analytical columns:
 
@@ -274,6 +362,22 @@ wide <- tidyr::pivot_wider(
   names_from = c(tenure, ami_tier), values_from = ratio
 )
 ```
+
+## Cumulative vs. banded tiers — `afford_bands()`
+
+The tiers are **cumulative ceilings**: `VLI` counts everything affordable at or below 50% AMI (so it
+includes `ELI`). That matches how the reports phrase tiers ("affordable to households below 50%"). When
+you instead want the **non-overlapping slices** — the 30–50% band, the 50–80% band — pass the result
+through `afford_bands()`, which differences consecutive tiers within each tract × tenure and
+recomputes `supply`/`ratio`/`rate` (and the availability columns) on the banded counts.
+
+```{r}
+sf_idx <- afford_index("06", "075", tenure = "rent")   # cumulative
+sf_bands <- afford_bands(sf_idx)                        # ELI, 30–50, 50–80, 80–120 slices
+```
+
+Tier *labels* keep their names (the `VLI` row now holds the 30–50% slice). HPRM and the EDR reports
+think in cumulative ceilings; use bands when you need a clean partition (e.g. stacked compositions).
 
 ## Mapping the index
 
@@ -327,8 +431,8 @@ arguments — it is purely the income limits):
 |---|---|---|
 | `state` | — (required) | State FIPS or name. |
 | `counties` | — (required) | County FIPS or names. |
-| `year` | `2024` | ACS 5-year endpoint year. |
-| `ami_source` | `"acs"` | `"acs"` / `"hud"` / `"hud_acs"` (see above). |
+| `year` | `2024` | Limit year (ACS5 endpoint for `acs`/`acs_fmr`; HUD fiscal year for `hud`/`hud_acs`). |
+| `ami_source` | `"auto"` | `"auto"` / `"hud"` / `"hud_acs"` / `"acs_fmr"` / `"acs"` (see above). |
 | `ami_tiers` | `c(ELI=.30, VLI=.50, LI=.80, MI=1.20)` | Named tier fractions of AMI. |
 | `hud_hh_size` | `4` | Household size 1–8 (or `NULL` for unadjusted). |
 
@@ -471,9 +575,13 @@ join.
 ## Data sources
 
 All inputs are ACS 5-year estimates via `tidycensus::get_acs()` (`CENSUS_API_KEY` required). v2 tables:
-`B19113` (median family income), `B19001` (income distribution), `B25063` (gross rent), `B25094`
-(owner cost, basis A), `B25075` (home value, basis B). v1 additionally uses `B19013` and `B25085`.
-Geometry comes from `tigris::tracts()`. `ami_source = "hud"` uses the `hudr` package + `HUD_API_KEY`.
+`B19113` (median family income, AMI basis), `B19001` (all-household income), `B25118` (income by
+tenure — the `demand` universes), `B25063` (gross rent), `B25094` (owner cost, basis A), `B25075`
+(home value, basis B `owned_value`), `B25085` (for-sale price asked, basis B `for_sale`); and for
+Gate-2 availability, `B25004` + `B25003` (vacancy) and `B07013` (turnover). `ami_source = "hud"` uses
+HUD's published limits via a bundled snapshot or the `hudr` package + `HUD_API_KEY`; `"acs_fmr"` and
+`"hud_acs"` also pull HUD Fair Market Rents for the high-cost bump. Geometry comes from
+`tigris::tracts()`.
 
 ## See also
 

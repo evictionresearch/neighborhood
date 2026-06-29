@@ -9,13 +9,16 @@ afford_index(
   counties,
   year = 2024,
   tenure = c("rent", "own_current", "own_buyin"),
-  ami_source = c("acs", "hud", "hud_acs"),
+  demand = c("matched", "all", "renter", "owner", "likelihood"),
+  ami_source = c("auto", "hud", "hud_acs", "acs_fmr", "acs"),
   ami_tiers = c(ELI = 0.3, VLI = 0.5, LI = 0.8, MI = 1.2),
   hud_hh_size = 4,
   interest_rate = NULL,
   term_years = 30,
   down_pct = 0.1,
   tax_ins_rate = 0.0125,
+  buyin_stock = c("owned_value", "for_sale"),
+  availability = TRUE,
   geometry = FALSE
 )
 }
@@ -28,9 +31,22 @@ afford_index(
 
 \item{tenure}{Any of \code{"rent"}, \code{"own_current"} (A), \code{"own_buyin"} (B).}
 
-\item{ami_source}{\code{"acs"} (default), \code{"hud"} (official HUD limits; needs
-\code{hudr} + \code{HUD_API_KEY}), or \code{"hud_acs"} (not yet implemented); see
-\code{\link[=ami_cutoffs]{ami_cutoffs()}}.}
+\item{demand}{Which household universe the affordable supply is compared to
+(sets \code{reg_hh_tier}/\code{reg_hh_total} and thus \code{ratio}/\code{rate}). One of:
+\code{"matched"} (default; rent supply vs \strong{renter} households, ownership supply
+vs \strong{owner} households -- from \code{B25118}), \code{"all"} (all households, \code{B19001}
+-- everyone as a potential mover), \code{"renter"} / \code{"owner"} (that universe for
+every tenure), or \code{"likelihood"} (all households split into rent/own demand
+by the ACS tenure propensity per income tier; with realized ACS shares this
+tracks \code{"matched"} closely and is the hook for modeled cross-tenure mobility
+-- an owner who could rent, and vice versa). Default \code{"matched"} is what the
+deployed SLC/San Diego reports assume.}
+
+\item{ami_source}{\code{"auto"} (default; most-exact available: hud -> hud_acs ->
+acs_fmr -> acs), \code{"hud"} (official HUD limits; snapshot then API), \code{"hud_acs"}
+(Census-only HUD-cascade reproduction; overstates in high-cost capped areas),
+\code{"acs_fmr"} (ACS + FMR high-cost bump), or \code{"acs"} (pure B19113 fractions);
+see \code{\link[=ami_cutoffs]{ami_cutoffs()}}.}
 
 \item{ami_tiers}{Named tier fractions of AMI (default ELI/VLI/LI/MI).}
 
@@ -43,6 +59,19 @@ uses a built-in by-year approximation.}
 \item{term_years, down_pct, tax_ins_rate}{\code{"own_buyin"} mortgage assumptions
 (default 30 years, 10\% down, 1.25\% combined tax+insurance of value/year).}
 
+\item{buyin_stock}{Price universe for \code{"own_buyin"}: \code{"owned_value"} (default,
+\code{B25075} value of owner-occupied homes -- the full distribution of what
+homes are worth here, stable at tract level) or \code{"for_sale"} (\code{B25085}
+price asked on vacant-for-sale units -- closer to "what a mover could buy
+now" but small-count and noisy). Availability is handled separately by the
+Gate-2 vacancy/turnover measures.}
+
+\item{availability}{If \code{TRUE} (default), attach Gate-2 availability: per-tract
+\code{vacancy_rate} (point-in-time openings, \code{B25004}) and \code{turnover_rate}
+(past-year move-outs, \code{B07013}), tenure-matched, plus \code{available_vacancy}
+and \code{available_turnover} (= \code{accessible} x each rate -- affordable units
+that are actually open / turning over). Set \code{FALSE} for price-only Gate 1.}
+
 \item{geometry}{If \code{TRUE}, attach tract polygons (an \code{sf} tibble). With the
 long output this duplicates polygons across tenure/tier; filter to one
 tenure and tier before mapping.}
@@ -50,7 +79,9 @@ tenure and tier before mapping.}
 \value{
 A long tibble, one row per tract x tenure x tier, with \code{accessible},
 \code{total}, \code{supply}, \code{reg_hh_tier}, \code{reg_hh_total}, \code{class_prop}, \code{ratio},
-\code{rate}, the county \code{ami}, and the tier \code{income_cutoff}.
+\code{rate}, the county \code{ami}, and the tier \code{income_cutoff}. When
+\code{availability = TRUE}, also \code{vacancy_rate}, \code{turnover_rate},
+\code{available_vacancy}, and \code{available_turnover} (Gate 2).
 }
 \description{
 For each census tract, counts the housing units affordable to households at
@@ -70,8 +101,9 @@ income ceiling:
 \item \code{"own_current"} (basis A, default): current selected monthly
 owner cost (\code{B25094}); same 30\% rule as rent. Describes the
 affordability of the existing owned stock as currently financed.
-\item \code{"own_buyin"} (basis B): home value (\code{B25075}) converted to
-the income needed to \emph{buy in today} via an explicit mortgage model
+\item \code{"own_buyin"} (basis B): home price (\code{B25075} owner value by
+default, or \code{B25085} for-sale price asked -- see \code{buyin_stock})
+converted to the income needed to \emph{buy in today} via a mortgage model
 (\code{interest_rate}, \code{term_years}, \code{down_pct},
 \code{tax_ins_rate}). Answers "could a mover afford to buy here now?".
 }
@@ -83,10 +115,24 @@ region's share of tier households -- a location quotient), and \code{rate}
 }
 \examples{
 \dontrun{
-sf_idx <- afford_index("06", "075", 2024)                 # San Francisco
-sf_idx[sf_idx$tenure == "rent" & sf_idx$ami_tier == "VLI", ]
+# San Francisco rental affordability, default matched (vs renters) demand
+sf <- afford_index("06", "075", 2024, tenure = "rent")
+sf[sf$ami_tier == "VLI", c("GEOID", "supply", "ratio", "available_vacancy")]
+
+# Which tracts can a VLI renter actually move into? (affordable AND open)
+sf[sf$ami_tier == "VLI" & sf$available_turnover > 0, ]
+
+# Non-overlapping bands (the 30-50\%, 50-80\% slices) instead of cumulative
+afford_bands(sf)
+
+# Owner "buy-in" affordability off the for-sale flow, exact HUD limits
+afford_index("06", "075", 2024, tenure = "own_buyin",
+             buyin_stock = "for_sale", ami_source = "hud")
+
+# Compare demand universes: renters vs all households
+afford_index("06", "075", 2024, tenure = "rent", demand = "all")
 }
 }
 \seealso{
-\code{\link[=ami_cutoffs]{ami_cutoffs()}}, \code{\link[=afford]{afford()}} (legacy)
+\code{\link[=ami_cutoffs]{ami_cutoffs()}}, \code{\link[=afford_bands]{afford_bands()}}, \code{\link[=afford]{afford()}} (legacy)
 }

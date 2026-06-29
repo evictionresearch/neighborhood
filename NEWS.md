@@ -155,10 +155,39 @@
   ELI/VLI/LI use HUD's per-household-size limits (caps/floors/high-cost baked in);
   the path is snapshot-first with live-API fallback and never leaks the API key
   on error. Needs the `hudr` package (now in Suggests) + `HUD_API_KEY`.
-* `data-raw/build_hud_il.R` builds a bundled national `hud_il_<year>` snapshot so
-  the `"hud"` path works offline once committed (longevity insurance).
-* `ami_source = "hud_acs"` (full HUD-cascade reproduction) still fails fast with
-  guidance; arrives next (see `dev/hud-income-limits-architecture.md`).
+* `data-raw/build_hud_il.R` builds a bundled `hud_il_<year>` snapshot (in
+  `inst/extdata/`) so the `"hud"` path works offline, exact, with no rate limits.
+  It now takes an optional state / county subset and **merges** into any existing
+  snapshot, so you can capture your study counties first and the nation later
+  (longevity insurance).
+* `ami_source` now offers `"auto"` (default; most-exact available, in order
+  hud → hud_acs → acs_fmr → acs), `"acs_fmr"` (ACS fractions + HUD's FMR
+  high-cost bump), and `"hud_acs"` — the Census-only HUD-cascade reproduction
+  (median family income trended from the FY−2 ACS, FMR bump, ELI poverty floor,
+  LI US-median cap, HUD family-size factors). `hud_acs` reproduces HUD in
+  ordinary areas but **overstates limits in high-cost areas** where HUD's
+  year-over-year increase cap binds (that cap depends on HUD's own publication
+  history and is not reproducible from public data — e.g. San Diego FY2024 VLI
+  75,750 vs ~82,600), and it uses county—not metro—median income; use `"hud"`
+  for high-cost reports. The AMI engine now lives in `R/ami_cutoffs.R`. See
+  `dev/hud-income-limits-architecture.md`.
+* `afford_index(demand = ...)` chooses the household universe the supply is
+  compared to: `"matched"` (default — rent vs **renters**, ownership vs
+  **owners**, from `B25118`, matching the deployed reports), `"all"` (everyone,
+  `B19001`), `"renter"`/`"owner"`, or `"likelihood"` (split by ACS tenure
+  propensity per income tier). This fixes the prior all-households denominator
+  that overstated rental adequacy (e.g. SF VLI rental ratio 0.90 vs renters,
+  not 1.08 vs all households).
+* `afford_index(buyin_stock = ...)` picks the `own_buyin` price universe:
+  `"owned_value"` (`B25075`, default) or `"for_sale"` (`B25085`, the for-sale
+  flow).
+* `afford_index(availability = TRUE)` adds **Gate 2** of the choice funnel:
+  per-tract `vacancy_rate` (`B25004`) and `turnover_rate` (`B07013`), plus
+  `available_vacancy`/`available_turnover` (affordable units that are actually
+  open / turning over) — affordable *and* attainable, not just affordable.
+* `afford_bands()` converts the cumulative tiers (≤30 / ≤50 / ≤80%) into
+  non-overlapping bands (the 30–50%, 50–80% slices), recomputing
+  `supply`/`ratio`/`rate` on the banded counts.
 
 ## Documentation
 

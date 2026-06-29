@@ -2,7 +2,7 @@
 % Please edit documentation in R/afford.R
 \name{afford}
 \alias{afford}
-\title{Tract-level housing affordability index}
+\title{Tract-level housing affordability index (legacy v1 — superseded)}
 \usage{
 afford(state, counties, ami_limit, year = 2024, geometry = FALSE, ...)
 }
@@ -28,6 +28,14 @@ per tract, including \code{tr_rent_supply}/\code{tr_own_supply},
 map categories, and a \code{popup} field for use with \code{leaflet}.
 }
 \description{
+\strong{Superseded by \code{\link[=afford_index]{afford_index()}}.} \code{afford()} is the original v1 engine,
+retained for backward compatibility (e.g. existing maps). Prefer
+\code{\link[=afford_index]{afford_index()}} for new work: it fixes v1's documented defects -- most
+importantly the hard-coded \code{price * 0.188} ownership factor (a ~3.8\%, 0\%-down
+mortgage baked in, which overstates ownership affordability ~30-40\% at 2024
+rates) and the median-of-tract-medians AMI. See the v1->v2 crosswalk in
+\code{vignette("affordability-index")}.
+
 \code{afford()} identifies, for a given income group, how much of each census tract's
 housing stock is affordable, and compares that supply to the region's share of
 households in the same income group. It returns a per-tract supply measure, a

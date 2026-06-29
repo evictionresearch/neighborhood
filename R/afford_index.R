@@ -118,142 +118,64 @@
   unname(out)
 }
 
-# ---- internal: read a bundled HUD income-limit snapshot, if present ----------
-# Returns the data.frame `hud_il_<year>` if it is bundled with the package, else
-# NULL. Snapshots are the longevity fallback for when HUD's API is unreachable;
-# build them with data-raw/build_hud_il.R.
-.afi_hud_snapshot <- function(year) {
-  nm <- paste0("hud_il_", year)
-  items <- tryCatch(utils::data(package = "neighborhood")$results[, "Item"],
-                    error = function(e) character(0))
-  if (!nm %in% items) return(NULL)
-  env <- new.env()
-  tryCatch({
-    utils::data(list = nm, package = "neighborhood", envir = env)
-    get(nm, envir = env)
-  }, error = function(e) NULL)
-}
-
-# ---- internal: official HUD income-limit cutoffs (snapshot first, then API) --
-# Returns the same shape as the "acs" path. ELI/VLI/LI come straight from HUD's
-# published limits for the requested family size (so caps/floors/high-cost
-# adjustments are baked in); any non-30/50/80 tier (e.g. MI = 120%) is *derived*
-# as fraction x area median x family-size factor and is not a HUD-published limit.
-.afi_hud_cutoffs <- function(state, counties, year, ami_tiers, hud_hh_size) {
-  size <- if (is.null(hud_hh_size)) 4L else as.integer(hud_hh_size)
-  if (!size %in% 1:8) stop("hud_hh_size must be an integer 1-8.", call. = FALSE)
-  sf <- unname(.afi_hh_size_factor[as.character(size)])
-
-  snap <- .afi_hud_snapshot(year)
-  need_api <- is.null(snap) || !all(paste0(state, counties) %in% snap$GEOID)
-  if (need_api) {
-    if (!requireNamespace("hudr", quietly = TRUE))
-      stop("ami_source = 'hud' needs a bundled snapshot or the 'hudr' package ",
-           "(install.packages('hudr')) plus a HUD_API_KEY.", call. = FALSE)
-    if (!nzchar(Sys.getenv("HUD_API_KEY")))
-      stop("ami_source = 'hud' needs a bundled snapshot or a HUD_API_KEY ",
-           "(register free at huduser.gov; e.g. in ~/.Renviron).", call. = FALSE)
-  }
-
-  pick <- function(il, field) {        # robust to which sub-table holds a field
-    for (el in il) if (field %in% names(el)) return(el[[field]][1])
-    NA
-  }
-  one <- function(co) {
-    geoid <- paste0(state, co)
-    if (!is.null(snap) && geoid %in% snap$GEOID) {        # snapshot hit
-      r <- snap[snap$GEOID == geoid, , drop = FALSE]
-      med <- as.numeric(r$median_income); nm <- as.character(r$area_name)
-      eli <- as.numeric(r[[paste0("il30_p", size)]])
-      vli <- as.numeric(r[[paste0("il50_p", size)]])
-      li  <- as.numeric(r[[paste0("il80_p", size)]])
-    } else {                                              # live HUD API
-      il <- tryCatch(hudr::get_hud_il_data(paste0(geoid, "99999"), as.character(year)),
-        error = function(e)            # suppress original msg: it can echo the key
-          stop("HUD API call failed for county ", geoid, " (", year,
-               "); original error hidden to avoid leaking the API key.", call. = FALSE))
-      med <- as.numeric(pick(il, "median_income")); nm <- as.character(pick(il, "area_name"))
-      eli <- as.numeric(il$extremely_low[[paste0("il30_p", size)]])
-      vli <- as.numeric(il$very_low[[paste0("il50_p", size)]])
-      li  <- as.numeric(il$low[[paste0("il80_p", size)]])
-    }
-    out <- data.frame(GEOID = geoid,
-                      NAME = if (length(nm) && !is.na(nm)) nm else NA_character_,
-                      ami = med, stringsAsFactors = FALSE)
-    for (ti in names(ami_tiers)) {
-      f <- ami_tiers[[ti]]
-      out[[paste0("cut_", ti)]] <-
-        if (isTRUE(all.equal(f, 0.30))) eli
-        else if (isTRUE(all.equal(f, 0.50))) vli
-        else if (isTRUE(all.equal(f, 0.80))) li
-        else f * med * sf              # derived (e.g. MI = 120%); not a HUD limit
-    }
-    out
-  }
-  dplyr::as_tibble(do.call(rbind, lapply(counties, one)))
-}
-
-#' @title Area Median Income tier cutoffs by county
-#' @description
-#' Returns each study county's Area Median Income (AMI) and the income ceilings
-#' for the standardized affordability tiers (ELI/VLI/LI/MI). In the default
-#' `"acs"` source, AMI is the county median **family** income (ACS `B19113`,
-#' HUD's anchor) and tiers are simple fractions of it, optionally adjusted for
-#' household size with HUD's family-size factors.
-#' @param state State (FIPS code like `"06"` or a name/abbreviation like `"CA"`).
-#' @param counties County or counties (3-digit FIPS like `"075"` or names).
-#' @param year ACS 5-year endpoint year.
-#' @param ami_source One of `"acs"` (default; Census only), `"hud"` (official
-#'   published HUD limits via the HUD API; requires the `hudr` package and a
-#'   `HUD_API_KEY`), or `"hud_acs"` (full HUD-cascade reproduction; not yet
-#'   implemented). With `"hud"`, ELI/VLI/LI come straight from HUD's per-
-#'   household-size limits; tiers without a HUD limit (e.g. MI = 120%) are
-#'   derived as a fraction of the area median.
-#' @param ami_tiers Named numeric vector of tier fractions of AMI. Default
-#'   `c(ELI = .30, VLI = .50, LI = .80, MI = 1.20)`.
-#' @param hud_hh_size Household size (1-8) for the HUD family-size adjustment;
-#'   default `4`. Use `NULL` to leave AMI unadjusted (4-person basis).
-#' @return A tibble with one row per county: `GEOID`, `NAME`, `ami`, and one
-#'   `cut_<TIER>` income-ceiling column per tier.
-#' @seealso [afford_index()]
-#' @examples \dontrun{
-#' ami_cutoffs("06", c("075", "081"), 2024)
-#' }
-#' @export
-ami_cutoffs <- function(state, counties, year = 2024,
-                        ami_source = c("acs", "hud", "hud_acs"),
-                        ami_tiers = c(ELI = 0.30, VLI = 0.50, LI = 0.80, MI = 1.20),
-                        hud_hh_size = 4) {
-  ami_source <- match.arg(ami_source)
-  state <- .afi_norm_state(state)
-  counties <- .afi_norm_counties(state, counties)
-
-  size_factor <- if (is.null(hud_hh_size)) 1 else {
-    k <- as.character(hud_hh_size)
-    if (!k %in% names(.afi_hh_size_factor))
-      stop("hud_hh_size must be 1-8 (or NULL).", call. = FALSE)
-    unname(.afi_hh_size_factor[k])
-  }
-
-  if (ami_source == "hud")
-    return(.afi_hud_cutoffs(state, counties, year, ami_tiers, hud_hh_size))
-  if (ami_source == "hud_acs")
-    stop("ami_source = 'hud_acs' (full HUD-cascade reproduction) is not yet ",
-         "implemented; use 'hud' (live API) or 'acs'. See ",
-         "dev/hud-income-limits-architecture.md.", call. = FALSE)
-
-  # ami_source == "acs": county median FAMILY income (B19113); `ami` is the
-  # 4-person area median, family-size adjustment applied to the tier cutoffs.
-  ami <- tidycensus::get_acs(geography = "county",
-                             variables = c(ami = "B19113_001"),
+# ---- internal: B25118 tenure x income brackets (owner/renter demand) ---------
+# Like .afi_get_brackets but for the tenure-split table B25118: it keeps an
+# owner/renter `tenure_grp` (parsed from the label) so the two universes are not
+# merged, and drops the "Owner/Renter occupied:" subtotals and the grand total.
+.afi_get_tenure_brackets <- function(geography, state, counties, year) {
+  vars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
+  raw <- tidycensus::get_acs(geography = geography, table = "B25118",
                              state = state, county = counties,
-                             year = year, survey = "acs5")
-  out <- data.frame(GEOID = ami$GEOID, NAME = ami$NAME,
-                    ami = ami$estimate, stringsAsFactors = FALSE)
-  for (ti in names(ami_tiers))
-    out[[paste0("cut_", ti)]] <- out$ami * ami_tiers[[ti]] * size_factor
-  dplyr::as_tibble(out)
+                             year = year, survey = "acs5", cache_table = TRUE)
+  raw <- dplyr::left_join(raw, vars, by = c("variable" = "name"))
+  raw$tenure_grp <- ifelse(grepl("Owner occupied", raw$label), "owner",
+                    ifelse(grepl("Renter occupied", raw$label), "renter", NA_character_))
+  bounds <- t(vapply(raw$label, .afi_parse_label, numeric(2)))
+  raw$lo <- bounds[, 1]; raw$hi <- bounds[, 2]
+  raw <- raw[!is.na(raw$lo) & !is.na(raw$tenure_grp),
+             c("GEOID", "tenure_grp", "lo", "hi", "estimate")]
+  names(raw)[names(raw) == "estimate"] <- "n"
+  raw
 }
+
+# ---- internal: regional cumulative households per tier (interpolated) --------
+# `hh` has columns county, lo, hi, n. Returns a named vector (tier -> regional
+# count of households with income <= the tier's cutoff), within-bracket
+# interpolated and summed across counties.
+.afi_demand_vec <- function(hh, cuts, tier_names) {
+  vapply(tier_names, function(ti) {
+    cc <- cuts[, c("county", paste0("cut_", ti))]
+    names(cc)[2] <- "inc_cut"
+    d <- dplyr::left_join(hh, cc, by = "county")
+    per_co <- dplyr::summarize(dplyr::group_by(d, county),
+      tier_hh = .afi_interp_le(lo, hi, n, dplyr::first(inc_cut)), .groups = "drop")
+    sum(per_co$tier_hh, na.rm = TRUE)
+  }, numeric(1))
+}
+
+# ---- internal: tract availability rates (Gate 2: vacancy + turnover) ---------
+# Per tract, the share of stock that is OPEN now (point-in-time vacancy, B25004)
+# and the share that TURNS OVER per year (B07013 past-year movers), separately
+# for rental and owner stock. NA where the denominator is zero.
+.afi_availability <- function(state, counties, year) {
+  vars <- c(own_occ = "B25003_002", rent_occ = "B25003_003",
+            for_rent = "B25004_002", for_sale = "B25004_004",
+            mov_own_tot = "B07013_002", mov_rent_tot = "B07013_003",
+            mov_own_same = "B07013_005", mov_rent_same = "B07013_006")
+  d <- tidycensus::get_acs(geography = "tract", variables = vars, state = state,
+                           county = counties, year = year, survey = "acs5",
+                           output = "wide")
+  g <- function(nm) as.numeric(d[[paste0(nm, "E")]])
+  rate <- function(num, den) ifelse(den > 0, num / den, NA_real_)
+  data.frame(
+    GEOID          = d$GEOID,
+    vac_rate_rent  = rate(g("for_rent"), g("rent_occ") + g("for_rent")),
+    vac_rate_own   = rate(g("for_sale"), g("own_occ")  + g("for_sale")),
+    turn_rate_rent = rate(g("mov_rent_tot") - g("mov_rent_same"), g("mov_rent_tot")),
+    turn_rate_own  = rate(g("mov_own_tot")  - g("mov_own_same"),  g("mov_own_tot")),
+    stringsAsFactors = FALSE)
+}
+
 
 #' @title Tract-level affordability index (Gate 1: supply by income tier)
 #' @description
@@ -273,8 +195,9 @@ ami_cutoffs <- function(state, counties, year = 2024,
 #'   \item \code{"own_current"} (basis A, default): current selected monthly
 #'     owner cost (\code{B25094}); same 30% rule as rent. Describes the
 #'     affordability of the existing owned stock as currently financed.
-#'   \item \code{"own_buyin"} (basis B): home value (\code{B25075}) converted to
-#'     the income needed to \emph{buy in today} via an explicit mortgage model
+#'   \item \code{"own_buyin"} (basis B): home price (\code{B25075} owner value by
+#'     default, or \code{B25085} for-sale price asked -- see \code{buyin_stock})
+#'     converted to the income needed to \emph{buy in today} via a mortgage model
 #'     (\code{interest_rate}, \code{term_years}, \code{down_pct},
 #'     \code{tax_ins_rate}). Answers "could a mover afford to buy here now?".
 #' }
@@ -287,9 +210,21 @@ ami_cutoffs <- function(state, counties, year = 2024,
 #' @param counties County or counties (3-digit FIPS or names).
 #' @param year ACS 5-year endpoint year (default `2024`).
 #' @param tenure Any of `"rent"`, `"own_current"` (A), `"own_buyin"` (B).
-#' @param ami_source `"acs"` (default), `"hud"` (official HUD limits; needs
-#'   `hudr` + `HUD_API_KEY`), or `"hud_acs"` (not yet implemented); see
-#'   [ami_cutoffs()].
+#' @param demand Which household universe the affordable supply is compared to
+#'   (sets `reg_hh_tier`/`reg_hh_total` and thus `ratio`/`rate`). One of:
+#'   `"matched"` (default; rent supply vs **renter** households, ownership supply
+#'   vs **owner** households -- from `B25118`), `"all"` (all households, `B19001`
+#'   -- everyone as a potential mover), `"renter"` / `"owner"` (that universe for
+#'   every tenure), or `"likelihood"` (all households split into rent/own demand
+#'   by the ACS tenure propensity per income tier; with realized ACS shares this
+#'   tracks `"matched"` closely and is the hook for modeled cross-tenure mobility
+#'   -- an owner who could rent, and vice versa). Default `"matched"` is what the
+#'   deployed SLC/San Diego reports assume.
+#' @param ami_source `"auto"` (default; most-exact available: hud -> hud_acs ->
+#'   acs_fmr -> acs), `"hud"` (official HUD limits; snapshot then API), `"hud_acs"`
+#'   (Census-only HUD-cascade reproduction; overstates in high-cost capped areas),
+#'   `"acs_fmr"` (ACS + FMR high-cost bump), or `"acs"` (pure B19113 fractions);
+#'   see [ami_cutoffs()].
 #' @param ami_tiers Named tier fractions of AMI (default ELI/VLI/LI/MI).
 #' @param hud_hh_size Household size (1-8) for AMI's family-size adjustment
 #'   (default `4`; `NULL` for unadjusted).
@@ -297,28 +232,61 @@ ami_cutoffs <- function(state, counties, year = 2024,
 #'   uses a built-in by-year approximation.
 #' @param term_years,down_pct,tax_ins_rate `"own_buyin"` mortgage assumptions
 #'   (default 30 years, 10% down, 1.25% combined tax+insurance of value/year).
+#' @param buyin_stock Price universe for `"own_buyin"`: `"owned_value"` (default,
+#'   `B25075` value of owner-occupied homes -- the full distribution of what
+#'   homes are worth here, stable at tract level) or `"for_sale"` (`B25085`
+#'   price asked on vacant-for-sale units -- closer to "what a mover could buy
+#'   now" but small-count and noisy). Availability is handled separately by the
+#'   Gate-2 vacancy/turnover measures.
+#' @param availability If `TRUE` (default), attach Gate-2 availability: per-tract
+#'   `vacancy_rate` (point-in-time openings, `B25004`) and `turnover_rate`
+#'   (past-year move-outs, `B07013`), tenure-matched, plus `available_vacancy`
+#'   and `available_turnover` (= `accessible` x each rate -- affordable units
+#'   that are actually open / turning over). Set `FALSE` for price-only Gate 1.
 #' @param geometry If `TRUE`, attach tract polygons (an `sf` tibble). With the
 #'   long output this duplicates polygons across tenure/tier; filter to one
 #'   tenure and tier before mapping.
 #' @return A long tibble, one row per tract x tenure x tier, with `accessible`,
 #'   `total`, `supply`, `reg_hh_tier`, `reg_hh_total`, `class_prop`, `ratio`,
-#'   `rate`, the county `ami`, and the tier `income_cutoff`.
-#' @seealso [ami_cutoffs()], [afford()] (legacy)
+#'   `rate`, the county `ami`, and the tier `income_cutoff`. When
+#'   `availability = TRUE`, also `vacancy_rate`, `turnover_rate`,
+#'   `available_vacancy`, and `available_turnover` (Gate 2).
+#' @seealso [ami_cutoffs()], [afford_bands()], [afford()] (legacy)
 #' @examples \dontrun{
-#' sf_idx <- afford_index("06", "075", 2024)                 # San Francisco
-#' sf_idx[sf_idx$tenure == "rent" & sf_idx$ami_tier == "VLI", ]
+#' # San Francisco rental affordability, default matched (vs renters) demand
+#' sf <- afford_index("06", "075", 2024, tenure = "rent")
+#' sf[sf$ami_tier == "VLI", c("GEOID", "supply", "ratio", "available_vacancy")]
+#'
+#' # Which tracts can a VLI renter actually move into? (affordable AND open)
+#' sf[sf$ami_tier == "VLI" & sf$available_turnover > 0, ]
+#'
+#' # Non-overlapping bands (the 30-50%, 50-80% slices) instead of cumulative
+#' afford_bands(sf)
+#'
+#' # Owner "buy-in" affordability off the for-sale flow, exact HUD limits
+#' afford_index("06", "075", 2024, tenure = "own_buyin",
+#'              buyin_stock = "for_sale", ami_source = "hud")
+#'
+#' # Compare demand universes: renters vs all households
+#' afford_index("06", "075", 2024, tenure = "rent", demand = "all")
 #' }
 #' @export
 afford_index <- function(state, counties, year = 2024,
                          tenure = c("rent", "own_current", "own_buyin"),
-                         ami_source = c("acs", "hud", "hud_acs"),
+                         demand = c("matched", "all", "renter", "owner", "likelihood"),
+                         ami_source = c("auto", "hud", "hud_acs", "acs_fmr", "acs"),
                          ami_tiers = c(ELI = 0.30, VLI = 0.50, LI = 0.80, MI = 1.20),
                          hud_hh_size = 4,
                          interest_rate = NULL, term_years = 30,
                          down_pct = 0.10, tax_ins_rate = 0.0125,
+                         buyin_stock = c("owned_value", "for_sale"),
+                         availability = TRUE,
                          geometry = FALSE) {
   ami_source <- match.arg(ami_source)
   tenure <- match.arg(tenure, several.ok = TRUE)
+  demand <- match.arg(demand)
+  buyin_stock <- match.arg(buyin_stock)
+  stopifnot(is.logical(availability), length(availability) == 1)
   state <- .afi_norm_state(state)
   counties <- .afi_norm_counties(state, counties)
 
@@ -331,21 +299,49 @@ afford_index <- function(state, counties, year = 2024,
   price_factor <- .afi_price_income_factor(interest_rate, term_years,
                                            down_pct, tax_ins_rate)
 
-  # -- Demand: regional households per tier (B19001, interpolated, summed) -----
-  hh <- .afi_get_brackets("county", "B19001", state, counties, year)
-  hh$county <- hh$GEOID
-  reg_hh_total <- sum(hh$n, na.rm = TRUE)
-  demand <- vapply(tier_names, function(ti) {
-    cc <- cuts[, c("county", paste0("cut_", ti))]
-    names(cc)[2] <- "inc_cut"
-    d <- dplyr::left_join(hh, cc, by = "county")
-    per_co <- dplyr::summarize(dplyr::group_by(d, county),
-      tier_hh = .afi_interp_le(lo, hi, n, dplyr::first(inc_cut)), .groups = "drop")
-    sum(per_co$tier_hh, na.rm = TRUE)
-  }, numeric(1))
+  # -- Demand: regional households per tier, by universe (interpolated) --------
+  # Universes: all households (B19001); renter & owner (B25118 tenure x income).
+  # Each is the regional count with income <= the tier cutoff. `demand_for()`
+  # maps a supply row's (tenure, tier) to the right (count, total) for `demand`.
+  d_all <- d_ren <- d_own <- NULL
+  if (demand %in% c("all", "likelihood")) {
+    hh_all <- .afi_get_brackets("county", "B19001", state, counties, year)
+    hh_all$county <- hh_all$GEOID
+    d_all <- list(tier = .afi_demand_vec(hh_all, cuts, tier_names),
+                  total = sum(hh_all$n, na.rm = TRUE))
+  }
+  if (demand %in% c("matched", "renter", "owner", "likelihood")) {
+    tb <- .afi_get_tenure_brackets("county", state, counties, year)
+    tb$county <- tb$GEOID
+    ren <- tb[tb$tenure_grp == "renter", , drop = FALSE]
+    own <- tb[tb$tenure_grp == "owner",  , drop = FALSE]
+    d_ren <- list(tier = .afi_demand_vec(ren, cuts, tier_names), total = sum(ren$n, na.rm = TRUE))
+    d_own <- list(tier = .afi_demand_vec(own, cuts, tier_names), total = sum(own$n, na.rm = TRUE))
+  }
+  # tenure -> demand universe for the default "matched" mode: rent vs renters,
+  # ownership vs owners. (own_current and own_buyin are both ownership.)
+  demand_for <- function(ten, ti) {           # returns c(reg_hh_tier, reg_hh_total)
+    rent_like <- ten == "rent"
+    safe <- function(num, den) if (is.finite(den) && den > 0) num / den else 0
+    switch(demand,
+      all     = c(d_all$tier[[ti]], d_all$total),
+      renter  = c(d_ren$tier[[ti]], d_ren$total),
+      owner   = c(d_own$tier[[ti]], d_own$total),
+      matched = if (rent_like) c(d_ren$tier[[ti]], d_ren$total)
+                else            c(d_own$tier[[ti]], d_own$total),
+      likelihood = {        # all households split by the ACS tenure propensity
+        num_t <- if (rent_like) d_ren$tier[[ti]] else d_own$tier[[ti]]
+        num_T <- if (rent_like) d_ren$total      else d_own$total
+        c(d_all$tier[[ti]] * safe(num_t, d_ren$tier[[ti]] + d_own$tier[[ti]]),
+          d_all$total      * safe(num_T, d_ren$total      + d_own$total))
+      })
+  }
 
   # -- Supply: per tract, per requested tenure, per tier ----------------------
-  tenure_table <- c(rent = "B25063", own_current = "B25094", own_buyin = "B25075")
+  # own_buyin reads the chosen price universe: owner-occupied value (B25075,
+  # default) or the for-sale flow (B25085, vacant-for-sale price asked).
+  tenure_table <- c(rent = "B25063", own_current = "B25094",
+                    own_buyin = if (buyin_stock == "for_sale") "B25085" else "B25075")
   supply_one <- function(ten) {
     tb <- .afi_get_brackets("tract", tenure_table[[ten]], state, counties, year)
     tb$county <- substr(tb$GEOID, 1, 5)
@@ -370,8 +366,10 @@ afford_index <- function(state, counties, year = 2024,
   supply <- dplyr::bind_rows(lapply(tenure, supply_one))
 
   # -- Assemble: join demand, county AMI, derive supply/ratio/rate -------------
-  supply$reg_hh_tier  <- demand[supply$ami_tier]
-  supply$reg_hh_total <- reg_hh_total
+  dm <- do.call(rbind, lapply(seq_len(nrow(supply)), function(i)
+    demand_for(supply$tenure[i], as.character(supply$ami_tier[i]))))
+  supply$reg_hh_tier  <- dm[, 1]
+  supply$reg_hh_total <- dm[, 2]
   supply <- dplyr::left_join(supply, cuts[, c("county", "ami")], by = "county")
   supply <- dplyr::mutate(supply,
     class_prop = reg_hh_tier / reg_hh_total,
@@ -380,10 +378,29 @@ afford_index <- function(state, counties, year = 2024,
     rate       = ifelse(reg_hh_tier > 0, accessible / reg_hh_tier * 1e5, NA_real_),
     ami_tier   = factor(ami_tier, levels = tier_names),
     year       = year, ami_source = ami_source)
-  supply <- dplyr::as_tibble(supply[order(supply$GEOID, supply$tenure, supply$ami_tier),
-    c("GEOID", "county", "year", "ami_source", "tenure", "ami_tier", "ami",
-      "income_cutoff", "accessible", "total", "supply",
-      "reg_hh_tier", "reg_hh_total", "class_prop", "ratio", "rate")])
+
+  out_cols <- c("GEOID", "county", "year", "ami_source", "tenure", "ami_tier",
+    "ami", "income_cutoff", "accessible", "total", "supply",
+    "reg_hh_tier", "reg_hh_total", "class_prop", "ratio", "rate")
+
+  # -- Gate 2: availability -- affordable AND open / turning over --------------
+  # vacancy = point-in-time openings (B25004); turnover = annual move-outs
+  # (B07013). available_* = accessible * rate, assuming open/turnover units share
+  # the occupied affordability mix (report alongside the price-only `accessible`).
+  if (isTRUE(availability)) {
+    av <- .afi_availability(state, counties, year)
+    supply <- dplyr::left_join(supply, av, by = "GEOID")
+    is_rent <- supply$tenure == "rent"
+    supply$vacancy_rate       <- ifelse(is_rent, supply$vac_rate_rent,  supply$vac_rate_own)
+    supply$turnover_rate      <- ifelse(is_rent, supply$turn_rate_rent, supply$turn_rate_own)
+    supply$available_vacancy  <- supply$accessible * supply$vacancy_rate
+    supply$available_turnover <- supply$accessible * supply$turnover_rate
+    out_cols <- c(out_cols, "vacancy_rate", "turnover_rate",
+                  "available_vacancy", "available_turnover")
+  }
+
+  supply <- dplyr::as_tibble(
+    supply[order(supply$GEOID, supply$tenure, supply$ami_tier), out_cols])
 
   if (isTRUE(geometry)) {
     geo <- tigris::tracts(state = state, county = counties, cb = TRUE, year = year)
@@ -391,4 +408,44 @@ afford_index <- function(state, counties, year = 2024,
     supply <- sf::st_as_sf(dplyr::left_join(geo, supply, by = "GEOID"))
   }
   supply
+}
+
+#' @title Convert cumulative AMI tiers to non-overlapping bands
+#' @description
+#' [afford_index()] reports **cumulative** tiers (ELI = at/below 30% AMI, VLI =
+#' at/below 50%, ...). `afford_bands()` differences them into **non-overlapping
+#' bands** (the 30-50% slice, the 50-80% slice, ...) within each tract x tenure,
+#' so the tiers partition the stock instead of nesting. The lowest tier is
+#' unchanged; `supply`/`class_prop`/`ratio`/`rate` (and any availability columns)
+#' are recomputed on the banded counts. Tier *labels* keep their names (the `VLI`
+#' row now holds the 30-50% slice). Assumes tiers are ascending in AMI fraction
+#' (the default ELI/VLI/LI/MI order).
+#' @param x A tibble returned by [afford_index()].
+#' @return `x` with `accessible`, `reg_hh_tier`, and any `available_*` columns
+#'   differenced to bands, and `supply`/`class_prop`/`ratio`/`rate` recomputed.
+#' @seealso [afford_index()]
+#' @examples \dontrun{
+#' idx   <- afford_index("06", "075", 2024, tenure = "rent")   # cumulative
+#' bands <- afford_bands(idx)                                   # 30-50, 50-80, ...
+#' }
+#' @export
+afford_bands <- function(x) {
+  req <- c("GEOID", "tenure", "ami_tier", "accessible", "total",
+           "reg_hh_tier", "reg_hh_total")
+  if (!is.data.frame(x) || !all(req %in% names(x)))
+    stop("`x` must be an afford_index() result (missing columns).", call. = FALSE)
+  has_av <- all(c("vacancy_rate", "turnover_rate") %in% names(x))
+  x <- dplyr::ungroup(dplyr::mutate(
+    dplyr::arrange(dplyr::group_by(x, GEOID, tenure), ami_tier),
+    accessible  = accessible  - dplyr::lag(accessible,  default = 0),
+    reg_hh_tier = reg_hh_tier - dplyr::lag(reg_hh_tier, default = 0)))
+  x <- dplyr::mutate(x,
+    supply     = ifelse(total > 0, accessible / total, NA_real_),
+    class_prop = ifelse(reg_hh_total > 0, reg_hh_tier / reg_hh_total, NA_real_),
+    ratio      = ifelse(class_prop > 0, supply / class_prop, NA_real_),
+    rate       = ifelse(reg_hh_tier > 0, accessible / reg_hh_tier * 1e5, NA_real_))
+  if (has_av) x <- dplyr::mutate(x,
+    available_vacancy  = accessible * vacancy_rate,
+    available_turnover = accessible * turnover_rate)
+  x
 }

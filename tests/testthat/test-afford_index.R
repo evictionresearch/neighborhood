@@ -49,7 +49,51 @@ test_that("HUD family-size factors are the standard table", {
   expect_equal(unname(neighborhood:::.afi_hh_size_factor["8"]), 1.32)
 })
 
-test_that("hud_acs source fails fast (not yet implemented, no API call)", {
-  expect_error(ami_cutoffs("06", "075", 2024, ami_source = "hud_acs"),
-               "not yet implemented")
+test_that("hud_acs errors (no API call) for a year with no verified trend factor", {
+  expect_error(ami_cutoffs("06", "075", 1990, ami_source = "hud_acs"),
+               "income-trend factor")
+})
+
+test_that("ami_source is validated", {
+  expect_error(ami_cutoffs("06", "075", 2024, ami_source = "nonsense"))
+})
+
+test_that("afford_bands differences cumulative tiers into non-overlapping slices", {
+  x <- data.frame(
+    GEOID        = rep("06075000100", 4),
+    tenure       = rep("rent", 4),
+    ami_tier     = factor(c("ELI", "VLI", "LI", "MI"),
+                          levels = c("ELI", "VLI", "LI", "MI")),
+    accessible   = c(10, 25, 60, 90),       # cumulative
+    total        = rep(100, 4),
+    reg_hh_tier  = c(100, 200, 320, 400),   # cumulative
+    reg_hh_total = rep(1000, 4),
+    vacancy_rate = rep(0.05, 4),
+    turnover_rate = rep(0.20, 4))
+  b <- afford_bands(x)
+  expect_equal(b$accessible,  c(10, 15, 35, 30))    # tier minus the tier below
+  expect_equal(b$reg_hh_tier, c(100, 100, 120, 80))
+  expect_equal(b$supply,      c(.10, .15, .35, .30))
+  expect_equal(b$class_prop,  c(.10, .10, .12, .08))
+  expect_equal(b$available_vacancy, c(10, 15, 35, 30) * 0.05)
+})
+
+test_that("afford_bands rejects non-afford_index input", {
+  expect_error(afford_bands(data.frame(a = 1)), "afford_index")
+})
+
+# Live end-to-end check (needs a Census API key + network); skipped otherwise.
+test_that("afford_index runs end-to-end and is internally consistent (live ACS)", {
+  testthat::skip_on_cran()
+  testthat::skip_if_offline()
+  testthat::skip_if(!nzchar(Sys.getenv("CENSUS_API_KEY")), "no CENSUS_API_KEY")
+  idx <- afford_index("06", "075", 2024, tenure = "rent", ami_source = "acs")
+  expect_true(all(c("supply", "ratio", "rate", "vacancy_rate",
+                    "available_vacancy", "available_turnover") %in% names(idx)))
+  expect_true(all(idx$supply >= 0 & idx$supply <= 1, na.rm = TRUE))
+  expect_true(all(idx$available_vacancy <= idx$accessible + 1e-6, na.rm = TRUE))
+  # cumulative tiers: accessible is non-decreasing ELI -> MI within a tract
+  one <- idx[idx$GEOID == idx$GEOID[1], ]
+  one <- one[order(one$ami_tier), ]
+  expect_false(is.unsorted(one$accessible))
 })

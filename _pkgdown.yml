@@ -13,6 +13,7 @@ reference:
     desc: Tract-level housing affordability relative to area median income.
     contents:
       - afford_index
+      - afford_bands
       - ami_cutoffs
       - afford
   - title: Mapping (MapLibre)

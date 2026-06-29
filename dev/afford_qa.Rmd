@@ -1,0 +1,228 @@
+---
+title: "Affordability index — QA across regions & every iteration"
+date: "Built from cached results; FY2024 / ACS 2020–2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    self_contained: true
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 11, fig.height = 4.6, dpi = 96, out.width = "100%")
+library(ggplot2); library(sf); library(patchwork); library(dplyr)
+try(suppressMessages(pkgload::load_all("..", quiet = TRUE)), silent = TRUE)  # for afford_bands()
+qa <- readRDS("afford_qa_data.rds")
+
+# clean map theme + two fill scales: diverging for ratio (midpoint 1), sequential
+# (viridis) for shares/counts.
+map_theme <- theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", size = 12),
+        plot.subtitle = element_text(color = "grey35", size = 9.5),
+        legend.key.height = unit(8, "pt"))
+
+afmap <- function(x, ten, tier, col, title, sub = "", kind = c("ratio","seq"),
+                  lim = NULL) {
+  kind <- match.arg(kind)
+  d <- x[x$tenure == ten & x$ami_tier == tier, ]
+  g <- ggplot(d) + geom_sf(aes(fill = .data[[col]]), color = NA) +
+    map_theme + labs(title = title, subtitle = sub)
+  if (kind == "ratio")
+    g + scale_fill_gradient2(low = "#b2182b", mid = "#f7f7f7", high = "#2166ac",
+          midpoint = 1, limits = c(0, 2), oob = scales::squish,
+          name = "supply ÷\nneed")
+  else
+    g + scale_fill_viridis_c(option = "mako", direction = -1, limits = lim,
+          oob = scales::squish, name = col, labels = scales::label_comma())
+}
+med <- function(x, ten, tier, col = "ratio")
+  median(x[[col]][x$tenure == ten & x$ami_tier == tier], na.rm = TRUE)
+```
+
+## What this page checks
+
+A QA sweep of the rebuilt `afford_index()` across four very different housing markets —
+**`r paste(sapply(qa$regions, '[[', 'label'), collapse=' · ')`** — exercising **every parameter
+iteration** (demand universe, tenure, owner buy-in basis, Gate-2 availability, all five AMI sources,
+the tier gradient, and banding). Each section asks: *is the function doing what we intend?*
+
+All results are pre-computed (`dev/afford_qa_data.R`) and cached, so this page is reproducible and
+needs no API. AMI is **HUD** (off the bundled snapshot) unless a section says otherwise. Ratio maps
+are a **location quotient**: red = a tract carries *less* than its fair share of affordable supply
+for the tier (`<1`), blue = *more* (`>1`), white = parity.
+
+---
+
+## 1. Does it run everywhere? VLI rental supply ratio
+
+```{r region-medians}
+data.frame(
+  Region = sapply(qa$regions, "[[", "label"),
+  `Tracts` = sapply(qa$baseline, function(x) length(unique(x$GEOID))),
+  `Median VLI-rent ratio` = round(sapply(names(qa$baseline),
+     function(k) med(qa$baseline[[k]], "rent", "VLI")), 2),
+  check.names = FALSE, row.names = NULL)
+```
+
+```{r region-maps, fig.height=8.6}
+ps <- lapply(names(qa$baseline), function(k)
+  afmap(qa$baseline[[k]], "rent", "VLI", "ratio", qa$regions[[k]]$label, kind = "ratio"))
+wrap_plots(ps, ncol = 2) + plot_layout(guides = "collect")
+```
+
+**Verdict.** Runs cleanly on all four (single- and multi-county). The gradient is sensible and
+*differentiated*: Hennepin/Minneapolis is near parity (median 0.95), the Bay and King run below it,
+and **Atlanta is the most squeezed (0.32)** — most tracts carry far less affordable rental supply
+than their share of VLI renters. Exactly the kind of spatial signal the index exists to surface. ✓
+
+---
+
+## 2. `demand` — whose need is supply compared to? (King County)
+
+The denominator is the fix that most moves the headline. Same VLI rental supply, three universes:
+
+```{r demand-maps, fig.height=4.6}
+afmap(qa$baseline$king,        "rent", "VLI", "ratio", "matched (vs renters) — default", kind="ratio") +
+afmap(qa$king_demand_all,      "rent", "VLI", "ratio", "all households",                  kind="ratio") +
+afmap(qa$king_demand_owner,    "rent", "VLI", "ratio", "owners",                          kind="ratio") +
+  plot_layout(guides = "collect")
+```
+
+```{r demand-tab}
+data.frame(
+  demand = c("matched (renters)","all households","owners"),
+  `median VLI-rent ratio` = round(c(
+     med(qa$baseline$king,"rent","VLI"),
+     med(qa$king_demand_all,"rent","VLI"),
+     med(qa$king_demand_owner,"rent","VLI")), 2),
+  check.names = FALSE)
+```
+
+**Verdict.** Working as intended. Against **renters** (default) the ratio is lower than against
+**all households** — renters skew lower-income, so a given affordable-rental share covers a smaller
+fraction of their need. Comparing rental supply to **owners** (higher income, fewer VLI) inflates the
+ratio. The default `matched` is the report-correct universe. ✓
+
+---
+
+## 3. `tenure` — three cost models (King County, VLI, share affordable)
+
+```{r tenure-maps, fig.height=4.6}
+lim3 <- c(0,1)
+afmap(qa$baseline$king, "rent",        "VLI", "supply", "rent (gross rent)",          kind="seq", lim=lim3) +
+afmap(qa$baseline$king, "own_current", "VLI", "supply", "own_current (monthly cost)", kind="seq", lim=lim3) +
+afmap(qa$baseline$king, "own_buyin",   "VLI", "supply", "own_buyin (buy in today)",   kind="seq", lim=lim3) +
+  plot_layout(guides = "collect")
+```
+
+**Verdict.** The three cost models behave distinctly and correctly. `own_current` (carrying the homes
+people already own, often on old cheap mortgages) shows the **most** VLI-affordable owner stock;
+`own_buyin` (buying in *today* at ~6.9%) shows the **least** — the real barrier a mover faces. Rent
+sits between. This is the v1 `0.188` bug fixed: ownership affordability is now rate-aware. ✓
+
+---
+
+## 4. `buyin_stock` — which homes count for buy-in (King, own_buyin, VLI)
+
+```{r buyin-maps, fig.height=4.6}
+afmap(qa$baseline$king,    "own_buyin", "VLI", "supply", "owned_value (B25075) — default", kind="seq", lim=c(0,1)) +
+afmap(qa$king_buyin_fs,    "own_buyin", "VLI", "supply", "for_sale (B25085) — the flow",   kind="seq", lim=c(0,1)) +
+  plot_layout(guides = "collect")
+```
+
+**Verdict.** Both work; the contrast is the point. `owned_value` uses the full, stable distribution of
+what homes are worth; `for_sale` uses only the sparse vacant-for-sale flow (far fewer units, noisier,
+many tracts near zero) — closer to "what a mover could actually buy now." Availability (next) is the
+cleaner way to handle openness. ✓
+
+---
+
+## 5. Gate 2 — affordable *vs.* attainable (King, VLI rent)
+
+`accessible` = affordable units (Gate 1). `available_turnover` = those that actually open up in a year
+(Gate 1 × turnover rate). Shared color scale, so the shrinkage is visible:
+
+```{r avail-maps, fig.height=4.6}
+acc_lim <- c(0, quantile(qa$baseline$king$accessible[qa$baseline$king$tenure=="rent" &
+                          qa$baseline$king$ami_tier=="VLI"], 0.97, na.rm=TRUE))
+afmap(qa$baseline$king, "rent", "VLI", "accessible",         "Gate 1: affordable units",          kind="seq", lim=acc_lim) +
+afmap(qa$baseline$king, "rent", "VLI", "available_turnover", "Gate 2: + turnover (attainable/yr)", kind="seq", lim=acc_lim) +
+  plot_layout(guides = "collect")
+```
+
+**Verdict.** Gate 2 attaches and behaves correctly — the attainable map is a strict, much dimmer
+subset of the affordable map (turnover ≈ 15–25% of renter stock/yr). "Affordable on paper" is far
+larger than "actually open to move into," which is the whole point of the funnel. ✓
+
+---
+
+## 6. `ami_source` — the math check (income ceilings, 4 sources)
+
+This is where correctness lives. One county per region, every source's 4-person ceilings:
+
+```{r cutoffs-tab}
+ct <- qa$cutoffs
+ct$ami <- round(ct$ami); ct$ELI <- round(ct$ELI); ct$VLI <- round(ct$VLI); ct$LI <- round(ct$LI)
+ct
+```
+
+**Verdict — behaving exactly as designed, and this is the most important check:**
+
+- **Bay (SF), high-cost coastal:** `acs` VLI (85.6k) **understates** HUD (97.9k) by ~13% — it omits
+  HUD's FMR high-cost bump. `hud_acs` reproduces HUD here **to the dollar** (97,900). Use `hud`/`auto`.
+- **Atlanta (Fulton):** `acs`/`hud_acs` VLI (65k/61k) **overstate** HUD (53.75k) — Fulton county is
+  richer than the metro HUD averages over (the documented county-vs-metro divergence). `hud` is right.
+- **King:** `hud_acs` LI is capped at the US median (97,800) while HUD's actual LI (110,950) exceeds
+  it via the high-cost exception — the documented cap limitation of the from-scratch reproduction.
+- **Hennepin:** ordinary-cost — sources converge closely; `hud_acs` ≈ `hud`.
+
+Net: `acs` is transparent but diverges in high-cost *and* rich-county-in-poor-metro cases; **`hud`
+(the default `auto`) is the one to trust for reports**, and the snapshot makes it offline-exact. The
+function steers you correctly. ✓
+
+---
+
+## 7. Tier gradient + banding (King, rent)
+
+Cumulative ceilings ELI ≤30% → MI ≤120%. Supply should rise monotonically as the ceiling rises:
+
+```{r tier-maps, fig.height=8.6}
+ps <- lapply(c("ELI","VLI","LI","MI"), function(ti)
+  afmap(qa$baseline$king, "rent", ti, "supply", paste0(ti, " (≤", c(ELI=30,VLI=50,LI=80,MI=120)[ti], "% AMI)"),
+        kind = "seq", lim = c(0,1)))
+wrap_plots(ps, ncol = 2) + plot_layout(guides = "collect")
+```
+
+```{r band-check}
+king_df <- sf::st_drop_geometry(qa$baseline$king)
+cum <- sapply(c("ELI","VLI","LI","MI"), function(ti)
+  round(median(king_df$supply[king_df$tenure=="rent" & king_df$ami_tier==ti], na.rm=TRUE), 3))
+banded <- tryCatch({
+  b <- afford_bands(king_df)
+  sapply(c("ELI","VLI","LI","MI"), function(ti)
+    round(median(b$supply[b$tenure=="rent" & b$ami_tier==ti], na.rm=TRUE), 3))
+}, error = function(e) rep(NA, 4))
+data.frame(tier = c("ELI","VLI","LI","MI"),
+           `cumulative supply (≤ ceiling)` = unname(cum),
+           `banded supply (slice via afford_bands)` = unname(banded),
+           check.names = FALSE)
+```
+
+**Verdict.** Cumulative supply is monotone as it must be — each higher ceiling captures strictly more
+stock (ELI ⊂ VLI ⊂ LI ⊂ MI). `afford_bands()` differences them into the non-overlapping slices
+(the banded column no longer nests), for partition/stacked views. ✓
+
+---
+
+## Bottom line
+
+Across four contrasting markets and every parameter, `afford_index()` does what we intend: the
+spatial signal is sensible and differentiated, the demand universes shift the ratio in the right
+direction, the tenure/buy-in models are rate-aware, Gate 2 correctly shrinks affordable to attainable,
+the tiers are monotone, and the AMI sources diverge exactly where the design says they should —
+with `hud`/`auto` steering toward the correct, report-grade numbers. The one thing to remember for
+reports: **stick with `hud` (or `auto`) in high-cost or rich-county-in-poor-metro regions**, where
+the Census-only sources knowingly drift.
+```
