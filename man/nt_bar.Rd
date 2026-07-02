@@ -128,9 +128,12 @@ nt_bar(counties, "county", "rate", value_fmt = "comma")
 
 Other ern_charts:
 \code{\link[=ern_palette]{ern_palette()}},
+\code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
 \code{\link[=nt_lollipop]{nt_lollipop()}},
+\code{\link[=nt_pd_bart]{nt_pd_bart()}},
+\code{\link[=nt_pd_plot]{nt_pd_plot()}},
 \code{\link[=nt_range]{nt_range()}},
 \code{\link[=nt_scatter]{nt_scatter()}},
 \code{\link[=nt_slope]{nt_slope()}},

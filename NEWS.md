@@ -2,6 +2,22 @@
 
 ## New features
 
+* **The affordability verdict and the free-will capacity readout.**
+  `afford_index()` gains explicit burden lines — `burden` (default 0.30, the
+  HUD standard) and `stretch` (default 0.50, HUD's severe-burden threshold) —
+  emitting `accessible_stretch`/`supply_stretch` alongside the standard counts
+  (`afford_bands()` differences them too). Two new functions turn the engine's
+  output into the question it exists to answer (*with free choice at ≤30% /
+  ≤50% of income: where, how many units, how many people?*):
+    - `afford_verdict()` — the three-class map verdict (**affordable / roughly
+      affordable / not affordable**), a tract-majority rule equivalent to a
+      median-unit statement. Headline maps classify rather than shade:
+      continuous gradients read as "no problem here" to policy audiences.
+    - `afford_capacity()` — units-and-people arithmetic per tenure × tier:
+      affordable units per 100 tier households, openings per year (turnover)
+      and now (vacancy), and the regional **shortfall** that remains even
+      under perfect free sorting. NLIHC-Gap-style, pre-competition-adjustment.
+
 * **A gallery of editorial chart types.** Seven new `echarts4r`-backed functions
   extend the "newspaper graphic" look (minimal axes, `yaxis = "hover"`, accent
   highlight, direct labels, dark tooltip, `source` credit) beyond trend lines to
@@ -29,6 +45,51 @@
   `ern_palette()` to expose the house colors — so the same design language
   reproduces the report and paper figures, not just the interactive widgets.
   `ggplot2` is now an `Imports` dependency.
+
+* **A full brand palette system, WCAG-verified.** `ern_palette()` grows from 4
+  palettes to 11, organized by what the data means and led by the 2022 brand
+  triad (dark navy / blue navy / brand red):
+    - *Qualitative:* `"qualitative"` (rebuilt house default — blue navy, brand
+      red, chart steel, teal, then gold/purple/green/slate; every fill clears
+      the WCAG 1.4.11 3:1 non-text minimum on white, and the first four are the
+      most colorblind-separable subset), `"neutral"` (red-free, for categories
+      where red would read as "bad"), and `"legacy"` (the pre-1.1.0 vector,
+      verbatim, for reproducing published figures).
+    - *Sequential:* `"blues"` (neutral magnitude), `"reds"` (brand-red
+      intensity for filings/displacement counts), `"greens"` (more = good),
+      alongside the existing `"ramp"` risk ramp (now documented as
+      risk-only).
+    - *Diverging:* `"div_brand"` (navy ↔ brand red, valenced — red marks the
+      bad pole) and `"div_gold"` (blue ↔ gold, neutral), via new
+      `scale_color_ern_div()` / `scale_fill_ern_div()` with a `midpoint`
+      argument; `scale_*_ern_c()` gains a `palette` argument (default
+      unchanged).
+    - **The red rule.** Brand red `#F9322B` is verified WCAG-compliant as a
+      *graphic* (3.8:1 on white ≥ the 3:1 non-text minimum) and stays the
+      chart accent; red rendered as *text* uses the canonical `#CC2118`
+      (5.5:1, AA). `ern_palette("brand")` tokens sync to the canonical brand
+      guide: `muted` is now `#586573` (was deprecated `#6c7a89`),
+      `accent_deep` is `#CC2118` (was `#D6231C`), and `accent_deeper`
+      (`#B01D16`), `steel_chart` (`#7B96B5`, brand steel darkened to clear
+      3:1 as a fill), and `tint` (`#e8eef4`) are new.
+    - **`ern_swatch()`** writes and opens a self-contained HTML swatch sheet
+      generated from the live palette definitions — every palette titled,
+      labeled with its exact `ern_palette()` string, and badged with computed
+      WCAG contrast — so choosing a scheme is reading a page.
+    - Documented end-to-end in `vignette("ern-palettes")`, with live figures
+      built from the bundled `mn_evictions` data.
+
+* **Partial-dependence plots for the HPRM BART models.** `nt_pd_plot()` draws a
+  partial-dependence curve (posterior mean + credible ribbon) over a frequency
+  histogram of the predictor — the "PD curve with a frequency table underneath"
+  figure used for the EDR/EER driver plots — in the `theme_ern()` house style.
+  It is model-agnostic (takes a tidy PD table plus the observed values), so it
+  runs with no Java. `nt_pd_bart()` is the `bartMachine` bridge that computes
+  that table from a fitted model (server-only: needs `bartMachine` + a Java
+  runtime). Reimplements CHEST-Lab's `pdPlotGG.R` (Scarpone, Brinkmann et al.
+  2020) and the bartMachine `pd_plot()` workflow from the original UDP HPRM work
+  (Ramiller & Thomas), adding the frequency panel and decoupling the plotting
+  from the Java computation. `patchwork` is now an `Imports` dependency.
 
 * **Honest, consistent charts.** Filled bars (`nt_bar`, `nt_stacked_bar`) now
   always start at zero, `nt_range` extends its axis so confidence whiskers can't

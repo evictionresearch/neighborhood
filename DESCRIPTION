@@ -34,6 +34,7 @@ Imports:
     mapgl (>= 0.4.0),
     echarts4r (>= 0.4.0),
     ggplot2,
+    patchwork,
     jsonlite,
     scales,
     stringr,
@@ -48,7 +49,9 @@ Suggests:
     knitr,
     rmarkdown,
     tidyr,
-    hudr
+    hudr,
+    bartMachine,
+    arrow
 SystemRequirements: tippecanoe (optional, for building PMTiles vector tiles)
 VignetteBuilder: knitr
 Config/testthat/edition: 3

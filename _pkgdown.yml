@@ -14,6 +14,10 @@ reference:
     contents:
       - afford_index
       - afford_bands
+      - afford_verdict
+      - afford_capacity
+      - afford_stability
+      - inflow_index
       - ami_cutoffs
       - afford
   - title: Mapping (MapLibre)
@@ -48,11 +52,13 @@ reference:
   - title: Static charts (ggplot2)
     desc: >
       A ggplot2 theme and color scales in the same ERN look, for reproducing the
-      static (print/PDF) report and paper figures.
+      static (print/PDF) report and paper figures. ern_swatch() opens the titled
+      sheet of every palette with WCAG contrast receipts.
     contents:
       - theme_ern
       - scale_ern
       - ern_palette
+      - ern_swatch
   - title: Crosswalks
     contents:
       - get_co_puma
@@ -68,6 +74,7 @@ articles:
       - mapping-with-maplibre
       - interactive-charts
       - chart-gallery
+      - ern-palettes
       - precarity-mapping
       - neighborhood-typologies
       - affordability-index

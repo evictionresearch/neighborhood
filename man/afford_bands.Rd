@@ -10,16 +10,17 @@ afford_bands(x)
 \item{x}{A tibble returned by \code{\link[=afford_index]{afford_index()}}.}
 }
 \value{
-\code{x} with \code{accessible}, \code{reg_hh_tier}, and any \verb{available_*} columns
-differenced to bands, and \code{supply}/\code{class_prop}/\code{ratio}/\code{rate} recomputed.
+\code{x} with \code{accessible}, \code{reg_hh_tier}, and any \verb{available_*} /
+\code{accessible_stretch} columns differenced to bands, and
+\code{supply}/\code{class_prop}/\code{ratio}/\code{rate} (and \code{supply_stretch}) recomputed.
 }
 \description{
 \code{\link[=afford_index]{afford_index()}} reports \strong{cumulative} tiers (ELI = at/below 30\% AMI, VLI =
 at/below 50\%, ...). \code{afford_bands()} differences them into \strong{non-overlapping
 bands} (the 30-50\% slice, the 50-80\% slice, ...) within each tract x tenure,
 so the tiers partition the stock instead of nesting. The lowest tier is
-unchanged; \code{supply}/\code{class_prop}/\code{ratio}/\code{rate} (and any availability columns)
-are recomputed on the banded counts. Tier \emph{labels} keep their names (the \code{VLI}
+unchanged; \code{supply}/\code{class_prop}/\code{ratio}/\code{rate} (and any availability or
+stretch columns) are recomputed on the banded counts. Tier \emph{labels} keep their names (the \code{VLI}
 row now holds the 30-50\% slice). Assumes tiers are ascending in AMI fraction
 (the default ELI/VLI/LI/MI order).
 }

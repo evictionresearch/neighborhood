@@ -1,0 +1,418 @@
+---
+title: "Stable destinations (P1): joining affordability with HPRM stability"
+subtitle: "A walkthrough of the first cut — King County, WA (Seattle) and the 9-county Bay Area, VLI renters"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    self_contained: true
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 11, dpi = 96, out.width = "100%")
+library(ggplot2); library(sf); library(patchwork); library(dplyr)
+suppressMessages(pkgload::load_all("..", quiet = TRUE))   # nt_map() + afford_*/inflow_index()
+d <- readRDS("p1_eval_data.rds"); s <- d$summ; sb <- d$summ_bay
+ck <- d$cap_king[d$cap_king$ami_tier == "VLI", ]   # free-will capacity, VLI renters
+cb <- d$cap_bay[d$cap_bay$ami_tier == "VLI", ]
+king <- d$king; vli <- king[king$ami_tier == "VLI", ]
+bay  <- d$bay;  bay_vli <- bay[bay$ami_tier == "VLI", ]
+dvlim <- range(c(king$dis_value, bay$dis_value), na.rm = TRUE)   # shared inflow colour scale
+mt <- theme_void(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", size = 11),
+        plot.subtitle = element_text(color = "grey35", size = 9),
+        legend.key.height = unit(7, "pt"))
+map_aff <- function(v) ggplot(v) + geom_sf(aes(fill = supply), color = NA) + mt +
+  scale_fill_gradient(low = "#f7fbff", high = "#08519c", limits = c(0,1),
+                      labels = scales::label_percent(), name = "% of rentals\naffordable to VLI") +
+  labs(title = "Where VLI can afford", subtitle = "darker = a larger share of rentals within reach")
+map_stab <- function(v) ggplot(v) + geom_sf(aes(fill = stability), color = NA) + mt +
+  scale_fill_gradient2(low = "#d73027", mid = "#fee08b", high = "#1a9850", midpoint = 0.5,
+                       limits = c(0,1), breaks = c(0,.5,1), labels = c("0\nprecarious","0.5","1\nstable"),
+                       name = "stability") +
+  labs(title = "Where it's stable", subtitle = "red = precarious (high HPRM), green = stable")
+bivar_cat <- function(v) factor(dplyr::case_when(
+    v$supply <  median(v$supply, na.rm = TRUE) ~ "Less affordable",
+    v$stability >= 0.8                          ~ "Affordable & stable (>= 0.8)",
+    v$stability >= 0.5                          ~ "Affordable, elevated risk (0.5-0.8)",
+    TRUE                                        ~ "Affordable, high precarity (< 0.5)"),
+  levels = c("Affordable & stable (>= 0.8)","Affordable, elevated risk (0.5-0.8)",
+             "Affordable, high precarity (< 0.5)","Less affordable"))
+
+# --- interactive MapLibre choropleths (the ggplot map_*() below are now unused) ---
+vli$cat <- bivar_cat(vli); bay_vli$cat <- bivar_cat(bay_vli)
+prep <- function(v) {   # trim to display columns + lightly simplify for a responsive web map
+  v <- v[, c("GEOID", "county", "supply", "stability", "dis_value", "cat",
+             "verdict", "stable_cat")]
+  v <- sf::st_transform(v, 3857)
+  v <- sf::st_simplify(v, dTolerance = 60, preserveTopology = TRUE)
+  sf::st_transform(v, 4326)
+}
+vli_m <- prep(vli); bay_m <- prep(bay_vli)
+dvmax <- max(c(king$dis_value, bay$dis_value), na.rm = TRUE)   # shared inflow ceiling
+# headline maps render VERDICTS, not gradients (the across-the-board rule):
+# a continuous scale that shows a place as "mid" reads as "no problem here".
+ml_verdict <- function(v) { v <- v[!is.na(v$verdict), ]
+  nt_map(v, "verdict", type = "categorical",
+    colors = c("#1a9850", "#fdae61", "#d73027"),
+    legend_title = "verdict for a VLI renter", before_id = "water") }
+ml_stabcat <- function(v) { v <- v[!is.na(v$stable_cat), ]
+  nt_map(v, "stable_cat", type = "categorical",
+    colors = c("#1a9850", "#fdae61", "#d73027"),
+    legend_title = "stability verdict", before_id = "water") }
+ml_dv    <- function(v) nt_map(v, "dis_value", type = "continuous",
+    colors = c("#d73027", "#fdae61", "#1a9850"), breaks = c(50, dvmax),
+    legend_title = "net low-income migration (pivot +50)", before_id = "water")
+ml_bivar <- function(v) nt_map(v, "cat", type = "categorical",
+    colors = c("#1a9850", "#fdae61", "#d73027", "#d9d9d9"),
+    legend_title = "afford x stability", before_id = "water")
+map_bivar <- function(v) { v$cat <- bivar_cat(v)
+  ggplot(v) + geom_sf(aes(fill = cat), color = "white", linewidth = 0.04) + mt +
+  scale_fill_manual(values = c("Affordable & stable (>= 0.8)"="#1a9850",
+                               "Affordable, elevated risk (0.5-0.8)"="#fdae61",
+                               "Affordable, high precarity (< 0.5)"="#d73027",
+                               "Less affordable"="#d9d9d9"), name = NULL, drop = FALSE) +
+  labs(title = "Where can a VLI renter afford — and stay?",
+       subtitle = "affordable tracts graded by stability: green >= 0.8, orange 0.5-0.8, red < 0.5") +
+  theme(legend.position = "bottom", legend.text = element_text(size = 8)) +
+  guides(fill = guide_legend(nrow = 2)) }
+map_dv <- function(v) ggplot(v) + geom_sf(aes(fill = dis_value), color = "white", linewidth = 0.04) + mt +
+  scale_fill_gradient2(low = "#d73027", mid = "#fdae61", high = "#1a9850", midpoint = 50,
+    limits = dvlim, oob = scales::squish, name = "net low-income\nmigration\n(dis_value)") +
+  labs(title = "Where are low-income households moving to?",
+       subtitle = "EDR net migration, pivot +50: red = outflow (displacement), orange ≈ break-even, green = inflow (growth)")
+```
+
+## What this evaluates
+
+This is the first cut of the **"good place" / stable-destination layer** — the step that turns the
+affordability index into a *destination* measure. The logic, per the design (`dev/good-place-design.md`)
+and the theory (`hprm/manuscripts/a-good-place.md`):
+
+> **A good place is not a tract's score — it's a household's *access*: where it can afford, reach, and
+> *stay*.** Affordability tells us where a VLI renter *could* live; it says nothing about whether
+> they'd be pushed back out. So we intersect the afford-and-reach set with **housing stability**, which
+> we read directly from ERN's own HPRM (displacement + eviction risk) rather than from any "opportunity"
+> score.
+
+Here we run it for **King County, WA** (Seattle), VLI renters (≤50% AMI), renting — the cleanest test
+region (single county; both HPRM signals present and non-CA, so no out-of-sample EER caveat) — then
+extend to the **9-county Bay Area**, the high-displacement contrast, below.
+
+## How "stability" is measured
+
+Stability is built from two HPRM fields, each mapped to a 0–1 score using **HPRM's own published risk
+anchors**, then **equal-weighted** (your call):
+
+- **Displacement** — `dis_value` (the EDR composite). It is deliberately *not* a raw sum of the AMI-tier
+  net-migration predictions: it sums only the tiers at or below the **+50 BART-uncertainty buffer**, so
+  a confidently in-migrating tier can't mask a displacing one. Anchors: `+50 → 1.0` (stable), `−300`
+  (Extreme) `→ 0`.
+- **Eviction** — `ev_value` (the EER filing-rate ratio; 1.0 = state average). Anchors: `0.8 → 1.0`,
+  `2.0` (Extreme) `→ 0`.
+
+```{r curves, fig.height=2.8, fig.width=10}
+g1 <- ggplot(d$fn_edr, aes(dis_value, s_edr)) +
+  annotate("rect", xmin=-Inf, xmax=-300, ymin=-Inf, ymax=Inf, fill="#b2182b", alpha=.08) +
+  geom_line(linewidth=1, color="#1f6f78") +
+  geom_vline(xintercept=c(50,-100,-300), linetype=3, color="grey55") +
+  annotate("text", x=c(60,-95,-295), y=0.05, label=c("At Risk","Elevated","Extreme"),
+           hjust=0, size=2.7, color="grey40") +
+  labs(title="Displacement → stability", x="dis_value (EDR)", y="s_edr") + theme_minimal(base_size=10)
+g2 <- ggplot(d$fn_eer, aes(ev_value, s_eer)) +
+  annotate("rect", xmin=2, xmax=Inf, ymin=-Inf, ymax=Inf, fill="#b2182b", alpha=.08) +
+  geom_line(linewidth=1, color="#1f6f78") +
+  geom_vline(xintercept=c(0.8,1.5,2.0), linetype=3, color="grey55") +
+  annotate("text", x=c(0.82,1.52,2.02), y=0.95, label=c("At Risk","High","Extreme"),
+           hjust=0, size=2.7, color="grey40") +
+  labs(title="Eviction → stability", x="ev_value (EER)", y="s_eer") + theme_minimal(base_size=10)
+g1 + g2
+```
+*Figure 1. Each HPRM risk field mapped to a 0-1 stability score on its published anchors.*
+
+`stability = 0.5 · s_edr + 0.5 · s_eer`, on every tract — so the 0–1 scale reads in plain terms:
+
+- **1.0 = fully stable** — no measurable displacement (`dis_value ≥ +50`) *and* below-average eviction
+  (`ev_value ≤ 0.8`): low-income renters are holding on here.
+- **0.0 = maximally precarious** — Extreme on *both* (`dis_value ≤ −300` *and* `ev_value ≥ 2.0`).
+- **0.5 = the midpoint** — e.g., "High" risk on both dimensions, or Extreme on one and stable on the other.
+
+**EDR vs EER — and a switch.** These aren't the same harm. **EDR** (`dis_value`) is *net out-migration* —
+low-income households actually **leaving**. **EER** (`ev_value`) is the *added precarity of the
+formal-eviction channel*. They can diverge — HPRM's "policy substitution," where tenant protections
+suppress eviction filings while market displacement intensifies. So stability should take a
+**`stability_source`** option: **`both`** (default), **`edr`** (displacement only — the purest "are
+low-income people being pushed out?"), or **`eer`** (eviction only). For California, where EER is
+out-of-sample, `edr` is the robust choice. *(`stability_source` is now a coded parameter of
+`afford_stability()`; this walkthrough uses `both`.)*
+
+**Honesty note:** the HPRM signal is *built* from individual data (the Data Axle panel + court records —
+Carlson's individual approach, not the population/compositional method that invites the ecological
+fallacy), but its *output* is a tract rate. So we treat `stability` as a **place-level risk descriptor**,
+not a guarantee for any one household — the individual-level check is the Gate-4 observed-move residual,
+later.
+
+## The data join
+
+HPRM is FY2022 (2020-census tracts); the afford index is 2024 (also 2020-census tracts), so they join
+cleanly on `GEOID`. Coverage in King County: **`r s$join_matched` of `r s$join_total` tracts** (the one
+miss is a no-renter edge tract).
+
+## The free-will arithmetic
+
+Before any map: if every VLI renter household could re-sort freely, paying at most 30% of income
+in rent, what could each region absorb? The `afford_capacity()` readout (VLI renters, rent):
+
+```{r capacity}
+cap <- rbind(cbind(region = "King County", as.data.frame(ck)),
+             cbind(region = "Bay Area (9-county)", as.data.frame(cb)))
+knitr::kable(dplyr::transmute(cap, region,
+  `VLI renter households`      = scales::comma(tier_households, accuracy = 100),
+  `affordable units (at 30%)`  = scales::comma(affordable_units, accuracy = 100),
+  `per 100 households`         = round(per100_affordable, 1),
+  shortfall                    = scales::comma(shortfall, accuracy = 100),
+  `per 100 at 50% (stretch)`   = round(per100_stretch, 1),
+  `open per year, per 100`     = round(per100_open_year, 1),
+  `open now, per 100`          = round(per100_open_now, 1),
+  `tracts < 1 opening/yr`      = tracts_lt1_open))
+```
+
+King County's rental stock holds **`r round(ck$per100_affordable)` affordable units per 100 VLI
+renter households** — a structural deficit of **`r scales::comma(round(ck$shortfall))` units even
+under perfect free sorting** — and only **`r round(ck$per100_open_year)` per 100 open up in a
+year** (**`r round(ck$per100_open_now, 1)` per 100** are vacant right now). The Bay holds
+**`r round(cb$per100_affordable)` per 100** (shortfall **`r scales::comma(round(cb$shortfall))`**),
+with **`r round(cb$per100_open_year)` per 100** opening yearly. At the 50%-of-income *stretch*
+line the reachable stock roughly doubles (King **`r round(ck$per100_stretch)`**, Bay
+**`r round(cb$per100_stretch)`** per 100) — the shortage lives at the 30% standard, not at 50%.
+*These are price-only ceilings: an affordable unit occupied by a higher-income household still
+counts. The NLIHC-style "affordable and available" competition adjustment is the planned
+refinement (see `dev/affordability-deep-dive.md`).*
+
+## The maps
+
+The two ingredients first, each as a **verdict** — per the across-the-board presentation rule:
+policy audiences read maps by color, and a gradient that renders a tract "mid" is read as "no
+problem here," so headline maps classify. For affordability the two burden lines give the classes
+plain meaning at the tract-majority (= median-unit) rule: **affordable** — the typical rental
+costs a VLI household ≤ 30% of income; **roughly affordable** — 30–50% (reachable only by
+stretching); **not affordable** — more than half their income, even stretching.
+
+**All maps below are interactive** - pan, scroll to zoom, hover a tract for its class or value,
+click for its GEOID, on a light Positron basemap.
+
+```{r map_aff}
+ml_verdict(vli_m)
+```
+*Figure 2. The verdict — where King County is affordable to a VLI renter: green = affordable (typical rental ≤ 30% of income), orange = roughly affordable (30–50%), red = not affordable (> 50% even stretching).*
+
+King splits **`r s$v_aff` affordable / `r s$v_rough` roughly affordable / `r s$v_not` not
+affordable**. The majority of the county is *orange* — reachable only by stretching past the 30%
+standard — which a continuous blue gradient rendered as unremarkable mid-tones.
+
+```{r map_stab}
+ml_stabcat(vli_m)
+```
+*Figure 3. The stability verdict — green = stable (≥ 0.8), orange = elevated (0.5–0.8), red = precarious (< 0.5), on HPRM's published anchors (from `afford_stability()`'s `stable_cat`).*
+
+Stability gets the same verdict grammar. Precarity concentrates in the dense urban core; the rural
+east is broadly stable.
+
+Now grade the *affordable* tracts by stability — with a **traffic-light** cut, because (as you flagged)
+an **Elevated**-risk tract isn't a settled destination: **green = stability ≥ 0.8** (genuinely stable,
+≈ HPRM "At Risk or better"); **orange = 0.5–0.8** (Elevated risk — reachable but not settled);
+**red = < 0.5** (High/Extreme precarity).
+
+```{r map_bivar}
+ml_bivar(vli_m)
+```
+*Figure 4. Where a VLI renter can afford - and stay. Affordable tracts graded by stability: green >= 0.8, orange 0.5-0.8, red < 0.5; grey = less affordable.*
+
+**Green** = affordable and genuinely stable (≥ 0.8). **Orange** = affordable but at **Elevated** risk
+(0.5–0.8) — reachable, not a settled destination; *this is the band you flagged, now visible instead of
+buried inside "green."* **Red** = affordable but High/Extreme precarity (< 0.5). **Grey** = less
+affordable. In King's more-affordable VLI half: **`r s$nc_green` green, `r s$nc_orange` orange, `r s$nc_red` red**.
+Raising the bar to 0.8 surfaces the cautionary orange ring the 0.5 cut was hiding — and, as the Bay
+section below shows, the *same* split recurs almost unchanged in a very different, higher-displacement market.
+
+**Switching to `edr`-only** (displacement only, dropping the eviction channel) keeps the trade-off: the
+motivating cases from earlier this session — **San Diego ≈ −0.48, Salt Lake ≈ −0.43** (both-signal) — are
+EDR-driven, so this is a *people-leaving* phenomenon first; eviction adds to it but doesn't create it.
+(`stability_source = "edr"` recomputes any of these directly.)
+
+## The three combination modes
+
+The design specifies three, all available; the **continuous weight (the map above) is the default**.
+
+**(a) Report-alongside** — the afford metrics with the stability fields attached, so nothing is hidden.
+The most-affordable VLI tracts, and how precarious each is:
+
+```{r tab}
+vli |> sf::st_drop_geometry() |>
+  arrange(desc(supply)) |>
+  transmute(GEOID, `afford supply` = round(supply,2), dis_value = round(dis_value),
+            ev_value = round(ev_value,2), hprm_score, stability = round(stability,2),
+            `stable?` = ifelse(stable, "yes","no")) |>
+  head(8)
+```
+
+**(b) Hard "stable destination" filter** — affordable + reachable + `stability ≥ 0.8` (the **green**
+tracts in the map above). In King's affordable half, **`r s$nc_green`** clear the 0.8 bar, **`r s$nc_orange`** sit
+in the orange Elevated band, and **`r s$nc_red`** are red — and the Bay (below) reproduces almost the same
+split (green ≈ `r round(100*sb$nc_green/(sb$nc_green+sb$nc_orange+sb$nc_red))`% of its affordable half, vs `r round(100*s$nc_green/(s$nc_green+s$nc_orange+s$nc_red))`% here).
+
+**(c) Continuous stability weight** — the **default**: each tract's `available_turnover × stability`
+(**availability now folded in** — the annual openings a group can afford, smoothly down-weighted by
+stability rather than hard-cut), so a moderately-precarious tract still counts, partially. This is
+the `stable_dest` column `afford_stability()` returns.
+
+## The finding
+
+The point of the layer, in one number: across King County tracts, **affordability and stability
+correlate `r round(s$cor_aff_stab, 2)`** for VLI renters. The places a VLI household can most afford are
+systematically the *least* stable — affordable tracts run median stability **`r round(s$med_stab_aff,2)`**
+vs **`r round(s$med_stab_less,2)`** for less-affordable ones. This is the affordability-precarity
+trade-off the opportunity paradigm can't see and the stable-destination layer is built to surface: a
+VLI renter's reachable, *holdable* options are fewer, and they skew to the edge.
+
+**Caveats (carry these):**
+
+- The maps are **visually area-weighted** — the large rural-east polygons dominate the eye. The
+  "periphery" read needs **unit/population weighting** before it's a finding, not just a picture.
+- HPRM is **2022**, afford is **2024** (a 2-year vintage gap; both 2020-census tracts).
+- King has both HPRM signals in-sample. For **California**, EER (`ev_value`) is an *out-of-sample*
+  prediction (CA excluded from EER training) — usable, but flag it.
+- The stability function is the agreed default (equal weights; published anchors) — configurable.
+
+## Aside: where are low-income households actually *moving to*?
+
+You flagged something the stability layer deliberately sets aside. `dis_value` is **signed net
+migration of low-income households** (codebook, `nmr_pred_*`: *"Negative = net outflow"*). The
+stability score treats everything at or above the +50 buffer as equally "stable" — but the
+*positive* tail is not merely the absence of displacement, it's **low-income neighborhood
+growth**: tracts where ELI/VLI/LI households are, on net, *moving in*. The codebook is explicit —
+when all three tiers clear +50, `dis_value` is *"backfilled with the raw sum (positive =
+low-income growth)."*
+
+So here is the raw `dis_value` range, pivoted at **+50** (the same buffer the HPRM risk bands use):
+red = net outflow (displacement), orange ≈ break-even, green = net inflow (low-income growth).
+
+```{r map_dv}
+ml_dv(vli_m)
+```
+*Figure 5. Where low-income households are moving to (King) - EDR net migration, pivot +50: red = outflow (displacement), green = inflow (growth).*
+
+In King County, **`r s$n_growth`** tracts are confident low-income **growth** (`dis_value > +50`,
+green), **`r s$n_disp`** are net **outflow** (`dis_value < 0`, red), and **`r s$n_even`** sit in the
+0-to-50 break-even zone the model can't distinguish from stable (`dis_value` spans
+`r round(s$dv_min)` to `r round(s$dv_max)`).
+
+**A caution you raised — this is a *prediction*, not a headcount.** `dis_value`/`nmr_pred_*` are BART
+predictions of net migration (Data Axle panel, INLA-smoothed), so a "growth" tract is where the model
+*expects* low-income in-migration to concentrate. The model's validated target is *displacement* (net
+outflow), so the positive/growth tail is comparatively **less validated** and is shrunk toward regional
+means. Treat it as a modeled signal to **triangulate** against observed flows (ACS
+geographic-mobility-by-income; IRS SOI county migration by AGI), not as ground truth — a *more recent*
+Data Axle vintage would refresh recency but not close the prediction-vs-observation gap or the panel's
+coverage bias (it underrepresents the poorest and undocumented). `inflow_index()` is source-agnostic
+here: pass observed net migration in the same shape and it works unchanged.
+
+> **Face-validity failure - do not read the positive/green tail as "destinations."** Mapped for the
+> Bay (Figure 8), positive `dis_value` reads *exclusionary and receiving suburbs* as major low-income
+> growth - **Marin median +338**, Sonoma +448, Contra Costa +400 - while the expensive cores go
+> negative. Marin as a low-income destination is not credible. EDR is a *displacement* model; its
+> positive tail is unvalidated extrapolation dominated by spatial smoothing where the low-income base
+> is tiny. **Decision (July 2026): center destinations on affordability + stability, not this.**
+> Positive `dis_value`'s one good use is *absence of displacement* feeding stability (which clamps the
+> magnitude away, so stability is robust to this). A purpose-built growth model is specified in
+> `hprm/HPRM_3.0_growth_model.md`. The two inflow maps below are kept as the *evidence* for this.
+
+**This is a different question from stability, and it deserves its own measure.** Stability asks
+*"can a household stay?"* (low displacement risk); this map asks *"where are low-income households
+actually going?"* — a **revealed-destination / demand** signal. The two are related but not the
+same: a growth tract is stable *for the incoming group*, but the flow itself may be **channeled**
+(the "highways of migration" — place stratification; Krysan & Crowder's cycles of segregation), not
+free. The right home for this is a **separate function** (a revealed-in-migration layer) built on
+the **raw `nmr_pred_el/vl/l`** fields — tier-specific (*"where are VLI households moving?"*), not the
+displacement-preserving composite. The payoff is the comparison the whole project is after: **where
+a group *can afford* to go** (`afford_index`) versus **where it *actually* goes** (revealed
+in-migration). That gap — potential minus revealed destinations — is the economic-segregation
+signal itself.
+
+## The 9-county Bay Area
+
+Does the affordability–precarity trade-off hold in a high-displacement metro, or is it a King artifact? Same recipe (VLI renters,
+`afford_stability()` + `inflow_index()`) across the **9-county Bay Area** (Alameda, Contra Costa, Marin,
+Napa, San Francisco, San Mateo, Santa Clara, Solano, Sonoma): **`r sb$join_matched` of `r sb$join_total`**
+tracts joined.
+
+*Two method notes.* (1) Three Bay counties — Napa, Solano, Sonoma — aren't in the offline HUD snapshot, so
+the Bay uses the **`hud_acs`** source (the validated ACS-based HUD approximation, MFI within ~1% of HUD)
+for all nine; King used the exact `hud` snapshot. (2) The Bay is **California, so EER (`ev_value`) is
+out-of-sample** — stability below is `both`, but `edr`-only is the robust read here.
+
+First the verdict (same classes as Figure 2): the Bay splits **`r sb$v_aff` affordable /
+`r sb$v_rough` roughly affordable / `r sb$v_not` not affordable** for VLI renters.
+
+```{r bay_verdict_map}
+ml_verdict(bay_m)
+```
+*Figure 6. Bay Area - the affordability verdict for a VLI renter (same classes as Figure 2).*
+
+```{r bay_bivar_map}
+ml_bivar(bay_m)
+```
+*Figure 7. Bay Area - where a VLI renter can afford and stay (same traffic-light scale as Figure 4).*
+
+The answer is **yes, at almost exactly the same strength**: the trade-off is **`r round(sb$cor_aff_stab, 2)`**
+for Bay VLI renters — identical to King's **`r round(s$cor_aff_stab, 2)`**. Affordable tracts run median
+stability **`r round(sb$med_stab_aff, 2)`** against **`r round(sb$med_stab_less, 2)`** for less-affordable
+ones (King: `r round(s$med_stab_aff, 2)` vs `r round(s$med_stab_less, 2)` — a hair wider gap in the Bay).
+Of the affordable VLI half, **`r sb$nc_green` green / `r sb$nc_orange` orange / `r sb$nc_red` red** — green
+is **`r round(100*sb$nc_green/(sb$nc_green+sb$nc_orange+sb$nc_red))`%** of the affordable half, essentially
+King's **`r round(100*s$nc_green/(s$nc_green+s$nc_orange+s$nc_red))`%**. The finding here is *not* that the
+Bay is worse — it's that the trade-off is **structural and metro-invariant**: two very different housing
+markets, the same −0.49. That is a stronger claim for the manuscript than a Bay-specific effect would be.
+
+And where are low-income households actually moving (shared +50-pivot scale)?
+
+```{r bay_dv_map}
+ml_dv(bay_m)
+```
+*Figure 8. Bay Area - where low-income households are moving to (same +50-pivot scale as Figure 5).*
+
+**`r sb$n_growth`** Bay tracts are confident low-income **growth** (`> +50`), **`r sb$n_disp`** net
+**outflow** (`< 0`), **`r sb$n_even`** break-even (`dis_value` `r round(sb$dv_min)` to `r round(sb$dv_max)`).
+*Here* is where the Bay actually diverges from King: **`r round(100*sb$n_disp/sb$join_total)`%** of Bay
+tracts are net outflow, against **`r round(100*s$n_disp/s$join_total)`%** in King — the higher displacement
+pressure that the equal trade-off *strength* conceals shows up in the raw migration, not in the bivariate.
+Read the two Bay maps together: where VLI can most afford (upper map) and where low-income households
+actually land (green, lower map) only partly coincide — and that gap between *afford* and *inflow* is the
+economic-segregation signal the project is built to measure.
+
+## Next steps
+
+1. ✅ **Wrapped into a package function** — `afford_stability()` now folds HPRM stability onto an
+   `afford_index()` result, with the `stability_source` switch (`both`/`edr`/`eer`), the CA-EER
+   out-of-sample flag, and **availability folded into the chain** (`stable_dest = available_turnover
+   × stability`, not `supply × stability`). This walkthrough is now generated *through* it.
+2. ✅ **Revealed-in-migration function** — `inflow_index()` (`dis_value` overall; raw `nmr_pred_*` per
+   tier), joinable onto an `afford_index()` result for the potential-vs-revealed comparison. **Now flagged
+   experimental** - its positive `dis_value` tail fails face validity (Marin reads as low-income
+   growth; see the caveat above Figures 5/8), so use it for the *displacement* read only; the
+   purpose-built growth model is specified in `hprm/HPRM_3.0_growth_model.md`.
+3. ✅ **Verdict + capacity (this build)** — `afford_index()` now carries both burden lines
+   (`burden` 30% / `stretch` 50%), `afford_verdict()` renders the three-class verdict the headline
+   maps above use (per the across-the-board rule: classify, don't shade), and `afford_capacity()`
+   produces the free-will table (units per 100, shortfall, openings). See
+   `dev/affordability-deep-dive.md` for the v1 autopsy behind this.
+4. **Competition adjustment** — NLIHC-style "affordable *and available*" (a cheap unit occupied by
+   a higher-income household isn't available): HUD CHAS at tract level. Also: gate the bivariate
+   (Figs 4/7) on the absolute verdict instead of the median split, and add MOE/reliability flags.
+5. **Extend** to AMI × race (Bay Area started above) and to Atlanta / Minneapolis — does the
+   affordability-precarity trade-off hold, and is it worse for Black and Latino renters? And
+   **triangulate** `inflow_index()` against observed ACS/IRS migration (it's a prediction).
+6. **P2 — the headline**: the Constraint Gap by AMI × race.
+```

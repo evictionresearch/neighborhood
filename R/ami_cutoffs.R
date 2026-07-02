@@ -72,6 +72,7 @@
   out <- vapply(counties, function(co) {
     r <- tryCatch(hudr::get_hud_fmr_data(paste0(state, co, "99999"), as.character(year)),
                   error = function(e) NULL)
+    if (!is.list(r)) r <- NULL   # hudr returns an error STRING (not a condition) on API failure
     bd <- r$basicdata
     if (is.null(bd) || is.null(bd$two_bedroom)) return(NA_real_)
     msa <- suppressWarnings(as.numeric(bd$two_bedroom[bd$zip_code == "MSA level"]))
@@ -135,6 +136,9 @@
   m <- .afi_acs_mfi(state, counties, mfi_vintage)
   m$county <- m$GEOID
   fmr <- if (fmr_bump) .afi_fmr_2br(state, counties, year) else NULL
+  if (fmr_bump && !is.null(fmr) && all(is.na(fmr)))
+    warning("2BR FMR unavailable (HUD API down?) -- the high-cost VLI bump is ",
+            "skipped, so VLI may be understated in high-cost areas.", call. = FALSE)
 
   if (!fmr_bump) {                                  # pure "acs": straight fractions
     sf <- unname(.afi_hh_size_factor[as.character(size)])
@@ -219,6 +223,10 @@
         error = function(e)        # suppress original msg: it can echo the key
           stop("HUD API call failed for county ", geoid, " (", year,
                "); original error hidden to avoid leaking the API key.", call. = FALSE))
+      if (!is.list(il))            # hudr returns an error STRING on API failure
+        stop("HUD API returned no usable data for county ", geoid, " (", year,
+             ") -- the API may be down. Use a year covered by the bundled ",
+             "snapshot, or retry later.", call. = FALSE)
       med <- as.numeric(pick(il, "median_income")); nm <- as.character(pick(il, "area_name"))
       eli <- as.numeric(pick(il, paste0("il30_p", size)))
       vli <- as.numeric(pick(il, paste0("il50_p", size)))

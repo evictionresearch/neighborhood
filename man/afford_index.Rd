@@ -13,6 +13,8 @@ afford_index(
   ami_source = c("auto", "hud", "hud_acs", "acs_fmr", "acs"),
   ami_tiers = c(ELI = 0.3, VLI = 0.5, LI = 0.8, MI = 1.2),
   hud_hh_size = 4,
+  burden = 0.3,
+  stretch = 0.5,
   interest_rate = NULL,
   term_years = 30,
   down_pct = 0.1,
@@ -53,6 +55,16 @@ see \code{\link[=ami_cutoffs]{ami_cutoffs()}}.}
 \item{hud_hh_size}{Household size (1-8) for AMI's family-size adjustment
 (default \code{4}; \code{NULL} for unadjusted).}
 
+\item{burden}{Share of income treated as affordable housing cost (default
+\code{0.30}, the HUD 30\%-of-income standard). Drives \code{accessible}/\code{supply} and
+everything downstream; for \code{"own_buyin"} it is the payment share inside the
+mortgage model.}
+
+\item{stretch}{Optional second, higher burden line (default \code{0.50} -- HUD's
+severe-burden threshold). Adds \code{accessible_stretch}/\code{supply_stretch}: what
+the tier could reach by stretching to this share of income (the "roughly
+affordable" band in \code{\link[=afford_verdict]{afford_verdict()}}). \code{NULL} to skip.}
+
 \item{interest_rate}{Annual mortgage rate for \code{"own_buyin"}; \code{NULL} (default)
 uses a built-in by-year approximation.}
 
@@ -78,7 +90,8 @@ tenure and tier before mapping.}
 }
 \value{
 A long tibble, one row per tract x tenure x tier, with \code{accessible},
-\code{total}, \code{supply}, \code{reg_hh_tier}, \code{reg_hh_total}, \code{class_prop}, \code{ratio},
+\code{total}, \code{supply} (and, when \code{stretch} is set, \code{accessible_stretch} /
+\code{supply_stretch}), \code{reg_hh_tier}, \code{reg_hh_total}, \code{class_prop}, \code{ratio},
 \code{rate}, the county \code{ami}, and the tier \code{income_cutoff}. When
 \code{availability = TRUE}, also \code{vacancy_rate}, \code{turnover_rate},
 \code{available_vacancy}, and \code{available_turnover} (Gate 2).
@@ -92,12 +105,12 @@ label-parsed income brackets with within-bracket interpolation, and treats
 rental and owner affordability with explicit, documented cost models.
 }
 \details{
-Affordability uses a 30\%-of-income rule throughout. For each tenure a tract's
-housing-cost brackets (parsed from ACS labels) are compared to the tier's
-income ceiling:
+Affordability uses a \code{burden}-of-income rule throughout (default 30\%, the
+HUD standard). For each tenure a tract's housing-cost brackets (parsed from
+ACS labels) are compared to the tier's income ceiling:
 \itemize{
 \item \code{"rent"}: gross rent (\code{B25063}); affordable if
-\code{rent <= income_cutoff * 0.30 / 12}.
+\code{rent <= income_cutoff * burden / 12}.
 \item \code{"own_current"} (basis A, default): current selected monthly
 owner cost (\code{B25094}); same 30\% rule as rent. Describes the
 affordability of the existing owned stock as currently financed.
@@ -112,6 +125,12 @@ only when fully below the cutoff. Per tract/tenure/tier the function returns
 \code{supply} (accessible / total), \code{ratio} (supply divided by the
 region's share of tier households -- a location quotient), and \code{rate}
 (accessible units per 100,000 regional tier households).
+
+A second, higher burden line (\code{stretch}, default 50\% -- HUD's severe-burden
+threshold) is computed alongside the standard: \code{accessible_stretch} /
+\code{supply_stretch} count what the tier could reach by \emph{stretching} to that
+share of income. The two lines together support the three-class verdict
+(affordable / roughly affordable / not affordable) -- see \code{\link[=afford_verdict]{afford_verdict()}}.
 }
 \examples{
 \dontrun{
@@ -134,5 +153,6 @@ afford_index("06", "075", 2024, tenure = "rent", demand = "all")
 }
 }
 \seealso{
-\code{\link[=ami_cutoffs]{ami_cutoffs()}}, \code{\link[=afford_bands]{afford_bands()}}, \code{\link[=afford]{afford()}} (legacy)
+\code{\link[=ami_cutoffs]{ami_cutoffs()}}, \code{\link[=afford_bands]{afford_bands()}}, \code{\link[=afford_verdict]{afford_verdict()}},
+\code{\link[=afford_capacity]{afford_capacity()}}, \code{\link[=afford]{afford()}} (legacy)
 }
