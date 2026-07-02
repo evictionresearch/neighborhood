@@ -1,0 +1,212 @@
+---
+title: "Color palettes: qualitative, sequential, diverging"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Color palettes: qualitative, sequential, diverging}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                      fig.width = 7, fig.height = 4.2, message = FALSE)
+```
+
+```{r setup}
+library(neighborhood)
+library(ggplot2)
+library(dplyr)
+```
+
+The package ships one color system, organized by **what the data means** rather
+than by what looks nice: qualitative palettes for mutually exclusive categories,
+sequential ramps for a single magnitude, diverging ramps for two directions
+around a neutral center. All of it leads with the 2022 brand triad — dark navy
+`#19222C`, blue navy `#223754`, brand red `#F9322B` — and every palette carries
+WCAG 2.1 receipts (the accessibility contrast rules), enforced by the package's
+test suite.
+
+## The swatch sheet
+
+Start here. One call opens a titled sheet of every palette, generated from the
+live definitions so it always matches your installed version — each card
+labeled with the exact string to pass to `ern_palette()` or the scales, a
+one-line "use for" rule, and a computed contrast badge per swatch:
+
+```{r, eval = FALSE}
+ern_swatch()
+```
+
+Pick the card that matches the data's meaning, then use its name below.
+
+## Choosing a palette
+
+| Your data | Palette | ggplot2 scale |
+|---|---|---|
+| Categories (series, groups) | `"qualitative"` | `scale_color_ern()` / `scale_fill_ern()` |
+| Categories where red would read as "bad" | `"neutral"` | `scale_fill_ern("neutral")` |
+| The 19 neighborhood typologies | `"typology"` | `scale_fill_ern("typology")` |
+| One magnitude, no valence | `"blues"` | `scale_fill_ern_c("blues")` |
+| One magnitude, red-themed (filings, displacement) | `"reds"` | `scale_fill_ern_c("reds")` |
+| One magnitude, more = good | `"greens"` | `scale_fill_ern_c("greens")` |
+| Risk (the HPRM / state-profile convention) | `"ramp"` | `scale_fill_ern_c()` |
+| Two directions, one side bad | `"div_brand"` | `scale_fill_ern_div("brand")` |
+| Two directions, neither side bad | `"div_gold"` | `scale_fill_ern_div("gold")` |
+| Raw hex vectors for anything else | any of the above | `ern_palette("...")` |
+
+## The red rule
+
+Brand red is central — and it is used by role, not banned. Verified against
+WCAG 2.1 (ratios on white):
+
+| Red | Ratio | Role |
+|---|---|---|
+| `#F9322B` brand red | 3.8:1 | **Shapes**: fills, lines, markers, map washes, large text. Passes the 3:1 non-text minimum (WCAG 1.4.11); fails body text. |
+| `#CC2118` text red | 5.5:1 | **Words**: direct labels, annotations, links. AA-safe, on white and on the `#e8eef4` tint. |
+| `#B01D16` deep red | 6.9:1 | Hover, active, deep emphasis. |
+
+One trap: red text on navy fails (2.9:1) — use white or steel there. All three
+live in `ern_palette("brand")` as `accent`, `accent_deep`, `accent_deeper`.
+
+## Qualitative: categories
+
+The default palette opens with the brand triad — blue navy carries the
+editorial line, brand red the highlight — and its first four colors are the
+most colorblind-separable subset, so the common chart sizes stay legible under
+color-vision deficiency. (Gold arrives fifth: it blurs with red for
+deuteranopes, so past four series lean on the house style's direct labels.)
+
+```{r qualitative-lines}
+big4 <- mn_evictions |>
+  filter(county %in% c("Hennepin", "Ramsey", "Dakota", "Anoka")) |>
+  summarise(filings = sum(filings), .by = c(county, year))
+
+ggplot(big4, aes(year, filings, color = county)) +
+  geom_line(linewidth = 0.8) +
+  scale_color_ern() +
+  labs(title = "Eviction filings, four largest counties",
+       subtitle = "Minnesota, 2017-2024", x = NULL, y = "Filings") +
+  theme_ern()
+```
+
+When the categories are people or programs, red stops being a highlight and
+starts being a verdict — a red band on a race composition reads as "the bad
+group." That is what `"neutral"` is for: the same family with no alarm color.
+
+```{r neutral-composition, fig.height = 3.2}
+renters <- mn_evictions |>
+  filter(year == 2024, county %in% c("Hennepin", "Ramsey", "Olmsted")) |>
+  distinct(county, Black = renters_black, White = renters_white,
+           Latine = renters_latine, Other = renters_other) |>
+  tidyr::pivot_longer(-county, names_to = "race", values_to = "renters")
+
+ggplot(renters, aes(renters, county, fill = race)) +
+  geom_col(position = "fill") +
+  scale_fill_ern("neutral") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(title = "Renter households by race", x = NULL, y = NULL) +
+  theme_ern()
+```
+
+Two more qualitative options: `"typology"` maps the 19 neighborhood-typology
+classes to their canonical key (`vignette("precarity-mapping")` shows it on a
+map — `nt_add_choropleth()` applies it automatically), and `"legacy"` is the
+pre-1.1.0 palette, kept verbatim so already-published figures can be reproduced
+exactly. Don't use `"legacy"` for new work.
+
+## Sequential: one magnitude
+
+Light-to-dark, interpolable to any number of classes with `n`. Filings are a
+quantity the network tells in red, so the heatmap below uses `"reds"`; use
+`"blues"` when the magnitude has no valence (counts, density, shares) and
+`"greens"` when the high end is desirable (affordability, stability). The
+4-class `"ramp"` (yellow-orange-red-purple) is the published HPRM / Minnesota /
+Washington **risk** convention — reserve it for genuinely bad quantities, and
+don't repurpose it for neutral ones.
+
+```{r sequential-heatmap, fig.height = 3.6}
+top8 <- mn_evictions |>
+  filter(year == 2024) |>
+  summarise(f = sum(filings), .by = county) |>
+  slice_max(f, n = 8) |>
+  pull(county)
+
+monthly <- mn_evictions |>
+  filter(year == 2024, county %in% top8) |>
+  summarise(filings = sum(filings), .by = c(county, month))
+
+ggplot(monthly, aes(factor(month), reorder(county, filings), fill = filings)) +
+  geom_tile(color = "white", linewidth = 0.4) +
+  scale_fill_ern_c("reds") +
+  labs(title = "Monthly filings, top-8 counties, 2024",
+       x = "Month", y = NULL, fill = "Filings") +
+  theme_ern(grid = "none")
+```
+
+```{r, eval = FALSE}
+# the same scale family, binned for a choropleth legend:
+ern_palette("blues", n = 5)   # 5 classes, light -> dark navy
+ern_palette("greens", n = 7)
+```
+
+## Diverging: two directions
+
+Set `midpoint` to pin the neutral center to a meaningful value (usually `0`),
+rather than letting it float at the middle of the data range. When one
+direction is genuinely bad — filings rising — use `"brand"`, which puts brand
+red on the bad pole: that is exactly what red is for.
+
+```{r diverging-change, fig.height = 4.6}
+change <- mn_evictions |>
+  filter(year %in% c(2023, 2024)) |>
+  summarise(filings = sum(filings), .by = c(county, year)) |>
+  tidyr::pivot_wider(names_from = year, values_from = filings,
+                     names_prefix = "y") |>
+  mutate(chg = y2024 - y2023) |>
+  slice_max(abs(chg), n = 12)
+
+ggplot(change, aes(chg, reorder(county, chg), fill = chg)) +
+  geom_col() +
+  scale_fill_ern_div("brand", midpoint = 0) +
+  labs(title = "Change in filings, 2023 to 2024",
+       subtitle = "Twelve largest swings; red = filings rose",
+       x = "Change in filings", y = NULL) +
+  theme_ern(legend = "none")
+```
+
+When neither direction is a warning — above vs. below average, owner vs.
+renter share — use `"gold"`: blue against gold, the most colorblind-safe
+diverging pair, with no alarm on either pole:
+
+```{r, eval = FALSE}
+scale_fill_ern_div("gold", midpoint = 0)
+```
+
+## The interactive charts and maps
+
+Every `nt_*` chart takes a `palette` argument, and `ern_palette()` hands the
+same vectors to anything else — so the interactive and static artifacts stay on
+one system:
+
+```{r, eval = FALSE}
+# interactive bar chart, red-free composition colors
+nt_bar(rates, "county", "rate", group = "race",
+       palette = ern_palette("neutral"))
+
+# leaflet / MapLibre maps: typology colors are applied automatically by
+# nt_pal() and nt_add_choropleth(); numeric layers use the risk ramp
+ern_palette("ramp")
+```
+
+## What the palettes guarantee
+
+Enforced by `tests/testthat/test-ern-palettes.R`, so they hold in every build:
+
+* every `"qualitative"` and `"neutral"` fill clears **3:1 on white** (WCAG
+  1.4.11, the non-text minimum);
+* the text reds clear **4.5:1 (AA)** on white and on the light-blue tint;
+* sequential ramps darken **monotonically**; diverging ramps peak at the
+  center — no false steps in a binned legend;
+* brand red sits in slot 2 of the default palette, and `"neutral"` contains no
+  red at all;
+* `"legacy"` never changes.

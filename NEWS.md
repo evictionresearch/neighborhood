@@ -30,6 +30,39 @@
   reproduces the report and paper figures, not just the interactive widgets.
   `ggplot2` is now an `Imports` dependency.
 
+* **A full brand palette system, WCAG-verified.** `ern_palette()` grows from 4
+  palettes to 11, organized by what the data means and led by the 2022 brand
+  triad (dark navy / blue navy / brand red):
+    - *Qualitative:* `"qualitative"` (rebuilt house default — blue navy, brand
+      red, chart steel, teal, then gold/purple/green/slate; every fill clears
+      the WCAG 1.4.11 3:1 non-text minimum on white, and the first four are the
+      most colorblind-separable subset), `"neutral"` (red-free, for categories
+      where red would read as "bad"), and `"legacy"` (the pre-1.1.0 vector,
+      verbatim, for reproducing published figures).
+    - *Sequential:* `"blues"` (neutral magnitude), `"reds"` (brand-red
+      intensity for filings/displacement counts), `"greens"` (more = good),
+      alongside the existing `"ramp"` risk ramp (now documented as
+      risk-only).
+    - *Diverging:* `"div_brand"` (navy ↔ brand red, valenced — red marks the
+      bad pole) and `"div_gold"` (blue ↔ gold, neutral), via new
+      `scale_color_ern_div()` / `scale_fill_ern_div()` with a `midpoint`
+      argument; `scale_*_ern_c()` gains a `palette` argument (default
+      unchanged).
+    - **The red rule.** Brand red `#F9322B` is verified WCAG-compliant as a
+      *graphic* (3.8:1 on white ≥ the 3:1 non-text minimum) and stays the
+      chart accent; red rendered as *text* uses the canonical `#CC2118`
+      (5.5:1, AA). `ern_palette("brand")` tokens sync to the canonical brand
+      guide: `muted` is now `#586573` (was deprecated `#6c7a89`),
+      `accent_deep` is `#CC2118` (was `#D6231C`), and `accent_deeper`
+      (`#B01D16`), `steel_chart` (`#7B96B5`, brand steel darkened to clear
+      3:1 as a fill), and `tint` (`#e8eef4`) are new.
+    - **`ern_swatch()`** writes and opens a self-contained HTML swatch sheet
+      generated from the live palette definitions — every palette titled,
+      labeled with its exact `ern_palette()` string, and badged with computed
+      WCAG contrast — so choosing a scheme is reading a page.
+    - Documented end-to-end in `vignette("ern-palettes")`, with live figures
+      built from the bundled `mn_evictions` data.
+
 * **Honest, consistent charts.** Filled bars (`nt_bar`, `nt_stacked_bar`) now
   always start at zero, `nt_range` extends its axis so confidence whiskers can't
   be clipped, and composition palettes scale to 6–7 categories without recycling

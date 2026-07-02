@@ -5,19 +5,18 @@
 \title{Eviction Research Network color palettes}
 \usage{
 ern_palette(
-  name = c("qualitative", "typology", "ramp", "brand"),
+  name = c("qualitative", "neutral", "legacy", "typology", "ramp", "blues", "reds",
+    "greens", "div_brand", "div_gold", "brand"),
   n = NULL,
   reverse = FALSE
 )
 }
 \arguments{
-\item{name}{Which palette: \code{"qualitative"} (the multi-series chart ramp),
-\code{"typology"} (the 19 neighborhood-typology colors, named), \code{"ramp"} (the
-4-class sequential yellow→orange→red→purple risk ramp), or \code{"brand"} (the
-named editorial tokens: \code{navy}, \code{accent}, \code{muted}, …).}
+\item{name}{Which palette (see above).}
 
-\item{n}{Optional number of colors; for \code{"qualitative"}/\code{"ramp"} the palette
-is recycled or interpolated to length \code{n}.}
+\item{n}{Optional number of colors. Qualitative palettes truncate to \code{n}
+(interpolating only past their length); sequential / diverging ramps
+interpolate to exactly \code{n} (e.g. \code{n = 5} classes for a binned map).}
 
 \item{reverse}{Logical; reverse the palette.}
 }
@@ -26,18 +25,63 @@ A character vector of hex colors (named for \code{"typology"}/\code{"brand"}).
 }
 \description{
 Exposes the ERN house colors so you can use them outside the bundled chart
-functions (in bespoke \code{ggplot2}, base graphics, or tables).
+functions (in bespoke \code{ggplot2}, base graphics, or tables). Call
+\code{\link[=ern_swatch]{ern_swatch()}} to open the titled swatch sheet of every palette below, with
+WCAG contrast receipts, and choose by name.
+
+\strong{Qualitative} — mutually exclusive categories:
+\itemize{
+\item \code{"qualitative"} — the house default, brand triad first: blue navy, brand
+red, chart steel, teal, then gold / purple / green / slate. Every fill
+clears WCAG 1.4.11 (3:1 on white); the first four are the most
+colorblind-separable subset.
+\item \code{"neutral"} — red-free variant for categories where red would read as
+"bad" (tenure, program, demographic compositions).
+\item \code{"legacy"} — the pre-1.1.0 chart palette, verbatim, for reproducing
+already-published figures.
+\item \code{"typology"} — the 19 neighborhood-typology colors, named.
+}
+
+\strong{Sequential} — ordered magnitude, light to dark:
+\itemize{
+\item \code{"blues"} — neutral magnitude, no valence (the default "more vs. less").
+\item \code{"reds"} — brand-red intensity for red-themed quantities (eviction
+filings, displacement counts).
+\item \code{"greens"} — positive quantities where more = good (affordability,
+stability).
+\item \code{"ramp"} — the 4-class yellow-orange-red-purple \strong{risk} ramp used across
+the HPRM / Minnesota / Washington maps; reserve it for genuinely bad
+quantities.
+}
+
+\strong{Diverging} — two directions around a neutral center:
+\itemize{
+\item \code{"div_brand"} — navy vs. brand red; valenced, red is the \emph{bad} pole.
+\item \code{"div_gold"} — blue vs. gold; neutral, neither pole a warning (and the
+most colorblind-safe diverging pairing).
+}
+
+\code{"brand"} returns the named editorial tokens (\code{navy}, \code{accent},
+\code{accent_deep}, \code{muted}, …). The red rule, WCAG-verified: \code{accent} \verb{#F9322B}
+is the \emph{graphics} red (3.8:1 on white — passes 1.4.11 for fills, lines,
+markers; fails AA body text), \code{accent_deep} \verb{#CC2118} is the \emph{text} red
+(5.5:1, AA-safe), \code{accent_deeper} \verb{#B01D16} is hover / deep emphasis.
 }
 \examples{
 ern_palette("brand")
 ern_palette("qualitative", n = 3)
+ern_palette("blues", n = 5)     # 5-class sequential bins
+ern_palette("div_gold", n = 9)  # 9-class diverging bins
 }
 \seealso{
 Other ern_charts:
+\code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_bar]{nt_bar()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
 \code{\link[=nt_lollipop]{nt_lollipop()}},
+\code{\link[=nt_pd_bart]{nt_pd_bart()}},
+\code{\link[=nt_pd_plot]{nt_pd_plot()}},
 \code{\link[=nt_range]{nt_range()}},
 \code{\link[=nt_scatter]{nt_scatter()}},
 \code{\link[=nt_slope]{nt_slope()}},
