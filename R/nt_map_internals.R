@@ -46,23 +46,72 @@
 .ern_ramp   <- c("#fed976", "#fd8d3c", "#F9322B", "#54278f")
 .ern_labels <- c("Lower", "Moderate", "High", "Extreme")
 
-# ERN editorial brand tokens (from the state-profile CSS :root). Shared by the
-# chart functions so the "newspaper graphic" look stays consistent.
+# ERN editorial brand tokens, synced to the canonical brand guide
+# (cidrlab/library/brand/ern/BRAND.md). The red rule, verified against WCAG 2.1:
+#   * accent  #F9322B -- GRAPHICS red (fills, lines, markers, map washes).
+#     3.8:1 on white / 3.3:1 on tint: passes 1.4.11 non-text contrast (>= 3:1)
+#     and large text, but FAILS AA body text (needs 4.5:1).
+#   * accent_deep #CC2118 -- TEXT red (direct labels, annotations, links).
+#     5.5:1 on white / 4.7:1 on tint: passes AA. Never put red text on navy.
+#   * accent_deeper #B01D16 -- hover / active / deep emphasis (6.9:1).
+# steel #8BA3BE is dark-background-only as text (2.6:1 on white); steel_chart
+# #7B96B5 is the same hue darkened just enough to clear 3:1 as a chart fill.
 .ern_brand <- list(
-  navy      = "#19222C",
-  navy_soft = "#223754",
-  steel     = "#8BA3BE",
-  accent    = "#F9322B",
-  accent_deep = "#D6231C",
-  muted     = "#6c7a89",
-  paper     = "#ffffff"
+  navy          = "#19222C",
+  navy_soft     = "#223754",
+  steel         = "#8BA3BE",
+  steel_chart   = "#7B96B5",
+  accent        = "#F9322B",
+  accent_deep   = "#CC2118",
+  accent_deeper = "#B01D16",
+  muted         = "#586573",
+  tint          = "#e8eef4",
+  paper         = "#ffffff"
 )
 .ern_font <- "Inter, -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif"
 
-# Default qualitative series palette for charts: navy first (the editorial trend
-# line), then accent and supporting tones for multi-series charts.
-.nt_chart_palette <- c("#19222C", "#F9322B", "#223754", "#8BA3BE",
-                       "#C95123", "#33a02c", "#9b66b0", "#1f78b4")
+# Default qualitative series palette for charts, brand triad first: blue navy
+# (the editorial trend line), brand red, then supporting tones. Ordered so the
+# first four -- the common chart sizes -- are the most colorblind-separable
+# subset (gold arrives fifth: it collides with red under deuteranopia, and by
+# then the house style's direct labels carry identification). Every fill
+# clears WCAG 1.4.11 (>= 3:1 on white); see ern_swatch() for receipts.
+.nt_chart_palette <- c("#223754", "#F9322B", "#7B96B5", "#2A8A86",
+                       "#C8860D", "#5A3A88", "#2C6B3A", "#586573")
+
+# Pre-1.1.0 qualitative palette, kept verbatim so published figures can be
+# reproduced exactly (ern_palette("legacy")).
+.nt_chart_palette_legacy <- c("#19222C", "#F9322B", "#223754", "#8BA3BE",
+                              "#C95123", "#33a02c", "#9b66b0", "#1f78b4")
+
+# Red-free qualitative palette for categories where the accent would moralize
+# (red reads as "bad" on tenure, program, or demographic compositions).
+.ern_qual_neutral <- c("#223754", "#C8860D", "#2A8A86", "#5A3A88",
+                       "#7B96B5", "#2C6B3A", "#7A4A1E", "#586573")
+
+# Sequential ramps (light -> dark, luminance-monotone; interpolable to any n).
+# blues:  neutral magnitude, no valence -- the default "more vs less" ramp,
+#         brand tint -> steel -> dark navy.
+# reds:   brand-red intensity for red-themed quantities (eviction filings,
+#         displacement counts); light end is the semantic red tint #FCE8E7.
+# greens: positive quantities where more = good (affordability, stability).
+.ern_seq_blues  <- c("#E8EEF4", "#C3D2E2", "#8BA3BE", "#5B7BA0",
+                     "#3A5578", "#223754", "#19222C")
+.ern_seq_reds   <- c("#FCE8E7", "#FABBB4", "#F97D71", "#F9322B",
+                     "#CC2118", "#8F1710")
+.ern_seq_greens <- c("#E8F3EA", "#C2E0C6", "#8CC494", "#4F9A5A",
+                     "#2C6B3A", "#1A4626")
+
+# Diverging ramps (7 stops, warm-white center, luminance peaks at the middle).
+# div_brand: navy <-> brand red, the valenced scale -- use when the axis truly
+#            runs good <-> bad, with red on the bad pole.
+# div_gold:  semantic blue <-> gold, the neutral scale -- two directions,
+#            neither a warning (gain/loss, above/below average). Blue-orange
+#            is the most colorblind-safe diverging pair.
+.ern_div_brand <- c("#223754", "#5E7CA0", "#C2CFDD", "#F4F1EE",
+                    "#F9ABA4", "#F9322B", "#B01D16")
+.ern_div_gold  <- c("#1B5A8A", "#6A95BB", "#BCD0E0", "#F2F0EC",
+                    "#E6BE7A", "#C8860D", "#8B5A00")
 
 # Neutral, accent-free ramp for COMPOSITION charts (stacked bars, waffles) where
 # every series is a recurring segment — the qualitative palette would otherwise

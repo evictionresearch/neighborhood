@@ -8,53 +8,127 @@
 \alias{scale_color_ern_c}
 \alias{scale_colour_ern_c}
 \alias{scale_fill_ern_c}
+\alias{scale_color_ern_div}
+\alias{scale_colour_ern_div}
+\alias{scale_fill_ern_div}
 \title{ERN color and fill scales for ggplot2}
 \usage{
-scale_color_ern(palette = c("qualitative", "typology"), reverse = FALSE, ...)
+scale_color_ern(
+  palette = c("qualitative", "neutral", "legacy", "typology"),
+  reverse = FALSE,
+  ...
+)
 
-scale_colour_ern(palette = c("qualitative", "typology"), reverse = FALSE, ...)
+scale_colour_ern(
+  palette = c("qualitative", "neutral", "legacy", "typology"),
+  reverse = FALSE,
+  ...
+)
 
-scale_fill_ern(palette = c("qualitative", "typology"), reverse = FALSE, ...)
+scale_fill_ern(
+  palette = c("qualitative", "neutral", "legacy", "typology"),
+  reverse = FALSE,
+  ...
+)
 
-scale_color_ern_c(reverse = FALSE, ...)
+scale_color_ern_c(
+  palette = c("ramp", "blues", "reds", "greens"),
+  reverse = FALSE,
+  ...
+)
 
-scale_colour_ern_c(reverse = FALSE, ...)
+scale_colour_ern_c(
+  palette = c("ramp", "blues", "reds", "greens"),
+  reverse = FALSE,
+  ...
+)
 
-scale_fill_ern_c(reverse = FALSE, ...)
+scale_fill_ern_c(
+  palette = c("ramp", "blues", "reds", "greens"),
+  reverse = FALSE,
+  ...
+)
+
+scale_color_ern_div(
+  palette = c("brand", "gold"),
+  midpoint = NULL,
+  reverse = FALSE,
+  ...
+)
+
+scale_colour_ern_div(
+  palette = c("brand", "gold"),
+  midpoint = NULL,
+  reverse = FALSE,
+  ...
+)
+
+scale_fill_ern_div(
+  palette = c("brand", "gold"),
+  midpoint = NULL,
+  reverse = FALSE,
+  ...
+)
 }
 \arguments{
-\item{palette}{\code{"qualitative"} (default) or \code{"typology"} (the named
-neighborhood-typology colors).}
+\item{palette}{For discrete scales: \code{"qualitative"} (default), \code{"neutral"},
+\code{"legacy"}, or \code{"typology"}. For continuous scales: \code{"ramp"} (default),
+\code{"blues"}, \code{"reds"}, or \code{"greens"}. For diverging scales: \code{"brand"}
+(default) or \code{"gold"}.}
 
 \item{reverse}{Logical; reverse the palette order.}
 
 \item{...}{Passed to the underlying \code{ggplot2} scale.}
+
+\item{midpoint}{Diverging scales only: the data value placed at the neutral
+center. Default \code{NULL} centers on the middle of the data range.}
 }
 \value{
 A \code{ggplot2} scale to add to a plot.
 }
 \description{
-Discrete and continuous \code{ggplot2} scales in the ERN palette, to match
-\code{\link[=theme_ern]{theme_ern()}}. Discrete scales default to the qualitative chart palette; pass
-\code{palette = "typology"} to color the 19 neighborhood typologies by their
-canonical key. Continuous scales use the 4-class sequential risk ramp.
+Discrete, continuous, and diverging \code{ggplot2} scales in the ERN palettes, to
+match \code{\link[=theme_ern]{theme_ern()}}. See \code{\link[=ern_palette]{ern_palette()}} for what each palette name means
+and \code{\link[=ern_swatch]{ern_swatch()}} for the visual sheet.
+\itemize{
+\item \strong{Discrete} (\code{scale_color_ern()} / \code{scale_fill_ern()}) default to the
+\code{"qualitative"} chart palette; other choices are \code{"neutral"} (red-free),
+\code{"legacy"} (pre-1.1.0), and \code{"typology"} (the 19 neighborhood typologies
+by their canonical key).
+\item \strong{Continuous} (\code{scale_color_ern_c()} / \code{scale_fill_ern_c()}) default to
+the \code{"ramp"} risk ramp (unchanged from earlier releases); pass
+\code{palette = "blues"}, \code{"reds"}, or \code{"greens"} for the sequential ramps.
+\item \strong{Diverging} (\code{scale_color_ern_div()} / \code{scale_fill_ern_div()}) use
+\code{"brand"} (navy vs. red, valenced — red is the bad pole) or \code{"gold"}
+(blue vs. gold, neutral). Set \code{midpoint} to pin the neutral center (e.g.
+\code{midpoint = 0} for change scores) rather than letting it float at the
+middle of the data range.
+}
 }
 \examples{
 \dontshow{if (requireNamespace("ggplot2", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 library(ggplot2)
 ggplot(mpg, aes(displ, hwy, color = drv)) +
   geom_point() + scale_color_ern() + theme_ern()
+
+# diverging fill centered on zero change
+df <- data.frame(x = LETTERS[1:7], chg = c(-30, -12, -4, 0, 8, 19, 42))
+ggplot(df, aes(x, chg, fill = chg)) +
+  geom_col() + scale_fill_ern_div("gold", midpoint = 0) + theme_ern()
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=theme_ern]{theme_ern()}}, \code{\link[=ern_palette]{ern_palette()}}.
+\code{\link[=theme_ern]{theme_ern()}}, \code{\link[=ern_palette]{ern_palette()}}, \code{\link[=ern_swatch]{ern_swatch()}}.
 
 Other ern_charts:
 \code{\link[=ern_palette]{ern_palette()}},
+\code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_bar]{nt_bar()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
 \code{\link[=nt_lollipop]{nt_lollipop()}},
+\code{\link[=nt_pd_bart]{nt_pd_bart()}},
+\code{\link[=nt_pd_plot]{nt_pd_plot()}},
 \code{\link[=nt_range]{nt_range()}},
 \code{\link[=nt_scatter]{nt_scatter()}},
 \code{\link[=nt_slope]{nt_slope()}},
