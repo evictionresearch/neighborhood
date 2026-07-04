@@ -44,6 +44,24 @@
   `afford_caption(pane = "availability")` carries its reading and what-ifs.
   Competition (CHAS) and screening remain the documented next layers.
 
+* **Pane 3 wired — the full funnel.** `afford_map(verdict_col = "stable_cat")`
+  renders the stability verdict (stable / elevated / precarious, same three
+  colors) from `afford_stability()`, `afford_caption(pane = "stability")`
+  carries its reading (*"a place you can afford and enter but cannot keep is
+  not a destination"*) and caveats (place-level risk; 2022 model vs 2024
+  prices; CA eviction signal out-of-sample), and `afford_capacity()` gains
+  the funnel's last columns: `per100_stable_dest` and
+  `per100_open_entry_stable` (openings that are entry-affordable **and**
+  stability-weighted).
+
+* **The HPRM jurisdiction map.** `nt_hprm_map()` renders scored HPRM tract
+  data as the report-page embed: switchable choropleth layers for displacement
+  risk (EDR), eviction risk (EER), the 0–8 composite, and divergence
+  (convergent / EDR-dominant / EER-dominant), each with its legend and rich
+  per-tract popup, the jurisdiction boundary framed on top, water erased and
+  the basemap decluttered by default. `nt_hprm_pal()` exposes the canonical
+  tier colors so interactive maps and static exports read identically.
+
 * **`nt_declutter_basemap()`** — hides the basemap's decorative land tints
   (parks, landcover, hillshade, ...) that wash out semi-transparent
   choropleth fills, leaving roads, water, and labels intact. On by default in

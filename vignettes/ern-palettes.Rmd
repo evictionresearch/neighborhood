@@ -182,6 +182,9 @@ diverging pair, with no alarm on either pole:
 scale_fill_ern_div("gold", midpoint = 0)
 ```
 
+Every fill scale has a color twin — `scale_color_ern_div()` (and the British
+`scale_colour_ern_div()` alias) work identically for point and line aesthetics.
+
 ## The interactive charts and maps
 
 Every `nt_*` chart takes a `palette` argument, and `ern_palette()` hands the

@@ -425,6 +425,34 @@ calls `nt_pmtiles()` under the hood with `layer = "nt"` and wires the source for
 you, so you rarely need the explicit three-step form above unless you want to host
 the archive separately.
 
+## 8. The model-driver plots: `nt_pd_plot()` and `nt_pd_bart()`
+
+The maps show *where* precarity concentrates; the partial-dependence plots show
+*why the model thinks so*. `nt_pd_plot()` draws the house figure used for the
+HPRM EDR/EER driver plates — the posterior-mean partial-dependence curve with
+its credible ribbon, over a frequency histogram of the predictor — so a reader
+sees both the modeled relationship and where the data actually sit.
+
+`nt_pd_plot()` is model-agnostic: it takes a tidy PD table (predictor value,
+mean, lower, upper) plus the observed predictor values, and needs no Java.
+
+```{r}
+# pd: a tidy table with columns value / mean / lower / upper
+# obs: the observed predictor values (for the frequency panel)
+nt_pd_plot(pd, obs,
+           xlab = "Median rent",
+           ylab = "Partial effect on displacement risk")
+```
+
+`nt_pd_bart()` is the bridge that *computes* that table from a fitted
+`bartMachine` model (server-side only: it needs the `bartMachine` package and a
+Java runtime — which is why the plotting is split out):
+
+```{r}
+pd <- nt_pd_bart(fit, "med_rent")   # posterior PD table from the fitted model
+nt_pd_plot(pd, training_data$med_rent)
+```
+
 ## Acknowledgments
 
 Mapping is built on Kyle Walker's **mapgl** and **tidycensus**; tiles use

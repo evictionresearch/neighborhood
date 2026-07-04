@@ -280,18 +280,80 @@ verdict_map(atl_v)
 
 ---
 
-# Pane 2 — availability at entry prices, first build (King County)
+# The three panes: affordability → availability → stability
 
 ```{r pane2_data, include=FALSE}
+options(timeout = 1200)                      # first-run block downloads are large
 zori   <- afford_zori(quiet = TRUE)          # Zillow ZIP asking rents (cached)
+slim <- function(v) {                        # simplify geometry, keep all columns
+  g <- sf::st_transform(sf::st_geometry(v), 3857)
+  sf::st_geometry(v) <- sf::st_transform(
+    sf::st_simplify(g, dTolerance = 60, preserveTopology = TRUE), 4326)
+  v
+}
 w_king <- nt_zcta_weights("53", "033")       # block-exact ZCTA x tract weights
-king2  <- afford_entry(pe$king, zori, weights = w_king)
-cap2   <- afford_capacity(king2)[afford_capacity(king2)$ami_tier == "VLI", ]
-k_vli  <- king2[king2$ami_tier == "VLI", ]
+# pane 2 (entry) then pane 3 (stability: HPRM displacement + eviction anchors)
+h_stab <- arrow::read_parquet(
+  "/Users/buffalo/data/evictionresearch/hprm/hprm_v5_full_2022.parquet",
+  col_select = c("geoid", "dis_value", "ev_value"))
+king3  <- afford_stability(slim(afford_entry(pe$king, zori, weights = w_king)), h_stab)
+# the other three markets: afford_entry() derives counties from the data and
+# builds its own weights (block pulls are cached by tigris)
+bay3   <- afford_stability(slim(afford_entry(pe$bay, zori)), h_stab)
+tc3    <- afford_stability(slim(afford_entry(tc_raw, zori)), h_stab)
+atl3   <- afford_stability(slim(afford_entry(atl_raw, zori)), h_stab)
+k_vli  <- king3[king3$ami_tier == "VLI", ]
 kv1 <- table(k_vli$verdict); kv2 <- table(k_vli$entry_verdict)
+kv3 <- table(k_vli$stable_cat)
 prem_med <- median(k_vli$entry_premium, na.rm = TRUE)
 prem_p90 <- quantile(k_vli$entry_premium, 0.9, na.rm = TRUE)
 n_fallback <- sum(k_vli$premium_fallback, na.rm = TRUE)
+
+# one synced three-pane row (affordability / entry / stability) per region;
+# the hatch stays on the price panes only -- pane 3's fill IS the risk read
+pane3_row <- function(x3, region, group) {
+  v <- x3[x3$ami_tier == "VLI", ]
+  k1 <- table(v$verdict); k2 <- table(v$entry_verdict); k3 <- table(v$stable_cat)
+  nt_map_sync(
+    afford_map(x3, "VLI", displacement = h,
+               legend_title = "verdict at incumbent prices"),
+    afford_map(x3, "VLI", verdict_col = "entry_verdict", displacement = h,
+               legend_title = "entry verdict (asking prices)"),
+    afford_map(x3, "VLI", verdict_col = "stable_cat"),
+    group = group, height = 500,
+    titles = c(sprintf("%s — 1 · affordability", region),
+               "2 · availability at entry",
+               "3 · stability"),
+    subtitles = c(
+      sprintf("what sitting tenants pay — a / r / n: %d / %d / %d",
+              k1[[1]], k1[[2]], k1[[3]]),
+      sprintf("what the door costs today — a / r / n: %d / %d / %d (median premium %.2fx)",
+              k2[[1]], k2[[2]], k2[[3]], median(v$entry_premium, na.rm = TRUE)),
+      sprintf("can they stay? (HPRM; no hatch — the fill is the risk) — s / e / p: %d / %d / %d",
+              k3[[1]], k3[[2]], k3[[3]])))
+}
+pane2_cap <- function(x3) {
+  cp <- afford_capacity(x3)
+  knitr::kable(dplyr::transmute(cp[cp$ami_tier == "VLI", ],
+    `affordable per 100 (standing)`  = round(per100_affordable, 1),
+    `open per year, per 100`         = round(per100_open_year, 1),
+    `affordable per 100 (at entry)`  = round(per100_entry, 1),
+    `open AND entry-affordable, per 100/yr` = round(per100_open_entry_year, 1),
+    `...AND stability-weighted, per 100/yr` = round(per100_open_entry_stable, 1)))
+}
+p2stats <- function(x3) {
+  v <- x3[x3$ami_tier == "VLI", ]
+  cp <- afford_capacity(x3)
+  list(prem = median(v$entry_premium, na.rm = TRUE),
+       fb = sum(v$premium_fallback, na.rm = TRUE), n = nrow(v),
+       v1 = table(v$verdict), v2 = table(v$entry_verdict),
+       s = table(v$stable_cat),
+       cap = as.data.frame(cp[cp$ami_tier == "VLI", ]))
+}
+k_cap <- p2stats(king3)$cap
+bs <- p2stats(bay3); ts <- p2stats(tc3); as_ <- p2stats(atl3)
+saveRDS(list(king = p2stats(king3), bay = bs, tc = ts, atl = as_),
+  "/private/tmp/claude-501/-Users-buffalo-git-evictionresearch-neighborhood/fece173f-44e2-4643-a35a-5414bacdc86b/scratchpad/pane2_regions.rds")
 ```
 
 Pane 1 prices each tract at what **sitting tenants** pay. Pane 2 re-prices it at **entry**: every
@@ -301,46 +363,84 @@ housing-unit weights (`nt_zcta_weights()`) — and the tract's rent distribution
 before the same 30%/50% verdict is applied (`afford_entry()`). King County's median entry premium
 is **`r sprintf("%.2f", prem_med)`x** (90th percentile `r sprintf("%.2f", prem_p90)`x;
 `r n_fallback` of `r nrow(k_vli)` tracts fell back to the area-median premium for thin listing
-coverage). The pair below is synced — pan to any neighborhood and read both prices at once.
+coverage). The third map is **stability** (`afford_stability()`: HPRM displacement + eviction
+risk on the published anchors, equal-weighted): whoever gets in — can they *stay*? Each row of
+three is synced — pan to any neighborhood and read all three at once.
 
 ```{r pane2_maps}
-nt_map_sync(
-  afford_map(king2, "VLI", displacement = h,
-             legend_title = "verdict at incumbent prices"),
-  afford_map(king2, "VLI", verdict_col = "entry_verdict", displacement = h,
-             legend_title = "entry verdict (asking prices)"),
-  group = "king2", height = 540,
-  titles = c("Pane 1 — affordability: what sitting tenants pay",
-             "Pane 2 — availability: what the door costs today"),
-  subtitles = c(
-    sprintf("verdict a / r / n: %d / %d / %d", kv1[[1]], kv1[[2]], kv1[[3]]),
-    sprintf("entry verdict a / r / n: %d / %d / %d — green shrinks %d%%, red grows %d%%",
-            kv2[[1]], kv2[[2]], kv2[[3]],
-            round(100 * (1 - kv2[[1]] / kv1[[1]])),
-            round(100 * (kv2[[3]] / kv1[[3]] - 1)))))
+pane3_row(king3, "King County", "king2")
 ```
 
 ```{r pane2_caption}
 afford_caption("VLI", pane = "availability")
 ```
 
-**The capacity line, standing vs entry (VLI renters, King County):**
-
-```{r pane2_cap}
-knitr::kable(dplyr::transmute(cap2,
-  `affordable per 100 (standing)`  = round(per100_affordable, 1),
-  `open per year, per 100`         = round(per100_open_year, 1),
-  `affordable per 100 (at entry)`  = round(per100_entry, 1),
-  `open AND entry-affordable per year, per 100` = round(per100_open_entry_year, 1)))
+```{r pane3_caption}
+afford_caption("VLI", pane = "stability")
 ```
 
-Read the last cell as the pane-2 sentence: *of every 100 VLI renter households in King County,
-about `r round(cap2$per100_open_entry_year)` could find a unit this year that both opens up and
-rents at ≤ 30% of their income at today's asking prices* — before competition (a cheap unit
-occupied by a higher-income household still counts; the CHAS layer is next) and before
-screening. One honest note: the earlier ZIP-level teaser (6 of 69 ZIPs asking-affordable)
-compared listing *levels* to the cost line; this model shifts each tract's own rent
-*distribution* by its premium, which is the defensible estimate — the wedge is real
+**The capacity funnel (VLI renters, King County):**
+
+```{r pane2_cap}
+pane2_cap(king3)
+```
+
+Read the row left to right as the funnel: *of every 100 VLI renter households in King County,
+the standing stock could house `r round(k_cap$per100_affordable)` at ≤ 30% of income; only
+`r round(k_cap$per100_open_year)` of those units open in a year;
+`r round(k_cap$per100_open_entry_year)` open **and** rent at ≤ 30% at today's asking prices; and
+weighting by stability leaves about `r round(k_cap$per100_open_entry_stable)` openings a year in
+neighborhoods a household can also hold onto* — before competition (a cheap unit occupied by a
+higher-income household still counts; the CHAS layer is next) and before screening. One honest
+note: the earlier ZIP-level teaser (6 of 69 ZIPs asking-affordable) compared listing *levels* to
+the cost line; this model shifts each tract's own rent *distribution* by its premium, which is
+the defensible estimate — the wedge is real
 (green −`r round(100 * (1 - kv2[[1]] / kv1[[1]]))`%, red +`r round(100 * (kv2[[3]] / kv1[[3]] - 1))`%)
 but smaller than the teaser implied. Method, validation plan, and caveats:
 `dev/availability-design.md`.
+
+## The same three panes, three more markets
+
+Same construction everywhere (each region's own ZIP premiums, block-exact weights, the same
+verdict and stability grammar; each row is synced independently).
+
+### 9-county Bay Area
+
+*(Median entry premium `r sprintf("%.2f", bs$prem)`x; `r bs$fb` of `r bs$n` tracts on the
+fallback premium. Cutoffs: the FMR-era ACS-HUD reproduction, pulled 2026-07-01. Stability note:
+California's eviction signal (EER) is out-of-sample — the displacement side carries the read.)*
+
+```{r pane2_bay}
+pane3_row(bay3, "Bay Area", "bay2")
+```
+
+```{r pane2_bay_cap}
+pane2_cap(bay3)
+```
+
+### Twin Cities, MN — 7-county metro
+
+*(Median entry premium `r sprintf("%.2f", ts$prem)`x; `r ts$fb` of `r ts$n` tracts on the
+fallback premium. Cutoffs: `hud_acs`, the HUD-outage fallback — converges with HUD in this
+ordinary-cost market.)*
+
+```{r pane2_tc}
+pane3_row(tc3, "Twin Cities", "tc2")
+```
+
+```{r pane2_tc_cap}
+pane2_cap(tc3)
+```
+
+### Atlanta metro, GA — Fulton, DeKalb, Cobb, Gwinnett
+
+*(Median entry premium `r sprintf("%.2f", as_$prem)`x; `r as_$fb` of `r as_$n` tracts on the
+fallback premium. Cutoffs: exact HUD snapshot.)*
+
+```{r pane2_atl}
+pane3_row(atl3, "Atlanta", "atl2")
+```
+
+```{r pane2_atl_cap}
+pane2_cap(atl3)
+```

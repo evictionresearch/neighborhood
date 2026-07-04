@@ -4,12 +4,16 @@
 \alias{afford_caption}
 \title{The standard reading and "what ifs" for the verdict maps}
 \usage{
-afford_caption(tier = "VLI", pane = c("affordability", "availability"))
+afford_caption(
+  tier = "VLI",
+  pane = c("affordability", "availability", "stability")
+)
 }
 \arguments{
 \item{tier}{Tier label used in the text (default \code{"VLI"}).}
 
-\item{pane}{\code{"affordability"} (default) or \code{"availability"}.}
+\item{pane}{\code{"affordability"} (default), \code{"availability"}, or
+\code{"stability"}.}
 }
 \value{
 An \code{htmltools} tag; place it under the map (e.g.
@@ -22,7 +26,7 @@ The caption block that must travel with \code{\link[=afford_map]{afford_map()}},
 how much a \code{tier} household will pay if they can move in there"}), the
 locked red-class descriptor (\emph{"even at the rents current tenants pay, a
 \code{tier} family would give up more than half their income in these
-neighborhoods — and entry prices run higher still"}), and the three
+neighborhoods -- and entry prices run higher still"}), and the three
 assumptions: \strong{if they can move in} (price-only), \strong{at incumbent prices}
 (entry runs higher), \strong{at the top of the tier's income range}.
 
@@ -31,6 +35,13 @@ assumptions: \strong{if they can move in} (price-only), \strong{at incumbent pri
 neighborhood today"}) and its assumptions: \strong{if a unit opens and they are
 accepted}, \strong{asking rents are estimated} (ZIP index shifted to tracts),
 and \strong{competition is not yet netted out} (the CHAS adjustment).
+
+\strong{\code{pane = "stability"}} (pane 3, \code{\link[=afford_stability]{afford_stability()}}): the staying
+reading (\emph{"this is whether a \code{tier} household that gets in can
+stay"}, on HPRM's published displacement + eviction anchors) and its
+assumptions: \strong{place-level risk, not a personal guarantee}, \strong{a 2022
+model against 2024 prices}, and \strong{California's eviction signal is
+out-of-sample} (lean on the displacement side there).
 }
 \seealso{
 \code{\link[=afford_map]{afford_map()}}, \code{\link[=afford_entry]{afford_entry()}}

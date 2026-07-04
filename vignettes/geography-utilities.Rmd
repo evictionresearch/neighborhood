@@ -1,0 +1,98 @@
+---
+title: "Geography utilities: crosswalks and cleaner tract maps"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Geography utilities: crosswalks and cleaner tract maps}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+Census tracts are the package's analysis unit, but the questions rarely stop at
+tract lines: cities want *their* numbers, rent indexes arrive by ZIP, PUMS
+microdata arrives by PUMA, and coastal tracts drag their maps into the water.
+Four small utilities handle the plumbing. All of them exist so that estimates
+can move **between geographies without areal hand-waving** — wherever possible
+the weights are built on census *blocks*, which nest exactly inside the larger
+units.
+
+## `nt_areal_weight()` — tracts ↔ places, block-exact
+
+*"What are Redwood City's numbers?"* is not "the tracts inside Redwood City" —
+tracts straddle municipal limits. `nt_areal_weight()` computes, for every
+(place, tract) overlap, the share of the tract's population / housing units /
+land that falls inside the place, using decennial blocks as the weighting
+surface. Because 2020 blocks nest within both 2020 tracts and 2020 places, the
+fractions are exact, not approximations.
+
+```{r}
+library(neighborhood)
+
+w <- nt_areal_weight("CA", "San Mateo",
+                     places = c("Redwood City", "San Mateo"))
+
+# population-weight any tract-level estimate onto the city:
+library(dplyr)
+w |>
+  left_join(tract_estimates, by = c("tract_geoid" = "GEOID")) |>
+  group_by(place_name) |>
+  summarise(renters_in_city = sum(renters_e * frac_pop, na.rm = TRUE))
+```
+
+By default only *incorporated* places (LSAD 25) are kept, which drops
+census-designated places for free. Multiply a tract estimate by `frac_pop`
+(or `frac_hu`, `frac_area`) and aggregate — that is the whole workflow.
+
+## `nt_zcta_weights()` — ZIPs → tracts, the same way
+
+The same block-exact idea, pointed at ZIP Code Tabulation Areas. This is the
+crosswalk under the affordability product's entry-price layer
+(`vignette("three-panes")`): Zillow's asking-rent index is ZIP-level, tracts
+are the analysis unit, and 2020 blocks nest inside both.
+
+```{r}
+w <- nt_zcta_weights("53", "033")     # King County
+head(w[, c("zcta", "tract_geoid", "frac_hu")])
+```
+
+`frac_hu` sums to ~1 over each tract, so a tract-level version of any ZIP-level
+quantity is a housing-unit-weighted average of its ZIPs. The first call
+downloads the national ZCTA boundary file through `tigris` (it is not published
+by state) — cache it with `options(tigris_use_cache = TRUE)`; every later call
+is instant.
+
+## `nt_erase_water()` — tracts that stop at the shoreline
+
+Coastal and lakefront tracts legally extend into open water, which makes
+choropleths read as if the bay had a rent burden. `nt_erase_water()` clips the
+water out of an `sf` layer for *display* (the data are untouched):
+
+```{r}
+balt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE) |>
+  nt_erase_water()
+nt_map(balt)
+```
+
+Use it on the mapping copy only — never re-weight estimates by the clipped
+areas.
+
+## `get_co_puma()` — counties ↔ PUMAs
+
+PUMS microdata lives on Public Use Microdata Areas. Urban counties contain
+several PUMAs; rural PUMAs contain several counties. `get_co_puma()` returns
+the county↔PUMA correspondence so microdata summaries can be carried to
+counties (and, since tracts nest in PUMAs, aggregated tract work can meet
+microdata halfway).
+
+```{r}
+cw <- get_co_puma(state = "CA")
+```
+
+## See also
+
+- `vignette("three-panes")` — where `nt_zcta_weights()` earns its keep (the
+  entry-price layer).
+- `vignette("mapping-with-maplibre")` — the mapping toolkit these feed.

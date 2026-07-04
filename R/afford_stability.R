@@ -85,7 +85,8 @@
 #'   `stability`, `eer_out_of_sample`, `attainable` (the availability count fed
 #'   to the gate), `stable_dest` (`attainable * stability` -- the continuous
 #'   headline), `stable` (logical hard filter), and `stable_cat` (a
-#'   stable/elevated/precarious factor).
+#'   stable/elevated/precarious factor). Re-running on a result that already
+#'   carries these columns simply recomputes them (idempotent).
 #' @seealso [afford_index()], [afford_bands()]
 #' @examples \dontrun{
 #' idx <- afford_index("53", "033", 2024, tenure = "rent")        # King County
@@ -106,6 +107,13 @@ afford_stability <- function(x, hprm,
   if (!is.data.frame(x) || !"GEOID" %in% names(x))
     stop("`x` must be an afford_index() result (with a GEOID column).", call. = FALSE)
   stopifnot(edr_weight >= 0, edr_weight <= 1, caution_cut <= stable_cut)
+
+  # idempotent: re-running on a prior result (or any frame that already carries
+  # stability columns) replaces them instead of creating .x/.y join collisions
+  stale <- intersect(names(x), c("dis_value", "ev_value", "s_edr", "s_eer",
+                                 "stability", "eer_out_of_sample", "attainable",
+                                 "stable_dest", "stable", "stable_cat"))
+  if (length(stale)) x <- x[, setdiff(names(x), stale)]
 
   h <- .afi_hprm_fields(hprm)
   clamp01 <- function(v) pmin(pmax(v, 0), 1)

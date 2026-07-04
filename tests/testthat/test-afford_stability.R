@@ -39,6 +39,21 @@ test_that("availability = 'none' uses accessible and CA is flagged out-of-sample
   expect_equal(turn$eer_out_of_sample, c(TRUE, FALSE)) # 06 = California
 })
 
+test_that("re-running on a prior result recomputes instead of colliding", {
+  x <- data.frame(GEOID = c("A", "B"), accessible = c(100, 100),
+                  available_turnover = c(10, 10), supply = c(0.5, 0.5))
+  hp <- data.frame(GEOID = c("A", "B"), dis_value = c(50, -300),
+                   ev_value = c(0.8, 2.0))
+  once <- afford_stability(x, hp)
+  twice <- afford_stability(once, hp)
+  expect_identical(twice, once)                       # idempotent
+  expect_false(any(grepl("\\.x$|\\.y$", names(twice))))
+  # and stale columns are genuinely recomputed, not kept
+  hp2 <- hp; hp2$dis_value <- c(-300, -300); hp2$ev_value <- c(2, 2)
+  re <- afford_stability(once, hp2)
+  expect_equal(re$stability, c(0, 0))
+})
+
 test_that("missing availability columns raise a helpful error", {
   x <- data.frame(GEOID = "A", accessible = 100, supply = 0.5)  # no available_turnover
   hp <- data.frame(GEOID = "A", dis_value = 50, ev_value = 0.8)

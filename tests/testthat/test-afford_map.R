@@ -60,6 +60,27 @@ test_that("verdict_col switches panes; declutter hook is on by default", {
                "entry_verdict")
 })
 
+test_that("verdict_col = stable_cat renders the stability verdict", {
+  t5 <- toy_sf
+  t5$stable_cat <- factor(c("stable", "elevated", "precarious"),
+                          levels = c("stable", "elevated", "precarious"))
+  m <- afford_map(t5, verdict_col = "stable_cat")
+  html <- wtags(m)
+  expect_true(grepl("Stable (≥0.8)", html, fixed = TRUE))
+  expect_true(grepl("stability verdict (can they stay?)", html, fixed = TRUE))
+  expect_error(afford_map(toy_sf, verdict_col = "stable_cat"),
+               "afford_stability")
+  t5$stable_cat <- c("yes", "no", "maybe")   # unknown class set
+  expect_error(afford_map(t5, verdict_col = "stable_cat"), "must hold")
+})
+
+test_that("afford_caption has a stability pane", {
+  html <- as.character(afford_caption("VLI", pane = "stability"))
+  expect_true(grepl("gets in can stay", html, fixed = TRUE))
+  expect_true(grepl("cannot keep is not a destination", html, fixed = TRUE))
+  expect_true(grepl("out-of-sample", html, fixed = TRUE))
+})
+
 test_that("afford_caption has an availability pane", {
   html <- as.character(afford_caption("VLI", pane = "availability"))
   expect_true(grepl("move into this neighborhood today", html, fixed = TRUE))

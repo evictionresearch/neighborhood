@@ -44,7 +44,8 @@ destination (default \code{0.8}, ~ HUD "At Risk or better").}
 \code{stability}, \code{eer_out_of_sample}, \code{attainable} (the availability count fed
 to the gate), \code{stable_dest} (\code{attainable * stability} -- the continuous
 headline), \code{stable} (logical hard filter), and \code{stable_cat} (a
-stable/elevated/precarious factor).
+stable/elevated/precarious factor). Re-running on a result that already
+carries these columns simply recomputes them (idempotent).
 }
 \description{
 Joins ERN's Housing Precarity Risk Model (HPRM) onto an \code{\link[=afford_index]{afford_index()}}

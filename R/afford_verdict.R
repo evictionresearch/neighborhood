@@ -122,6 +122,8 @@ afford_capacity <- function(x) {
   has_av <- all(c("available_turnover", "available_vacancy") %in% names(x))
   has_en <- "accessible_entry" %in% names(x)
   has_eo <- "available_entry_turnover" %in% names(x)
+  has_sd <- "stable_dest" %in% names(x)
+  has_es <- all(c("available_entry_turnover", "stability") %in% names(x))
 
   out <- dplyr::summarize(dplyr::group_by(x, tenure, ami_tier),
     n_tracts         = dplyr::n_distinct(GEOID),
@@ -137,6 +139,11 @@ afford_capacity <- function(x) {
       if (has_en) sum(accessible_entry, na.rm = TRUE) else NA_real_,
     open_entry_per_year =
       if (has_eo) sum(available_entry_turnover, na.rm = TRUE) else NA_real_,
+    stable_dest_per_year =
+      if (has_sd) sum(stable_dest, na.rm = TRUE) else NA_real_,
+    open_entry_stable_per_year =
+      if (has_es) sum(available_entry_turnover * stability, na.rm = TRUE)
+      else NA_real_,
     .groups = "drop")
 
   per100 <- function(units) ifelse(out$tier_households > 0,
@@ -147,6 +154,8 @@ afford_capacity <- function(x) {
   out$per100_open_now   <- per100(out$open_now)
   out$per100_entry      <- per100(out$affordable_entry_units)
   out$per100_open_entry_year <- per100(out$open_entry_per_year)
+  out$per100_stable_dest <- per100(out$stable_dest_per_year)
+  out$per100_open_entry_stable <- per100(out$open_entry_stable_per_year)
   out$shortfall         <- out$tier_households - out$affordable_units
 
   keep <- c("tenure", "ami_tier", "n_tracts", "tier_households",
@@ -155,6 +164,8 @@ afford_capacity <- function(x) {
     if (has_av) c("open_per_year", "per100_open_year",
                   "open_now", "per100_open_now", "tracts_lt1_open"),
     if (has_en) c("affordable_entry_units", "per100_entry"),
-    if (has_eo) c("open_entry_per_year", "per100_open_entry_year"))
+    if (has_eo) c("open_entry_per_year", "per100_open_entry_year"),
+    if (has_sd) c("stable_dest_per_year", "per100_stable_dest"),
+    if (has_es) c("open_entry_stable_per_year", "per100_open_entry_stable"))
   out[, keep]
 }

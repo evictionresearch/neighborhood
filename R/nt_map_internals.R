@@ -70,6 +70,19 @@
 )
 .ern_font <- "Inter, -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif"
 
+# 5-class HPRM risk scheme: the brand tint as the no-risk floor ("Lower" /
+# score 0 -- the light blue of the report pages' scale plate, whose CSS cells
+# .c0-.c4 carry these exact five colors), then .ern_ramp for the four elevated
+# tiers. Everything derives from the ern_palette() tokens (brand tint + ramp)
+# so the interactive maps, page CSS, and static exports can never drift apart.
+# Consumed by nt_hprm.R; defined HERE, below the tokens it derives from,
+# because nt_hprm.R sources first in alphabetical collation.
+.hprm_ramp5 <- c(.ern_brand$tint, .ern_ramp)
+
+# HPRM 0-8 composite bins share the scheme: 0 = tint (no component registered),
+# then the four ramp colors.
+.hprm_composite_colors <- .hprm_ramp5
+
 # Default qualitative series palette for charts, brand triad first: blue navy
 # (the editorial trend line), brand red, then supporting tones. Ordered so the
 # first four -- the common chart sizes -- are the most colorblind-separable

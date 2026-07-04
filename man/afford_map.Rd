@@ -18,26 +18,25 @@ afford_map(
 }
 \arguments{
 \item{x}{An \code{\link[=afford_index]{afford_index()}} result with geometry (\code{geometry = TRUE}) and a
-\code{verdict} column (\code{\link[=afford_verdict]{afford_verdict()}}; derived automatically when \code{supply}
-\itemize{
-\item \code{supply_stretch} are present).
-}}
+\code{verdict} column (\code{\link[=afford_verdict]{afford_verdict()}}; derived automatically when both
+\code{supply} and \code{supply_stretch} are present).}
 
 \item{tier}{Which AMI tier to map (default \code{"VLI"}, the pilot group).}
 
 \item{verdict_col}{Which verdict column to render: \code{"verdict"} (default,
-pane 1 -- incumbent prices) or \code{"entry_verdict"} (pane 2 -- entry prices,
-from \code{\link[=afford_entry]{afford_entry()}}). Any column holding the three verdict classes
-works.}
+pane 1 -- incumbent prices), \code{"entry_verdict"} (pane 2 -- entry prices,
+from \code{\link[=afford_entry]{afford_entry()}}), or \code{"stable_cat"} (pane 3 -- stability, from
+\code{\link[=afford_stability]{afford_stability()}}; stable / elevated / precarious take the same
+green / yellow / salmon). Any column holding either class set works.}
 
 \item{displacement}{Optional displacement layer for the red hatch: a
 data.frame (or \code{.parquet}/\code{.rds} path) with \code{GEOID}/\code{geoid} and either
-\code{dis_group} (hatched where non-\code{NA} — any income group at risk, the HPRM
+\code{dis_group} (hatched where non-\code{NA} -- any income group at risk, the HPRM
 convention) or \code{dis_value} (hatched where \verb{< 0}).}
 
-\item{colors}{Three fill colors, in class order affordable / roughly / not
+\item{colors}{Three fill colors, in class order good / middle / bad
 (default the report palette: green \verb{#74b56e}, pale yellow \verb{#fbf2b4},
-salmon \verb{#f4a582}).}
+salmon \verb{#f4a582} -- shared by all three panes).}
 
 \item{legend_title}{Legend title; default \code{"verdict for a <tier> household"}
 (\code{"entry verdict ..."} when \code{verdict_col = "entry_verdict"}).}
@@ -45,7 +44,7 @@ salmon \verb{#f4a582}).}
 \item{height}{Optional map height in CSS pixels.}
 
 \item{declutter}{Hide the basemap's decorative land tints (parks,
-landcover, hillshade) that wash out the fills — see
+landcover, hillshade) that wash out the fills -- see
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}}. Default \code{TRUE}.}
 
 \item{...}{Passed to \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} via \code{\link[=nt_map]{nt_map()}} (e.g. \code{popup},
@@ -53,17 +52,26 @@ landcover, hillshade) that wash out the fills — see
 under the basemap's water and labels).}
 }
 \value{
-A \code{maplibregl} htmlwidget — composable with \code{\link[=nt_map_sync]{nt_map_sync()}}.
+A \code{maplibregl} htmlwidget -- composable with \code{\link[=nt_map_sync]{nt_map_sync()}}.
 }
 \description{
+Renders one AMI tier of an \code{\link[=afford_verdict]{afford_verdict()}} result as the headline
+affordability map: a three-class categorical MapLibre choropleth --
+\strong{Affordable (at or under 30 percent of income) / Roughly affordable
+(30-50 percent) / Not affordable (over 50 percent)} -- in the house
+verdict palette, optionally
+with a red displacement hatch on top. The plain reading: \emph{this is how much
+a household at the tier's income limit will pay if they can move in there.}
 
+Pair it with \code{\link[=afford_caption]{afford_caption()}}, which states that reading and the "what
+ifs" the map assumes; those caveats must travel with the figure.
 }
 \details{
 The locked descriptor for the red class (VLI): \emph{"even at the rents current
 tenants pay, a VLI family would give up more than half their income in
-these neighborhoods — and entry prices run higher still."} The map prices
+these neighborhoods -- and entry prices run higher still."} The map prices
 tracts at what \strong{current tenants} pay (ACS gross rent, utilities
-included), so it \emph{understates} the cost of entry — asking rents on the
+included), so it \emph{understates} the cost of entry -- asking rents on the
 units that actually open run higher. It is \strong{price-only} (pane 1): it says
 nothing about whether a unit is open (availability, pane 2) or whether a
 household can stay (stability, pane 3).
@@ -89,10 +97,13 @@ Other ern_maps:
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
+\code{\link[=nt_hprm_map]{nt_hprm_map()}},
+\code{\link[=nt_hprm_pal]{nt_hprm_pal()}},
 \code{\link[=nt_layers_control]{nt_layers_control()}},
 \code{\link[=nt_map]{nt_map()}},
 \code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
-\code{\link[=nt_pmtiles]{nt_pmtiles()}}
+\code{\link[=nt_pmtiles]{nt_pmtiles()}},
+\code{\link[=nt_tract_interpolate]{nt_tract_interpolate()}}
 }
 \concept{ern_maps}

@@ -33,6 +33,8 @@ reference:
       - nt_map
       - nt_map_sync
       - nt_declutter_basemap
+      - nt_hprm_map
+      - nt_hprm_pal
       - nt_maplibre
       - nt_add_choropleth
       - nt_add_labels
@@ -86,4 +88,6 @@ articles:
       - ern-palettes
       - precarity-mapping
       - neighborhood-typologies
+      - three-panes
       - affordability-index
+      - geography-utilities

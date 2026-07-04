@@ -37,6 +37,12 @@ three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette
 supply engine) plus the first availability measures of **Gate 2** (`availability = TRUE`); the
 *Allowed* gate (discrimination, voucher rejection, eviction-record screening) is future work.
 
+> **This is the engine-room vignette.** The finished *product* built on this engine — the
+> three-pane maps and funnel (**affordability → availability → stability**: `afford_verdict()`,
+> `afford_entry()`, `afford_stability()`, `afford_capacity()`, `afford_map()`) — is explained,
+> simple-first, in `vignette("three-panes")`. Read that one to interpret the maps; read this one
+> to understand and control the numbers underneath.
+
 > **Note — two implementations, lead with the new one.** `afford_index()` is the rebuilt **v2
 > engine** and the recommended entry point. `afford()` is the original v1 implementation, kept for
 > backward compatibility and documented in an appendix at the end. New work should use
@@ -456,6 +462,26 @@ ami_cutoffs("CA", "San Francisco", 2024,
 Each `cut_<TIER>` is exactly the `income_cutoff` that `afford_index()` uses for that tier in that
 county. Inspecting it is the fastest sanity check on a region's results: if the dollar ceilings look
 wrong, the supply numbers will too.
+
+## `hud_ami()` — just the AMI level, with provenance
+
+When all you need is *the AMI number itself* — no tier ceilings — `hud_ami()` is the standalone
+puller: one row per county × year, vectorized over `years`, with an `ami_source` column recording
+which source actually filled each row (under `"auto"` every year resolves independently, so a
+multi-year pull can mix sources — filter on the column if that matters).
+
+```{r}
+hud_ami("53", "033")                        # King County, FY2024
+hud_ami("06", "073", years = 2019:2024)     # a time series (sources may mix)
+hud_ami("06", "073", ami_source = "acs")    # the county's own median, Census-only
+```
+
+Two things worth knowing. First, **HUD's geography**: income limits are published for *income
+limit areas* — metros (MSAs, or HUD's HMFA subareas) and non-metro counties — so the returned
+`NAME` is the HUD area the county belongs to (King County answers as the *Seattle-Bellevue HMFA*;
+the Bay Area splits across three HMFAs, so there is no single "Bay Area AMI"). Second, the AMI
+*level* is not household-size adjusted — HUD's size factors apply to the *limits* — so for
+size-adjusted ceilings use `ami_cutoffs()`.
 
 ---
 

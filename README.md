@@ -18,6 +18,90 @@ An R package with various functions to study neighborhood dynamics.
 devtools::install_github("evictionresearch/neighborhood", ref = "main")
 ```
 
+## Function reference (quick)
+
+*A terse index of everything exported; details in the vignettes and help pages.*
+
+**Affordability index** — three panes: affordability → availability → stability
+
+| Function | What it does |
+|---|---|
+| `afford_index()` | The engine: tract-level affordable supply by AMI tier (30%/50% burden lines, vacancy/turnover availability, demand universes) |
+| `afford_bands()` | Difference cumulative tiers into non-overlapping bands (30–50%, 50–80%, …) |
+| `afford_verdict()` | The three-class verdict: affordable / roughly affordable / not affordable |
+| `afford_capacity()` | Units-and-people arithmetic: affordable per 100 tier households, shortfall, openings (standing and at entry) |
+| `afford_map()` | The verdict map (pane 1, or pane 2 via `verdict_col = "entry_verdict"`), optional displacement hatch |
+| `afford_caption()` | The locked reading + "what ifs" block that travels with each pane's map |
+| `afford_entry()` | Pane 2: entry premium (asking ÷ standing rent) re-scores each tract at the door price |
+| `afford_zori()` | Zillow ZIP-level asking-rent index, downloaded once and cached |
+| `afford_stability()` | Pane 3: weight the attainable set by HPRM displacement + eviction stability |
+| `inflow_index()` | Revealed low-income net migration from HPRM (experimental; displacement read only) |
+| `ami_cutoffs()` | AMI tier income ceilings by county (source ladder: HUD snapshot/API → Census reproductions) |
+| `hud_ami()` | Standalone AMI level by county × year, with an `ami_source` provenance column |
+| `afford()` | Legacy v1 engine (superseded; kept for old maps) |
+
+**Neighborhood racial typologies**
+
+| Function | What it does |
+|---|---|
+| `ntdf()` | Build the tract typology data (optionally with geometry) |
+| `ntcheck()` | Typology counts, to decide concatenation |
+| `nt_pal()` | The canonical typology palette |
+
+**Interactive maps (MapLibre)**
+
+| Function | What it does |
+|---|---|
+| `nt_map()` | One-line choropleth of an `sf` layer |
+| `nt_map_sync()` | Two-plus maps side by side with locked (synchronized) views |
+| `nt_maplibre()` | Start a map (basemap, controls, fit to data) |
+| `nt_add_choropleth()` | Add a colored layer + legend + popup/tooltip |
+| `nt_add_labels()` | Add text labels |
+| `nt_layers_control()` | Layer switcher for multi-layer maps |
+| `nt_popup()` | Deterministic HTML popups |
+| `nt_pmtiles()` | PMTiles vector tiles for large/full-US layers |
+| `nt_declutter_basemap()` | Hide park/landcover/hillshade basemap tints under fills |
+
+**Interactive charts (echarts4r)**
+
+| Function | What it does |
+|---|---|
+| `nt_chart()` | Editorial trend/bar/area chart (hover y-axis, baselines, end labels) |
+| `nt_spark()` | Inline sparkline |
+| `nt_bar()` / `nt_lollipop()` | Ranked bars / dot rankings (diverging + grouped variants) |
+| `nt_dumbbell()` / `nt_range()` | Two-point disparity dots / estimate with error whisker |
+| `nt_stacked_bar()` | Composition / 100%-stacked bars |
+| `nt_slope()` / `nt_scatter()` / `nt_waffle()` | Before-after slopes / scatter + trend / unit ("Du Bois") chart |
+
+**Static charts (ggplot2)**
+
+| Function | What it does |
+|---|---|
+| `theme_ern()` | The house ggplot theme |
+| `scale_color_ern()` / `scale_fill_ern()` | Discrete house scales (`_c` continuous, `_div` diverging; `colour` aliases) |
+| `ern_palette()` | The brand palettes (qualitative, sequential, diverging) |
+| `ern_swatch()` | Open the palette sheet with WCAG contrast receipts |
+
+**HPRM maps & model plots**
+
+| Function | What it does |
+|---|---|
+| `nt_hprm_map()` | The jurisdiction-report HPRM map (switchable EDR / EER / composite / divergence layers, boundary framing) |
+| `nt_hprm_pal()` | Canonical colors for the scored HPRM tier vocabularies |
+| `nt_pd_plot()` | Partial-dependence curve + predictor histogram (BART driver plots) |
+| `nt_pd_bart()` | Compute the PD table from a fitted `bartMachine` model |
+
+**Geography utilities & crosswalks**
+
+| Function | What it does |
+|---|---|
+| `get_co_puma()` | County ↔ PUMA crosswalk |
+| `nt_areal_weight()` | Block-exact tract ↔ place population/housing weights |
+| `nt_zcta_weights()` | Block-exact ZCTA → tract housing-unit weights (the ZIP→tract crosswalk) |
+| `nt_erase_water()` | Clip water out of tract geometries for cleaner maps |
+
+**Bundled data:** `us_nt_tracts2024` (typologies for every US tract), `mn_evictions` (MN county-month filings).
+
 ## Neighborhood Racial Typologies Function
 
 The Neighborhood Racial Typologies function is a descriptive, categorical tool to help identify racial and ethnic divides within a region (e.g. city, county, state, etc.). Traditional segregation measures, such as the [disimilarity index](https://en.wikipedia.org/wiki/Index_of_dissimilarity), provide a single measure for a large geographical area. This descripitve function is useful for mapping tract level, small area (e.g. neighborhood level) divisions between ethnic and racial groups.  

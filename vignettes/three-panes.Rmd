@@ -1,0 +1,373 @@
+---
+title: "The three panes: affordability, availability, stability"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The three panes: affordability, availability, stability}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+# Chunks that touch the Census/HUD APIs or big local files are shown, not run.
+# Chunks marked eval=TRUE run offline (bundled snapshot / hand-built frames).
+```
+
+## The simple version
+
+The three-pane product answers one question three times, each time more honestly:
+
+> **Where could a very-low-income family actually live?**
+
+1. **Affordability** — *what would it cost them to live here?* Each tract gets a verdict at the
+   rents **current tenants** pay: **affordable** (the typical unit takes ≤ 30% of their income),
+   **roughly affordable** (30–50% — attainable only by stretching), or **not affordable** (more
+   than half their income).
+2. **Availability** — *could they actually get in?* The same verdict, re-priced at **today's
+   asking rents** (what the door costs, not what sitting tenants pay), reported next to how many
+   units actually **open up** in a year.
+3. **Stability** — *could they stay?* Whether the neighborhood is one a low-income household can
+   hold onto, from ERN's Housing Precarity Risk Model (displacement + eviction risk): **stable /
+   elevated / precarious**.
+
+Each pane is a three-color map — a **verdict, not a gradient** — because policy audiences read
+maps by color, and a continuous scale that renders a place "mid" is read as "there isn't a
+problem." The three maps multiply into one funnel sentence. King County, WA (VLI renters,
+FY2024):
+
+> Of every 100 very-low-income renter households, the standing stock could house **87** at
+> ≤ 30% of income — but only **25** of those units open up in a year, **21** open *and* rent at
+> ≤ 30% at today's asking prices, and weighting by neighborhood stability leaves about **17**
+> openings a year in places a family can also hold onto.
+
+That is the whole product. The rest of this vignette explains each pane in depth — what it
+measures, what it deliberately assumes, and the questions readers actually ask.
+
+```{r, eval = FALSE}
+library(neighborhood)
+
+# The full three-pane chain, one region:
+x <- afford_index("53", "033", 2024, tenure = "rent", geometry = TRUE) |>  # the engine
+  afford_verdict() |>                                    # pane 1: the verdict classes
+  afford_entry(afford_zori()) |>                         # pane 2: re-priced at entry
+  afford_stability("~/data/hprm/hprm_v5_full_2022.parquet")   # pane 3: can they stay?
+
+afford_capacity(x)          # the funnel numbers (per 100 tier households)
+afford_map(x)               # pane-1 map   (verdict at incumbent prices)
+afford_map(x, verdict_col = "entry_verdict")   # pane-2 map (at asking prices)
+afford_map(x, verdict_col = "stable_cat")      # pane-3 map (stability)
+```
+
+---
+
+# Pane 1 — Affordability: what would it cost them to live here?
+
+## What the map is saying
+
+Pick the tier first. The pilot group is **VLI** — very low income, at or below 50% of the Area
+Median Income, HUD's definition. The pane-1 map then says, tract by tract:
+
+> **This is how much a VLI household will pay if they can move in there:** green — the typical
+> unit takes no more than 30% of their income; orange — 30–50% (attainable only by stretching);
+> red — more than half their income.
+
+And for the red class, the locked descriptor:
+
+> **Even at the rents current tenants pay, a VLI family would give up more than half their
+> income in these neighborhoods — and entry prices run higher still.**
+
+Three "what ifs" must travel with every figure, and `afford_caption()` prints them so they are
+never retyped from memory:
+
+```{r, eval = TRUE}
+library(neighborhood)
+afford_caption("VLI")   # the standard reading + what-ifs block, ready to place under a map
+```
+
+## How the verdict is computed
+
+The engine (`afford_index()`, documented in `vignette("affordability-index")`) counts, per
+tract, the rental units affordable to the tier at two burden lines:
+
+- **`burden = 0.30`** — the HUD standard: gross rent (utilities included) at or below 30% of the
+  tier's income ceiling;
+- **`stretch = 0.50`** — HUD's *severe* burden threshold: reachable only by giving up 30–50% of
+  income.
+
+`afford_verdict()` then applies a **tract-majority rule**: a tract is *affordable* when at least
+half its units clear the 30% line, *roughly affordable* when at least half clear the 50% line,
+*not affordable* otherwise. At the default `share_cut = 0.5` each class is literally a
+**median-unit sentence** — "the typical rental here would cost a VLI family more than half its
+income" — which is why the classes survive a city-council meeting.
+
+A hand-built example, small enough to read (this runs offline):
+
+```{r, eval = TRUE}
+toy <- data.frame(
+  GEOID   = c("t-green", "t-orange", "t-red"),
+  tenure  = "rent", ami_tier = "VLI",
+  total   = c(100, 100, 100),
+  accessible = c(62, 20, 4),            # units at <= 30% of the VLI ceiling
+  supply           = c(0.62, 0.20, 0.04),
+  accessible_stretch = c(90, 70, 30),   # units at <= 50% (the stretch line)
+  supply_stretch     = c(0.90, 0.70, 0.30),
+  reg_hh_tier = 1000, reg_hh_total = 4000,
+  available_turnover = c(12, 5, 1), available_vacancy = c(3, 1, 0.2))
+
+v <- afford_verdict(toy)
+v[, c("GEOID", "supply", "supply_stretch", "verdict")]
+```
+
+The middle tract is the instructive one: only 20% of its units clear the 30% line, but 70%
+clear the 50% line — a family *can* get in, by stretching. That "roughly affordable" middle is
+usually the **largest class in every market we have run**, and it is the class a continuous
+blue gradient hides.
+
+## The income side, and where the dollars come from
+
+The verdict hinges on the tier's income ceiling. Those come from `ami_cutoffs()` (five sources,
+most-exact-first) — and the AMI level itself has a dedicated puller. HUD publishes income limits
+for *income limit areas* — metro areas (MSAs or HUD's own HMFA subareas) and non-metropolitan
+counties — so you query by county and the answer arrives from the county's HUD area. This runs
+offline against the bundled FY2024 snapshot:
+
+```{r, eval = TRUE}
+hud_ami("53", "033")   # King County -> the Seattle-Bellevue HMFA's AMI, with provenance
+```
+
+Note the `NAME`: King County's number *is* the Seattle-Bellevue HUD Metro FMR Area's — there is
+no more-local HUD AMI than the area. (The Bay Area splits into three HMFAs, so there is no
+single "Bay Area AMI".) `ami_source = "acs"` swaps in the county's own median family income —
+Census-only, reproducible, but ~13% low in high-cost coastal areas.
+
+## Questions people ask
+
+- **"Does green mean the neighborhood is cheap?"** No — it means *the typical unit is within
+  30% of the VLI income ceiling*. In a high-AMI metro the ceiling is high, so green is relative
+  to the region's own income structure, by design (that is what "affordable to VLI" means).
+- **"But people already live in those cheap units."** Correct, and pane 1 does not pretend
+  otherwise — it prices the *stock*, not the *vacancies*. Whether anything is open is pane 2;
+  whether the cheap units are occupied by higher-income households (they often are) is the
+  planned competition adjustment (NLIHC-style, HUD CHAS data), and until it lands every count is
+  a stated **ceiling**.
+- **"Whose income exactly?"** A household at the **top of the tier's range**
+  (household-size-adjusted). Families deeper in the band give up a larger share for the same
+  unit — so green is "manageable for the best-off VLI household."
+- **"Why 30% and 50%?"** They are the federal standards — cost burden and severe cost burden —
+  which makes the classes defensible in public: no invented thresholds.
+- **"Why not a prettier continuous map?"** Because "0.42 supply share" invites the reader to
+  shrug. The three classes are the finding. (Continuous columns — `supply`, `ratio`, `rate` —
+  are all still in the data for analysts.)
+
+## The other pane-1 outputs
+
+- `afford_bands()` — turns cumulative ceilings into non-overlapping slices (the 30–50% band).
+- `afford_capacity()` — the units-and-people arithmetic (next section).
+- `inflow_index()` — **experimental**: where low-income households appear to be *moving*, from
+  HPRM's net-migration predictions. Its positive tail failed face validity (exclusionary suburbs
+  read as destinations), so use it for the displacement (negative) read only; destinations are
+  measured by affordability + stability, not by it.
+
+---
+
+# Pane 2 — Availability: could they actually get in?
+
+## What the map is saying
+
+Pane 1 prices tracts at what **sitting tenants** pay — including the long-tenured cheap leases a
+mover will never be offered. Pane 2 re-prices every tract at **entry**:
+
+> **This is how much a VLI household will pay to move into this neighborhood today** — the same
+> three classes, priced at today's asking rents instead of what sitting tenants pay.
+
+And its counterpart to the locked descriptor:
+
+> **The door costs more than the rent roll: where the affordability map is green and this one is
+> not, the neighborhood is affordable only to those already in it.**
+
+```{r, eval = TRUE}
+afford_caption("VLI", pane = "availability")
+```
+
+## How the entry re-pricing works
+
+Three steps, three functions:
+
+```{r, eval = FALSE}
+zori <- afford_zori()                    # 1. Zillow's ZIP-level asking-rent index (cached)
+w    <- nt_zcta_weights("53", "033")     # 2. block-exact ZIP -> tract housing-unit weights
+x    <- afford_entry(x, zori, weights = w)   # 3. premium -> entry verdict (weights optional;
+                                             #    afford_entry builds them if omitted)
+```
+
+1. **`afford_zori()`** downloads (once, then caches) Zillow's Observed Rent Index — the smoothed
+   typical **asking rent** of listed units, monthly, ~8,400 ZIPs.
+2. **`nt_zcta_weights()`** crosswalks ZIPs to tracts *exactly*: 2020 census blocks nest inside
+   both 2020 tracts and 2020 ZCTAs, so each tract's housing-unit split across ZIPs is counted,
+   not areally approximated.
+3. **`afford_entry()`** computes each ZIP's **entry premium** — asking rent ÷ the same ZIP's
+   standing rent — brings it to tracts with the housing-unit weights, **shifts the tract's own
+   rent distribution up by it**, and re-applies the same 30/50 verdict grammar
+   (`entry_verdict`). Tracts with thin listing coverage fall back to the study-area median
+   premium and are flagged (`premium_fallback`).
+
+The ratio-shift matters: Zillow's index is the *typical listing* (mid-market), so using its
+level as "the tract's rent" would mis-state the cheap segment. Shifting the tract's own
+distribution keeps cheap tracts cheap — just re-priced to the door.
+
+## What the wedge looks like
+
+Median entry premiums and the verdict shift, VLI renters, computed 2026-07-04 (regenerate via
+`dev/report_style_maps.Rmd` in the source repo):
+
+| Market | median premium | verdict a / r / n, standing → entry |
+|---|---|---|
+| Bay Area (9-county) | **1.24×** | 380 / 1026 / 351 → **95 / 953 / 709** |
+| Twin Cities (7-county) | 1.14× | 433 / 325 / 16 → 267 / 453 / 54 |
+| King County | 1.07× | 139 / 315 / 40 → 87 / 339 / 68 |
+| Atlanta (4-county) | 1.04× | 116 / 627 / 182 → 69 / 636 / 220 |
+
+The premium is metro-specific and it is a *diagnosis*: in the Bay, asking rents run a quarter
+above standing rents (tenure discounts, rent stabilization), so the green class collapses by
+three-quarters at the door — the Bay is affordable mostly to those already housed in it. In
+Atlanta asking ≈ standing (fast-turnover market); its constraint is the scarce standing base,
+not the door. Same red maps, different diseases, different policy prescriptions.
+
+## Questions people ask
+
+- **"Is this Zillow's rent for my tract?"** No — it is your tract's *own* rent distribution,
+  shifted by the ZIP-level asking-vs-standing ratio. Zillow enters only as the shift factor.
+- **"Does it include whether a unit is open?"** Yes — availability is *both* the door price and
+  the door being open. The turnover/vacancy openings from the engine ride along
+  (`available_entry_turnover` = units that open per year **and** are entry-affordable).
+- **"What is still missing?"** Competition (a cheap unit occupied by a higher-income household
+  still counts — the CHAS adjustment is the next layer) and screening (records, credit,
+  vouchers). Both stated on the caption; the counts are ceilings.
+- **"Why do standing and entry disagree most in gentrifying places?"** Because that is where the
+  gap between what incumbents pay and what the market now asks is widest — the premium *is* a
+  gentrification-pressure readout.
+
+---
+
+# Pane 3 — Stability: could they stay?
+
+## What the map is saying
+
+A place you can afford and enter but cannot keep is not a destination. Pane 3 asks whether the
+neighborhood is one a low-income household can *hold onto*, using ERN's Housing Precarity Risk
+Model:
+
+> **This is whether a VLI household that gets in can stay:** green — stable (no measurable
+> displacement and below-average eviction risk, on HPRM's published anchors); orange — elevated
+> risk; red — precarious (High/Extreme displacement or eviction pressure).
+
+```{r, eval = TRUE}
+afford_caption("VLI", pane = "stability")
+```
+
+## How stability is computed
+
+`afford_stability()` joins two HPRM fields onto the result and maps each to a 0–1 score using
+**HPRM's own published risk anchors** — no new thresholds are invented:
+
+- **Displacement** (`dis_value`, the EDR net-migration composite): `+50 → 1.0` (no measurable
+  outflow), `−300` (Extreme) `→ 0`.
+- **Eviction** (`ev_value`, the EER filing-rate ratio): `0.8 → 1.0` (below-average), `2.0`
+  (Extreme) `→ 0`.
+
+`stability` is their weighted blend (`stability_source = "both"`, `"edr"`, or `"eer"`), and
+`stable_cat` cuts it at 0.8 / 0.5 into **stable / elevated / precarious**. The continuous
+headline is `stable_dest = available_turnover × stability` — openings, discounted by how
+holdable the neighborhood is. Offline demonstration on the published anchors:
+
+```{r, eval = TRUE}
+hp <- data.frame(GEOID = c("t-green", "t-orange", "t-red"),
+                 dis_value = c(50, -125, -300),   # +50 -> 1, -125 -> 0.5, -300 -> 0
+                 ev_value  = c(0.8, 1.4, 2.0))    # 0.8 -> 1, 1.4 -> 0.5, 2.0 -> 0
+s <- afford_stability(toy, hp)
+s[, c("GEOID", "stability", "stable_cat", "available_turnover", "stable_dest")]
+```
+
+## Questions people ask
+
+- **"Is this a prediction about my lease?"** No. HPRM is built from individual-level records but
+  published as **tract rates** — it describes the neighborhood's pressure, not any one
+  household's outcome.
+- **"Why does a cheap tract show red?"** That is the finding, not a bug: affordability and
+  instability travel together. Across every market we have measured, the correlation between a
+  tract's affordability and its stability is about **−0.5** — the places a VLI family can afford
+  are systematically the places under the most displacement pressure. That replicated from the
+  published SLC/San Diego reports through the corrected engine.
+- **"California looks different — why?"** The eviction model (EER) was trained without
+  California, so `ev_value` there is out-of-sample (flagged per tract in `eer_out_of_sample`);
+  the displacement side is the robust read. Bay Area maps lean on it.
+- **"Vintage?"** HPRM v5 is fitted on 2022 data; the price panes use 2020–24 ACS and current
+  asking rents — a stated two-year gap.
+
+---
+
+# The funnel: putting the three panes into one table
+
+`afford_capacity()` turns the columns into units-and-people arithmetic — one row per
+tenure × tier, everything per 100 tier households:
+
+```{r, eval = TRUE}
+cp <- afford_capacity(s)   # the toy frame, now carrying stability
+round(as.data.frame(cp[, c("tier_households", "per100_affordable",
+                           "per100_open_year", "per100_stable_dest", "shortfall")]), 1)
+```
+
+On real regions (VLI renters, per 100 households; computed 2026-07-04):
+
+| Market | affordable (standing) | …open per year | …open **and** entry-affordable | …**and** stability-weighted |
+|---|---|---|---|---|
+| King County | 86.8 | 24.8 | 21.0 | **17.4** |
+| Bay Area | 78.6 | 14.8 | 8.3 | **6.5** |
+| Twin Cities | 103.9 | 26.7 | 21.5 | **14.7** |
+| Atlanta | 51.3 | 11.2 | 10.2 | **6.1** |
+
+Read a row left to right and you have the report paragraph: what the stock could hold, what
+opens, what opens at a price a mover can pay, and what of *that* sits in neighborhoods they can
+keep. Each market loses most of its funnel at a different stage — the Bay at the door, Atlanta
+at the base, the Twin Cities at stability — which is exactly the kind of distinction a single
+"affordability score" cannot make.
+
+# The maps, together
+
+`afford_map()` renders any pane (`verdict_col = "verdict"` / `"entry_verdict"` /
+`"stable_cat"`), with the plain-language legend, an optional HPRM displacement hatch, and a
+basemap decluttered of park/landcover tints. `nt_map_sync()` locks two or more maps' views
+together, so a reader can pan to one neighborhood and read all three verdicts at once:
+
+```{r, eval = FALSE}
+nt_map_sync(
+  afford_map(x, "VLI", displacement = hprm),
+  afford_map(x, "VLI", verdict_col = "entry_verdict", displacement = hprm),
+  afford_map(x, "VLI", verdict_col = "stable_cat"),
+  titles = c("1 · affordability", "2 · availability at entry", "3 · stability"))
+```
+
+# What the product deliberately does not claim
+
+- **Competition is not yet netted out** — an affordable unit occupied by a higher-income
+  household still counts. Nationally, that adjustment roughly halves the affordable stock for
+  the lowest incomes (NLIHC's *Gap*: 7.2M ELI-affordable units, 3.8M affordable *and*
+  available). The HUD CHAS tract data is the planned source. Until then: ceilings, and the
+  captions say so.
+- **Screening is outside the measure** — records, credit, vouchers, discrimination ("the scarlet
+  E"). It is the theory's third force and a research program of its own (observed-move
+  calibration against the Data Axle panel).
+- **The verdict is tier-relative** — "affordable to VLI" is a statement about the region's own
+  income structure, not about absolute cheapness. And for broad bands (0–80% AMI) a burden
+  verdict saturates by construction; use the supply-vs-need `ratio`/`rate` classes there and
+  reserve the verdict for the tiers decisions target (VLI/ELI).
+
+## See also
+
+- `vignette("affordability-index")` — the engine underneath: `afford_index()`, `ami_cutoffs()`,
+  every argument, the v1→v2 crosswalk.
+- `vignette("mapping-with-maplibre")` — the mapping toolkit (`nt_map()`, synced maps,
+  decluttering).
+- In the source repo, `dev/affordability-deep-dive.md` (the v1 autopsy and replication),
+  `dev/availability-design.md` (the entry-price layer design), and `dev/report_style_maps.Rmd`
+  (the four-market evaluation document that produced the numbers above).

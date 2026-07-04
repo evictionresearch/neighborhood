@@ -66,6 +66,18 @@ test_that("afford_capacity reports entry columns when present", {
   expect_equal(cp$per100_open_entry_year, 0.925)
 })
 
+test_that("afford_capacity reports the full-funnel stability columns", {
+  toy3 <- toy
+  toy3$available_entry_turnover <- c(6, 3, 0.25, NA)
+  toy3$stability <- c(1, 0.5, 0.8, NA)
+  toy3$stable_dest <- toy3$available_turnover * toy3$stability
+  cp <- afford_capacity(toy3)
+  expect_equal(cp$stable_dest_per_year, 12 * 1 + 6 * 0.5 + 0.5 * 0.8)
+  expect_equal(cp$open_entry_stable_per_year, 6 * 1 + 3 * 0.5 + 0.25 * 0.8)
+  expect_equal(cp$per100_open_entry_stable,
+               (6 + 1.5 + 0.2) / 1000 * 100)
+})
+
 test_that("afford_bands differences the stretch columns too", {
   tb <- data.frame(
     GEOID = "a", tenure = "rent",

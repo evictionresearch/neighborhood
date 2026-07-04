@@ -17,7 +17,7 @@ utils::globalVariables(c(
   "accessible_stretch", "supply_stretch", "cost_cut_stretch",
   # afford_entry() / nt_zcta_weights() NSE columns
   "zcta", "premium", "coverage", "premium_fallback", "accessible_entry",
-  "available_entry_turnover",
+  "available_entry_turnover", "stable_dest", "stability",
   # nt_areal_weight() NSE columns
   "NAME", "GEOID20", "POP20", "HOUSING20", "ALAND20", "block", "tract_geoid",
   "pop", "hu", "area", "place_name", "place_geoid", "pop_in", "hu_in",

@@ -627,7 +627,57 @@ leaflet::leaflet(balt) |>
   leaflet::addLegend(pal = pal, values = ~nt_conc)
 ```
 
-## 10. Saving a standalone HTML map
+## 10. Synchronized maps: `nt_map_sync()`
+
+Comparing layers side by side only works if the reader can look at the *same
+place* on every map. `nt_map_sync()` lays two or more maps out in a row and
+locks their views together — pan, zoom, or rotate any one and the others follow
+instantly. Optional per-panel titles and subtitles ride above each map.
+
+```{r}
+md <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+
+nt_map_sync(
+  nt_map(md),                                   # typologies
+  nt_map(md, color = "pBlack"),                 # % Black
+  nt_map(md, color = "pLatine"),                # % Latine
+  titles = c("Neighborhood typologies", "Percent Black", "Percent Latine")
+)
+```
+
+Maps sync within a *group*: each `nt_map_sync()` call gets its own group by
+default, so two rows on one page move independently. To sync maps that are not
+side by side (say, one per report section), give both calls the same `group`:
+
+```{r}
+nt_map_sync(m1, m2, group = "overview")   # row 1
+nt_map_sync(m3, m4, group = "overview")   # elsewhere on the page, same views
+```
+
+The synchronization is plain client-side JavaScript (a shared registry and a
+re-entrancy guard), so it works in R Markdown, Quarto, the RStudio viewer, and
+saved standalone HTML alike. The three-pane affordability comparisons
+(`vignette("three-panes")`) are built on it.
+
+## 11. Decluttering the basemap: `nt_declutter_basemap()`
+
+Basemap styles tint parks, landcover, and hillshade. Under a semi-transparent
+choropleth those tints read as pale washes over your fill colors — a mottled
+"is that a fourth class?" effect. `nt_declutter_basemap()` hides the decorative
+land layers once the style loads, leaving roads, water, boundaries, and labels
+intact (and it never touches layers this package added):
+
+```{r}
+nt_map(md, color = "pBlack") |>
+  nt_declutter_basemap()
+
+# a custom pattern, if a style names its layers differently
+nt_map(md) |> nt_declutter_basemap(pattern = "park|forest|hillshade")
+```
+
+`afford_map()` applies it by default; for any other map it is one pipe step.
+
+## 12. Saving a standalone HTML map
 
 A map is an `htmlwidget`, so a self-contained, shareable HTML file is one call —
 the same kind of artifact the ERN state profiles publish:
@@ -640,7 +690,7 @@ htmlwidgets::saveWidget(m, "baltimore_typologies.html", selfcontained = TRUE)
 For inline (non-PMTiles) maps the file is fully self-contained. PMTiles maps
 additionally need the `.pmtiles` file hosted next to the page.
 
-## 11. When to drop to raw mapgl
+## 13. When to drop to raw mapgl
 
 The `neighborhood` functions cover the common path. Anything they don't expose,
 `mapgl` does — and you never have to leave the pipe to get to it. Reach for
