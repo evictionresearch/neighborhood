@@ -79,10 +79,13 @@ nt_maplibre(md) |>
 engine by Kyle Walker.
 
 Other ern_maps:
+\code{\link[=afford_map]{afford_map()}},
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_layers_control]{nt_layers_control()}},
 \code{\link[=nt_map]{nt_map()}},
+\code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}}
 }
 \concept{ern_maps}

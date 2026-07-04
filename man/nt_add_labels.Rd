@@ -64,9 +64,12 @@ nt_maplibre(md) |>
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}; \code{\link[mapgl:add_symbol_layer]{mapgl::add_symbol_layer()}} underneath.
 
 Other ern_maps:
+\code{\link[=afford_map]{afford_map()}},
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
+\code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_layers_control]{nt_layers_control()}},
 \code{\link[=nt_map]{nt_map()}},
+\code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}}
 }

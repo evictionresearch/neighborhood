@@ -15,6 +15,9 @@ utils::globalVariables(c(
   "rate", "ami", "tier_hh", "tenure", "tenure_grp", "vacancy_rate",
   "turnover_rate", "available_vacancy", "available_turnover",
   "accessible_stretch", "supply_stretch", "cost_cut_stretch",
+  # afford_entry() / nt_zcta_weights() NSE columns
+  "zcta", "premium", "coverage", "premium_fallback", "accessible_entry",
+  "available_entry_turnover",
   # nt_areal_weight() NSE columns
   "NAME", "GEOID20", "POP20", "HOUSING20", "ALAND20", "block", "tract_geoid",
   "pop", "hu", "area", "place_name", "place_geoid", "pop_in", "hu_in",

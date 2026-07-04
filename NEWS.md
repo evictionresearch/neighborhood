@@ -17,6 +17,46 @@
       affordable units per 100 tier households, openings per year (turnover)
       and now (vacancy), and the regional **shortfall** that remains even
       under perfect free sorting. NLIHC-Gap-style, pre-competition-adjustment.
+    - `afford_map()` + `afford_caption()` — pane 1 (of affordability →
+      availability → stability) as a product: the verdict choropleth in the
+      report palette (plain-language legend, optional HPRM displacement
+      hatch, colors stable when a class is absent), and the locked reading
+      that must travel with it — *"this is how much a \[tier\] household will
+      pay if they can move in there"*, the red-class descriptor (*"...and
+      entry prices run higher still"*), and the three "what ifs" (price-only;
+      incumbent prices; the tier's income ceiling).
+    - `hud_ami()` — the standalone AMI puller: one row per county × year with
+      the AMI level HUD anchors its limits on, vectorized over `years`, with
+      an `ami_source` provenance column (under `"auto"` each year resolves
+      independently, so multi-year pulls can mix sources).
+
+* **Pane 2 — availability at entry prices.** Pane 1 prices tracts at what
+  sitting tenants pay; movers face asking rents. Three new functions measure
+  the wedge and re-score at the door: `afford_zori()` (Zillow's ZIP-level
+  asking-rent index, downloaded once and cached), `nt_zcta_weights()`
+  (block-exact ZCTA → tract housing-unit crosswalk: 2020 blocks nest in both
+  2020 tracts and ZCTAs), and `afford_entry()` — each tract gets an **entry
+  premium** (asking ÷ standing rent, HU-weighted from its ZIPs, with a
+  coverage fallback), the rent distribution shifts by it, and the same 30/50
+  verdict grammar applies at entry (`entry_verdict`), plus
+  openings-at-entry counts. `afford_capacity()` gains the per-100-at-entry
+  columns, `afford_map(verdict_col = "entry_verdict")` maps pane 2, and
+  `afford_caption(pane = "availability")` carries its reading and what-ifs.
+  Competition (CHAS) and screening remain the documented next layers.
+
+* **`nt_declutter_basemap()`** — hides the basemap's decorative land tints
+  (parks, landcover, hillshade, ...) that wash out semi-transparent
+  choropleth fills, leaving roads, water, and labels intact. On by default in
+  `afford_map()`; pipe any other map through it.
+
+* **`nt_map_sync()` — synchronized side-by-side MapLibre maps.** Lay two or
+  more maps (`nt_map()` / `nt_maplibre()` / any `mapgl::maplibre()` pipeline)
+  in a row with their views locked together: pan, zoom, or rotate one and the
+  others follow, so the same area reads across layers at once (before/after,
+  two engines, afford × stability). Optional per-panel `titles`/`subtitles`,
+  auto or shared sync `group`s (same `group` syncs maps in different rows).
+  Client-side `jumpTo` with a re-entrancy guard; proven in the v1-vs-v2
+  report-style comparison before promotion.
 
 * **A gallery of editorial chart types.** Seven new `echarts4r`-backed functions
   extend the "newspaper graphic" look (minimal axes, `yaxis = "hover"`, accent

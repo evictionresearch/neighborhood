@@ -15,9 +15,11 @@ where each row set is a non-overlapping slice.}
 A tibble, one row per tenure x tier: \code{n_tracts}, \code{tier_households},
 \code{affordable_units}, \code{per100_affordable}, \code{shortfall} (positive =
 shortage), plus -- when the columns are present -- the stretch-line
-(\code{affordable_stretch_units}, \code{per100_stretch}) and availability
+(\code{affordable_stretch_units}, \code{per100_stretch}), availability
 (\code{open_per_year}, \code{per100_open_year}, \code{open_now}, \code{per100_open_now},
-\code{tracts_lt1_open}) readouts.
+\code{tracts_lt1_open}), and entry-price (\code{\link[=afford_entry]{afford_entry()}}:
+\code{affordable_entry_units}, \code{per100_entry}, \code{open_entry_per_year},
+\code{per100_open_entry_year}) readouts.
 }
 \description{
 The units-and-people arithmetic for an \code{\link[=afford_index]{afford_index()}} result: per tenure x

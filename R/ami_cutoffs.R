@@ -348,3 +348,67 @@ ami_cutoffs <- function(state, counties, year = 2024,
   }
   stop("ami_cutoffs(): no AMI source succeeded under 'auto'.", call. = FALSE)
 }
+
+#' @title Pull the HUD Area Median Income (AMI) by year and location
+#' @description
+#' The standalone AMI puller: one row per county x year with the **AMI level**
+#' HUD anchors its income limits on — no tier ceilings, no joins, just the
+#' number, with provenance. Wraps [ami_cutoffs()] (same source ladder, same
+#' county/name handling) but is vectorized over `years` and records which
+#' source each row actually came from.
+#' @details
+#' What `ami` is depends on the source that filled the row (the `ami_source`
+#' column says which): `"hud"` is HUD's published area median (family) income
+#' for the fiscal year — the number to quote in reports; `"hud_acs"` is the
+#' Census-only reproduction (county `B19113` at FY-2, trended); `"acs_fmr"` /
+#' `"acs"` are the county `B19113` median family income at the ACS `year`.
+#' Under `"auto"` each year resolves independently to the most exact source
+#' available (hud -> hud_acs -> acs_fmr -> acs), so a multi-year pull can mix
+#' sources — filter on `ami_source` if that matters for the analysis.
+#'
+#' The AMI level is not household-size adjusted (size factors apply to the
+#' *limits*, not the median) — for size-adjusted tier ceilings use
+#' [ami_cutoffs()].
+#' @param state State (FIPS code like `"06"` or a name/abbreviation like `"CA"`).
+#' @param counties County or counties (3-digit FIPS or names).
+#' @param years One or more years (HUD fiscal year for `hud`/`hud_acs`; ACS5
+#'   endpoint for `acs`/`acs_fmr`). Default `2024`.
+#' @param ami_source `"auto"` (default), `"hud"`, `"hud_acs"`, `"acs_fmr"`, or
+#'   `"acs"` — see [ami_cutoffs()].
+#' @return A tibble, one row per county x year: `GEOID`, `NAME`, `year`, `ami`,
+#'   and `ami_source` (the source that actually filled the row).
+#' @seealso [ami_cutoffs()] (tier ceilings), [afford_index()]
+#' @examples \dontrun{
+#' hud_ami("53", "033")                          # King County, FY2024, exact HUD
+#' hud_ami("CA", c("San Diego", "San Francisco"), 2024)
+#' hud_ami("06", "073", years = 2019:2024)       # a time series (sources may mix)
+#' hud_ami("06", "073", 2024, ami_source = "acs")  # Census-only, reproducible
+#' }
+#' @export
+hud_ami <- function(state, counties, years = 2024,
+                    ami_source = c("auto", "hud", "hud_acs", "acs_fmr", "acs")) {
+  ami_source <- match.arg(ami_source)
+  stopifnot(is.numeric(years), length(years) >= 1, !anyNA(years))
+
+  one_year <- function(yr) {
+    take <- function(res, src) {
+      out <- res[, c("GEOID", "NAME", "ami")]
+      out$year <- yr
+      out$ami_source <- src
+      out
+    }
+    if (ami_source != "auto")
+      return(take(ami_cutoffs(state, counties, yr, ami_source = ami_source),
+                  ami_source))
+    for (src in c("hud", "hud_acs", "acs_fmr", "acs")) {
+      res <- tryCatch(
+        suppressMessages(suppressWarnings(
+          ami_cutoffs(state, counties, yr, ami_source = src))),
+        error = function(e) NULL)
+      if (!is.null(res)) return(take(res, src))
+    }
+    stop("hud_ami(): no AMI source succeeded for ", yr, ".", call. = FALSE)
+  }
+  out <- dplyr::as_tibble(do.call(rbind, lapply(years, one_year)))
+  out[order(out$GEOID, out$year), c("GEOID", "NAME", "year", "ami", "ami_source")]
+}

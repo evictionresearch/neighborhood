@@ -98,9 +98,11 @@ afford_verdict <- function(x, share_cut = 0.5) {
 #' @return A tibble, one row per tenure x tier: `n_tracts`, `tier_households`,
 #'   `affordable_units`, `per100_affordable`, `shortfall` (positive =
 #'   shortage), plus -- when the columns are present -- the stretch-line
-#'   (`affordable_stretch_units`, `per100_stretch`) and availability
+#'   (`affordable_stretch_units`, `per100_stretch`), availability
 #'   (`open_per_year`, `per100_open_year`, `open_now`, `per100_open_now`,
-#'   `tracts_lt1_open`) readouts.
+#'   `tracts_lt1_open`), and entry-price ([afford_entry()]:
+#'   `affordable_entry_units`, `per100_entry`, `open_entry_per_year`,
+#'   `per100_open_entry_year`) readouts.
 #' @seealso [afford_index()], [afford_verdict()]
 #' @examples \dontrun{
 #' idx <- afford_index("53", "033", 2024, tenure = "rent")
@@ -118,6 +120,8 @@ afford_capacity <- function(x) {
             call. = FALSE)
   has_st <- "accessible_stretch" %in% names(x)
   has_av <- all(c("available_turnover", "available_vacancy") %in% names(x))
+  has_en <- "accessible_entry" %in% names(x)
+  has_eo <- "available_entry_turnover" %in% names(x)
 
   out <- dplyr::summarize(dplyr::group_by(x, tenure, ami_tier),
     n_tracts         = dplyr::n_distinct(GEOID),
@@ -129,6 +133,10 @@ afford_capacity <- function(x) {
     open_now      = if (has_av) sum(available_vacancy,  na.rm = TRUE) else NA_real_,
     tracts_lt1_open =
       if (has_av) sum(available_turnover < 1, na.rm = TRUE) else NA_integer_,
+    affordable_entry_units =
+      if (has_en) sum(accessible_entry, na.rm = TRUE) else NA_real_,
+    open_entry_per_year =
+      if (has_eo) sum(available_entry_turnover, na.rm = TRUE) else NA_real_,
     .groups = "drop")
 
   per100 <- function(units) ifelse(out$tier_households > 0,
@@ -137,12 +145,16 @@ afford_capacity <- function(x) {
   out$per100_stretch    <- per100(out$affordable_stretch_units)
   out$per100_open_year  <- per100(out$open_per_year)
   out$per100_open_now   <- per100(out$open_now)
+  out$per100_entry      <- per100(out$affordable_entry_units)
+  out$per100_open_entry_year <- per100(out$open_entry_per_year)
   out$shortfall         <- out$tier_households - out$affordable_units
 
   keep <- c("tenure", "ami_tier", "n_tracts", "tier_households",
     "affordable_units", "per100_affordable", "shortfall",
     if (has_st) c("affordable_stretch_units", "per100_stretch"),
     if (has_av) c("open_per_year", "per100_open_year",
-                  "open_now", "per100_open_now", "tracts_lt1_open"))
+                  "open_now", "per100_open_now", "tracts_lt1_open"),
+    if (has_en) c("affordable_entry_units", "per100_entry"),
+    if (has_eo) c("open_entry_per_year", "per100_open_entry_year"))
   out[, keep]
 }

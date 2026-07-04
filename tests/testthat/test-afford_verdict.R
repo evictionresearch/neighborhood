@@ -55,6 +55,17 @@ test_that("afford_capacity works without stretch/availability, warns on dupes", 
   expect_warning(afford_capacity(rbind(slim, slim[1, ])), "double-count")
 })
 
+test_that("afford_capacity reports entry columns when present", {
+  toy2 <- toy
+  toy2$accessible_entry <- c(30, 15, 5, NA)
+  toy2$available_entry_turnover <- c(6, 3, 0.25, NA)
+  cp <- afford_capacity(toy2)
+  expect_equal(cp$affordable_entry_units, 50)
+  expect_equal(cp$per100_entry, 5)
+  expect_equal(cp$open_entry_per_year, 9.25)
+  expect_equal(cp$per100_open_entry_year, 0.925)
+})
+
 test_that("afford_bands differences the stretch columns too", {
   tb <- data.frame(
     GEOID = "a", tenure = "rent",

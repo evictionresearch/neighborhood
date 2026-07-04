@@ -70,9 +70,12 @@ nt_layers_control(m, layers = c("Typology", names(demos)), title = "Show")
 \code{\link[mapgl:add_layers_control]{mapgl::add_layers_control()}} for a raw checkbox toggle.
 
 Other ern_maps:
+\code{\link[=afford_map]{afford_map()}},
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_map]{nt_map()}},
+\code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}}
 }

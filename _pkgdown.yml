@@ -16,9 +16,14 @@ reference:
       - afford_bands
       - afford_verdict
       - afford_capacity
+      - afford_map
+      - afford_caption
+      - afford_entry
+      - afford_zori
       - afford_stability
       - inflow_index
       - ami_cutoffs
+      - hud_ami
       - afford
   - title: Mapping (MapLibre)
     desc: >
@@ -26,6 +31,8 @@ reference:
       legends, labels, popups, and PMTiles. Built on Kyle Walker's mapgl.
     contents:
       - nt_map
+      - nt_map_sync
+      - nt_declutter_basemap
       - nt_maplibre
       - nt_add_choropleth
       - nt_add_labels
@@ -62,6 +69,8 @@ reference:
   - title: Crosswalks
     contents:
       - get_co_puma
+      - nt_areal_weight
+      - nt_zcta_weights
   - title: Datasets
     contents:
       - us_nt_tracts2024

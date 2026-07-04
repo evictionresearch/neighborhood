@@ -1,0 +1,346 @@
+---
+title: "Report-style comparison: the published v1 affordability layer vs v2"
+subtitle: "San Diego County & Salt Lake County — 'Limited Renter Affordability' with the EDR displacement hatch. Interactive: pan or zoom any map and its row follows."
+output:
+  html_document:
+    toc: false
+    self_contained: true
+---
+
+<style>
+.main-container { max-width: 1500px !important; }
+.hatch-note  { color: #7a1f1a; font-size: 0.8rem; margin: 6px 0 0 0; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(sf); library(dplyr); library(htmltools)
+suppressMessages(pkgload::load_all("..", quiet = TRUE))
+options(tigris_use_cache = TRUE, tigris_progress = FALSE)
+
+# HPRM v5 2022: the displacement hatch = any income group at displacement risk
+# (dis_group non-NA) -- the v5 analog of the reports' "Overall Displacement"
+# overlay ("the number of income groups experiencing any displacement risk").
+h <- arrow::read_parquet(
+  "/Users/buffalo/data/evictionresearch/hprm/hprm_v5_full_2022.parquet") |>
+  transmute(GEOID = geoid, dis_value, dis_group)
+
+# report palette (screenshot hues); all three class schemes share it so the
+# eye compares like with like
+lev1 <- c("Not affordable", "Less affordable", "More affordable")
+lev2 <- c("Not affordable (>50%)", "Roughly affordable (30-50%)",
+          "Affordable (<=30%)")
+pal <- c("#f4a582", "#fbf2b4", "#74b56e")
+rate_cls <- function(rate) factor(case_when(   # the published Not/Less/More
+  rate <= 100 ~ lev1[1],                       # cutpoints: accessible rentals
+  rate <= 200 ~ lev1[2],                       # per 100k tier households
+  TRUE        ~ lev1[3]), levels = lev1)
+
+# 45-degree hatch lines clipped to the displacement tracts
+hatch_lines <- function(g, spacing = 1200) {
+  g <- sf::st_union(sf::st_transform(g, 3857))
+  bb <- sf::st_bbox(g)
+  hgt <- unname(bb["ymax"] - bb["ymin"])
+  x0 <- seq(unname(bb["xmin"]) - hgt, unname(bb["xmax"]), by = spacing)
+  ln <- sf::st_sfc(lapply(x0, function(x)
+    sf::st_linestring(rbind(c(x, unname(bb["ymin"])),
+                            c(x + hgt, unname(bb["ymax"]))))), crs = 3857)
+  ln <- suppressWarnings(sf::st_intersection(ln, g))
+  sf::st_as_sf(data.frame(hatch = "displacement"),
+               geometry = sf::st_transform(ln, 4326))
+}
+simp <- function(g) sf::st_transform(
+  sf::st_simplify(sf::st_transform(g, 3857), dTolerance = 60,
+                  preserveTopology = TRUE), 4326)
+
+build <- function(state, co) {
+  v1 <- suppressMessages(afford(state, co, 0.8, 2024))
+  v1$cls <- rate_cls(v1$tr_rent_rate)
+  v2 <- suppressMessages(afford_index(state, co, 2024, tenure = "rent",
+                                      ami_source = "hud")) |> afford_verdict()
+  li  <- v2 |> filter(ami_tier == "LI")     # the layer's group: 0-80% AMI
+  li$cls <- rate_cls(li$rate)               # published classes, corrected engine
+  vli <- v2 |> filter(ami_tier == "VLI")    # pilot group: 0-50% AMI
+  vli$cls <- factor(case_when(
+    vli$verdict == "not affordable"     ~ lev2[1],
+    vli$verdict == "roughly affordable" ~ lev2[2],
+    vli$verdict == "affordable"         ~ lev2[3]), levels = lev2)
+  geo <- simp(sf::st_transform(
+    tigris::tracts(state = state, county = co, cb = TRUE, year = 2024), 4326)[, "GEOID"])
+  hp <- h[startsWith(h$GEOID, paste0(state, co)), ]
+  gj <- function(d) left_join(geo, as.data.frame(d)[, c("GEOID", "cls")],
+                              by = "GEOID") |> left_join(hp, by = "GEOID")
+  list(g1 = gj(v1), g2 = gj(li), g3 = gj(vli),
+       li_verdict = table(li$verdict, useNA = "ifany"),
+       hatch = hatch_lines(geo[geo$GEOID %in% hp$GEOID[!is.na(hp$dis_group)], ]))
+}
+
+# ---- synced MapLibre panels: nt_map_sync(), the package function this
+# document's inline JS was promoted into --------------------------------------
+mk_map <- function(g, legend_title, hatch) {
+  g <- g[!is.na(g$cls), c("GEOID", "cls")]
+  nt_map(g, "cls", type = "categorical", colors = pal,
+         legend_title = legend_title, before_id = "water") |>
+    mapgl::add_line_layer(id = "disp_hatch", source = hatch,
+                          line_color = "#c1272d", line_width = 0.9,
+                          line_opacity = 0.85) |>
+    nt_declutter_basemap()   # drop park/landcover tints that wash the fills
+}
+map_row <- function(x, region, group) tagList(
+  nt_map_sync(
+    mk_map(x$g1, "v1 classes (per-100k rate)", x$hatch),
+    mk_map(x$g2, "same classes, corrected engine", x$hatch),
+    mk_map(x$g3, "VLI verdict (30%/50% burden)", x$hatch),
+    group = group, height = 480,
+    titles = c(paste0("v1 — as published (", region, ")"),
+               "v2 — same classes, corrected engine",
+               "v2 — the verdict, VLI (0–50% AMI)"),
+    subtitles = c(
+      "Limited Renter Affordability, 0–80% AMI: legacy afford() rate classes (accessible rentals per 100k low-income households: ≤100 / 100–200 / >200)",
+      "identical cutpoints on the rebuilt rate: HUD income limits (v1's were 15–26% low) + renter-matched need",
+      "the pilot group's headline map: what the typical unit costs a VLI household (majority rule)")),
+  div(class = "hatch-note",
+      "Red hatching (all panels) = displacement: any income group at risk (HPRM v5 2022 dis_group). Pan or zoom any map — the row moves together; hover a tract for its class."))
+
+xtab <- function(g) {
+  sf::st_drop_geometry(g) |> filter(!is.na(cls)) |>
+    group_by(class = cls) |>
+    summarize(tracts = dplyr::n(),
+              hatched = sum(!is.na(dis_group)),
+              `share hatched` = scales::percent(mean(!is.na(dis_group)), 1),
+              .groups = "drop")
+}
+
+sd_  <- build("06", "073")
+slc_ <- build("49", "035")
+```
+
+**What this shows.** Each region three times, in the visual grammar of the published EDR reports
+([SANDAG](https://urban-displacement.github.io/edr-sandag/),
+[Salt Lake City](https://urban-displacement.github.io/edr-ut/slc_edr_report/)): the *"Limited
+Renter Affordability"* fill with the red **displacement hatch** on top. Left = **v1 exactly as
+published** (0–80% AMI, the rate cutpoints its code drew the report maps with). Middle = **the
+same map with only the engine corrected** — identical class cutpoints, but HUD's actual income
+limits (v1's were 15–26% too low) and renter-household need. Right = **the v2 verdict for the
+pilot VLI group** — the new presentation (burden classes), same hatch. **The three maps in each
+row are synchronized** (the package's `nt_map_sync()`) — pan or zoom any one and the others
+follow, so you can inspect an area of interest across all three at once.
+
+*Method notes: the published reports ran on report-era EDR (SLC: 2015–2019 data); the hatch here
+is HPRM v5 2022 — compare the pattern, not exact tract sets. Salt Lake is Salt Lake County only
+(the published Wasatch region adds Weber/Davis/Utah counties; the 2026-07-02 HUD API outage
+limits v2 to snapshot-exact counties). See `dev/affordability-deep-dive.md` §2–2.3 and
+`dev/slc_sd_replication.R`.*
+
+## San Diego County
+
+```{r sd}
+map_row(sd_, "San Diego", "sd")
+```
+
+```{r sd_tab}
+knitr::kable(lapply(sd_[c("g1","g2","g3")], xtab),
+  caption = "San Diego — v1 as published / v2 same classes / v2 VLI verdict, against the displacement hatch")
+```
+
+## Salt Lake County
+
+```{r slc}
+map_row(slc_, "Salt Lake", "slc")
+```
+
+```{r slc_tab}
+knitr::kable(lapply(slc_[c("g1","g2","g3")], xtab),
+  caption = "Salt Lake — v1 as published / v2 same classes / v2 VLI verdict, against the displacement hatch")
+```
+
+## How to read the difference
+
+- **The hatch is the same in every panel** — displacement doesn't move; the fill under it does.
+- **Left (v1): the published finding is visible and extreme.** In San Diego, v1 put just
+  **16 tracts** in "More Affordable" — and **16 of 16 sit under the displacement hatch** (Salt
+  Lake: 115 green, 61% hatched, against 3–7% in the other classes). That is the reports'
+  *"no 'more affordable' neighborhoods outside displacement-risk areas."*
+- **Middle: correct only the engine and the sliver becomes a real class.** Same cutpoints, HUD
+  cutoffs, renter-matched need: San Diego's green class grows **16 → 207**. The hatch still
+  concentrates on the green/yellow (reachable) side — the *gradient* survives the correction
+  (share hatched climbs 20% → 60% → 90% across the classes); the *"every affordable tract is
+  displacing"* absolutism does not. The published green-sliver effect was substantially the
+  artifact of income cutoffs 15–26% below HUD's.
+- **Right: the verdict for the group decisions are made about (VLI).** Plain-language classes
+  (affordable / roughly / not at 30%/50% of income), and displacement again lands almost
+  exclusively in the reachable classes.
+- **Why not the verdict at 0–80% AMI?** It saturates by construction: the 0–80% band's *ceiling*
+  income affords the typical unit in most tracts (San Diego: `r sd_$li_verdict[["affordable"]]`
+  of ~730 tracts read "affordable"), because a burden verdict answers *"can the band's top
+  afford here?"* while the reports' rate classes answer *"is there enough stock for the size of
+  the need?"* Different constructs: v2 carries both (`verdict` and `ratio`/`rate`), and for broad
+  bands the scarcity-vs-need rate (middle panel) is the right report-style layer, while the
+  verdict is sharpest for the tiers decisions target (VLI/ELI).
+
+---
+
+# Map 3 alone — the VLI verdict across four more markets
+
+```{r regions_data, include=FALSE}
+pe <- readRDS("p1_eval_data.rds")   # Bay + King: verdicts already computed
+                                    # (hud / hud_acs with the FMR-era cutoffs pulled 2026-07-01)
+vcls <- function(verdict) factor(case_when(
+  verdict == "not affordable"     ~ lev2[1],
+  verdict == "roughly affordable" ~ lev2[2],
+  verdict == "affordable"         ~ lev2[3]), levels = lev2)
+prep_vli <- function(sfdat) {
+  v <- sfdat[sfdat$ami_tier == "VLI" & !is.na(sfdat$verdict), ]
+  v$cls <- vcls(v$verdict)
+  simp(v[, c("GEOID", "cls")])
+}
+verdict_map <- function(v, height = 560) {
+  m <- nt_map(v, "cls", type = "categorical", colors = pal,
+              legend_title = "verdict for a VLI renter", before_id = "water") |>
+    mapgl::add_line_layer(id = "disp_hatch",
+      source = hatch_lines(v[v$GEOID %in% h$GEOID[!is.na(h$dis_group)], ]),
+      line_color = "#c1272d", line_width = 0.9, line_opacity = 0.85) |>
+    nt_declutter_basemap()   # drop park/landcover tints that wash the fills
+  m$height <- height
+  m
+}
+bay_v  <- prep_vli(pe$bay)
+king_v <- prep_vli(pe$king)
+tc_raw <- suppressMessages(afford_index("27",
+  c("Hennepin", "Ramsey", "Anoka", "Dakota", "Washington", "Scott", "Carver"),
+  2024, tenure = "rent", ami_source = "hud_acs", geometry = TRUE)) |> afford_verdict()
+tc_v   <- prep_vli(tc_raw)
+atl_raw <- suppressMessages(afford_index("13", c("121", "089", "067", "135"),
+  2024, tenure = "rent", ami_source = "hud", geometry = TRUE)) |> afford_verdict()
+atl_v  <- prep_vli(atl_raw)
+vc <- function(v) table(v$cls)   # counts in lev2 order: not / roughly / affordable
+```
+
+**The reading.** *This is how much a VLI household will pay if they can move in there*:
+**green** — the typical unit takes **no more than 30%** of their income; **orange** — **30–50%**
+(attainable only by stretching); **red** — **more than half their income**. For the red class,
+the descriptor:
+
+> **Even at the rents current tenants pay, a VLI family would give up more than half their
+> income in these neighborhoods — and entry prices run higher still.**
+
+**The "what ifs" this map assumes — read them with every figure:**
+
+- **"If they can move in."** The map is price-only. It says nothing about whether a unit is
+  *open* (availability — the next pane) or whether the applicant is *accepted* (records, credit,
+  vouchers — screening). A green tract with no vacancies admits no one.
+- **At incumbent prices.** Classes are priced at what *current tenants* pay (ACS gross rent,
+  utilities included). Asking rents on the units that actually open run higher, so the map
+  **understates** the entry barrier — the constraint is at least as bad as shown.
+- **At the top of the VLI range.** The share is computed at the VLI income ceiling
+  (household-size-adjusted HUD limit). Households deeper in the band give up a larger share of
+  income for the same unit — green is "manageable" for the best-off VLI household.
+
+Red hatching on every map = displacement (any income group at risk, HPRM v5 2022), as above.
+
+### 9-county San Francisco Bay Area
+
+**`r vc(bay_v)[[3]]` affordable / `r vc(bay_v)[[2]]` roughly affordable / `r vc(bay_v)[[1]]` not
+affordable.** *(Cutoffs: the validated ACS reproduction of the HUD limits, including the
+high-cost VLI bump, pulled 2026-07-01.)*
+
+```{r bay_verdict}
+verdict_map(bay_v)
+```
+
+### Twin Cities, MN — 7-county metro (Hennepin, Ramsey, Anoka, Dakota, Washington, Scott, Carver)
+
+**`r vc(tc_v)[[3]]` affordable / `r vc(tc_v)[[2]]` roughly affordable / `r vc(tc_v)[[1]]` not
+affordable.** *(Cutoffs: `hud_acs` — the HUD-outage fallback. In this ordinary-cost market the
+approximation converges with HUD (QA §6, Hennepin), and the FMR bump the outage disables does
+not bind here; suburban county-vs-metro divergence is possible — re-run on exact `hud` when the
+API returns.)*
+
+```{r tc_verdict}
+verdict_map(tc_v)
+```
+
+### King County, WA
+
+**`r vc(king_v)[[3]]` affordable / `r vc(king_v)[[2]]` roughly affordable / `r vc(king_v)[[1]]`
+not affordable.** *(Cutoffs: exact HUD snapshot.)*
+
+```{r king_verdict}
+verdict_map(king_v)
+```
+
+### Atlanta metro, GA — Fulton, DeKalb, Cobb, Gwinnett
+
+**`r vc(atl_v)[[3]]` affordable / `r vc(atl_v)[[2]]` roughly affordable / `r vc(atl_v)[[1]]` not
+affordable.** *(Cutoffs: exact HUD snapshot.)*
+
+```{r atl_verdict}
+verdict_map(atl_v)
+```
+
+---
+
+# Pane 2 — availability at entry prices, first build (King County)
+
+```{r pane2_data, include=FALSE}
+zori   <- afford_zori(quiet = TRUE)          # Zillow ZIP asking rents (cached)
+w_king <- nt_zcta_weights("53", "033")       # block-exact ZCTA x tract weights
+king2  <- afford_entry(pe$king, zori, weights = w_king)
+cap2   <- afford_capacity(king2)[afford_capacity(king2)$ami_tier == "VLI", ]
+k_vli  <- king2[king2$ami_tier == "VLI", ]
+kv1 <- table(k_vli$verdict); kv2 <- table(k_vli$entry_verdict)
+prem_med <- median(k_vli$entry_premium, na.rm = TRUE)
+prem_p90 <- quantile(k_vli$entry_premium, 0.9, na.rm = TRUE)
+n_fallback <- sum(k_vli$premium_fallback, na.rm = TRUE)
+```
+
+Pane 1 prices each tract at what **sitting tenants** pay. Pane 2 re-prices it at **entry**: every
+tract gets an **entry premium** — Zillow's ZIP-level asking-rent index (`afford_zori()`, month
+`r unique(zori$month)`) over the same ZIP's standing rents, brought onto tracts with block-exact
+housing-unit weights (`nt_zcta_weights()`) — and the tract's rent distribution is shifted by it
+before the same 30%/50% verdict is applied (`afford_entry()`). King County's median entry premium
+is **`r sprintf("%.2f", prem_med)`x** (90th percentile `r sprintf("%.2f", prem_p90)`x;
+`r n_fallback` of `r nrow(k_vli)` tracts fell back to the area-median premium for thin listing
+coverage). The pair below is synced — pan to any neighborhood and read both prices at once.
+
+```{r pane2_maps}
+nt_map_sync(
+  afford_map(king2, "VLI", displacement = h,
+             legend_title = "verdict at incumbent prices"),
+  afford_map(king2, "VLI", verdict_col = "entry_verdict", displacement = h,
+             legend_title = "entry verdict (asking prices)"),
+  group = "king2", height = 540,
+  titles = c("Pane 1 — affordability: what sitting tenants pay",
+             "Pane 2 — availability: what the door costs today"),
+  subtitles = c(
+    sprintf("verdict a / r / n: %d / %d / %d", kv1[[1]], kv1[[2]], kv1[[3]]),
+    sprintf("entry verdict a / r / n: %d / %d / %d — green shrinks %d%%, red grows %d%%",
+            kv2[[1]], kv2[[2]], kv2[[3]],
+            round(100 * (1 - kv2[[1]] / kv1[[1]])),
+            round(100 * (kv2[[3]] / kv1[[3]] - 1)))))
+```
+
+```{r pane2_caption}
+afford_caption("VLI", pane = "availability")
+```
+
+**The capacity line, standing vs entry (VLI renters, King County):**
+
+```{r pane2_cap}
+knitr::kable(dplyr::transmute(cap2,
+  `affordable per 100 (standing)`  = round(per100_affordable, 1),
+  `open per year, per 100`         = round(per100_open_year, 1),
+  `affordable per 100 (at entry)`  = round(per100_entry, 1),
+  `open AND entry-affordable per year, per 100` = round(per100_open_entry_year, 1)))
+```
+
+Read the last cell as the pane-2 sentence: *of every 100 VLI renter households in King County,
+about `r round(cap2$per100_open_entry_year)` could find a unit this year that both opens up and
+rents at ≤ 30% of their income at today's asking prices* — before competition (a cheap unit
+occupied by a higher-income household still counts; the CHAS layer is next) and before
+screening. One honest note: the earlier ZIP-level teaser (6 of 69 ZIPs asking-affordable)
+compared listing *levels* to the cost line; this model shifts each tract's own rent
+*distribution* by its premium, which is the defensible estimate — the wedge is real
+(green −`r round(100 * (1 - kv2[[1]] / kv1[[1]]))`%, red +`r round(100 * (kv2[[3]] / kv1[[3]] - 1))`%)
+but smaller than the teaser implied. Method, validation plan, and caveats:
+`dev/availability-design.md`.
