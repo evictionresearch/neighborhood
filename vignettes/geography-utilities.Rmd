@@ -28,12 +28,45 @@ land that falls inside the place, using decennial blocks as the weighting
 surface. Because 2020 blocks nest within both 2020 tracts and 2020 places, the
 fractions are exact, not approximations.
 
+A worked example — two neighboring cities in San Mateo County (weights computed
+2026-07-05 from the 2020 decennial blocks; the chunk is shown, not re-run at
+build):
+
 ```{r}
 library(neighborhood)
 
 w <- nt_areal_weight("CA", "San Mateo",
                      places = c("Redwood City", "San Mateo"))
+nrow(w)
+#> [1] 52
+```
 
+Fifty-two (place, tract) rows cover the two cities. Forty of them are the easy
+case — the tract lies fully inside one city (`frac_pop = 1`). The other rows
+are why this function exists. Sorted by the population fraction:
+
+```{r}
+w[w$frac_pop > 0 & w$frac_pop < 1,
+  c("place_name", "tract_geoid", "pop_in", "pop_t", "frac_pop", "frac_hu")]
+#>    place_name tract_geoid pop_in pop_t frac_pop frac_hu
+#>  Redwood City 06081610700   5108  5200    0.982   0.988
+#>  Redwood City 06081611100   5898  6423    0.918   0.924
+#>  Redwood City 06081610302   4338  4796    0.905   0.904
+#>  Redwood City 06081609800   3763  4733    0.795   0.792
+#>     San Mateo 06081606800   1651  3344    0.494   0.516
+#>  ...
+```
+
+Read the last row: tract `06081606800` straddles the San Mateo city limit
+almost exactly in half — 1,651 of its 3,344 residents live inside the city.
+Any "the tracts in San Mateo" shortcut either counts all 3,344 or none of
+them; the block-built weight counts 49.4% of whatever you are estimating.
+(A zero-population water tract in the bay also touches both cities — its
+fractions are all 0, so it drops out of any weighted sum on its own.)
+
+Applying the weights is one join and one multiply:
+
+```{r}
 # population-weight any tract-level estimate onto the city:
 library(dplyr)
 w |>

@@ -64,6 +64,62 @@
 #' California, so `ev_value` is out-of-sample there (flagged in
 #' `eer_out_of_sample`). The attainable set entering the stability gate is the
 #' chosen `availability` count; `stable_dest = attainable * stability`.
+#'
+#' @section Why stability, not an "opportunity" score:
+#' The conventional third layer would be an opportunity index (the Opportunity
+#' Atlas, the Child Opportunity Index, California's siting maps). This layer
+#' deliberately measures **housing stability** instead, for four reasons
+#' developed in `vignette("three-panes")` and, in full, in
+#' `dev/good-place-design.md`:
+#'
+#' 1. Opportunity scores aggregate *individual outcomes* to tracts; the
+#'    authors of the Opportunity Atlas themselves attribute only about three
+#'    fifths of its tract-to-tract variation to causal neighborhood effects,
+#'    the rest to sorting (Chetty et al. 2018, rev. 2025). The forces that
+#'    decide who lives where are structural -- income inequality, wage
+#'    stagnation, labor-market restructuring (Chapple 2017) -- so this product
+#'    measures the *structural constraint on the choice set* (afford, enter,
+#'    stay), not aggregated outcomes read as a property of land.
+#' 2. "High-opportunity" encodes a contested, suburban-and-white definition of
+#'    good (Goetz 2018); LIHTC residents' own assessments and employment
+#'    outcomes track the California opportunity domains weakly or not at all,
+#'    and what residents value is affordability, predictability, and the
+#'    ability to stay (Reid 2019). Stable, affordable housing is itself the
+#'    platform for mobility.
+#' 3. Individual relocation to "opportunity" tracts leaves the sorted
+#'    metropolitan structure intact (Sampson 2008), and steering households to
+#'    designated tracts risks recreating segregation -- hence the headline is
+#'    the size of the constrained choice set, never a prescribed destination.
+#' 4. Displacement measurement is proxy-dependent; tract-composition proxies
+#'    repeatedly miss it (Carlson 2020). EDR/EER are estimated from
+#'    household-level panel and court-record data (the individual approach),
+#'    then published as tract rates -- which is why the output here is a
+#'    place-level risk descriptor, never an individual prediction.
+#'
+#' @references
+#' Carlson, H. J. (2020). Measuring Displacement: Assessing Proxies for
+#' Involuntary Residential Mobility. *City & Community*, 19(3), 573-592.
+#' \doi{10.1111/cico.12482}
+#'
+#' Chapple, K. (2017). Income Inequality and Urban Displacement: The New
+#' Gentrification. *New Labor Forum*, 26(1), 84-93.
+#' \doi{10.1177/1095796016682018}
+#'
+#' Chetty, R., Friedman, J. N., Hendren, N., Jones, M. R., & Porter, S. R.
+#' (2018; revised 2025). The Opportunity Atlas: Mapping the Childhood Roots of
+#' Social Mobility. NBER Working Paper 25147.
+#'
+#' Goetz, E. G. (2018). *The One-Way Street of Integration: Fair Housing and
+#' the Pursuit of Racial Justice in American Cities*. Cornell University Press.
+#'
+#' Reid, C. K. (2019). Rethinking "Opportunity" in the Siting of Affordable
+#' Housing in California: Resident Perspectives on the Low-Income Housing Tax
+#' Credit. *Housing Policy Debate*, 29(4), 645-669.
+#' \doi{10.1080/10511482.2019.1582549}
+#'
+#' Sampson, R. J. (2008). Moving to Inequality: Neighborhood Effects and
+#' Experiments Meet Social Structure. *American Journal of Sociology*, 114(1),
+#' 189-231. \doi{10.1086/589843}
 #' @param x An [afford_index()] result (must have `GEOID`; for the default
 #'   `availability`, the `available_turnover`/`available_vacancy` columns from
 #'   `afford_index(..., availability = TRUE)`).

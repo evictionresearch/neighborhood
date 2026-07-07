@@ -73,7 +73,9 @@ nt_apartmentlist_rents <- function(dir = "~/data/apartment_list",
   stopifnot("no Apartment List file found (folder empty and site unreachable)" = nzchar(v))
   out <- utils::read.csv(
     file.path(dir, sprintf("Apartment_List_Rent_Estimates_%s.csv", v)),
-    check.names = FALSE, stringsAsFactors = FALSE)
+    check.names = FALSE, stringsAsFactors = FALSE,
+    # FIPS codes must stay character: leading zeros are data ("0660102")
+    colClasses = c(location_fips_code = "character"))
   out <- dplyr::as_tibble(out)
   attr(out, "vintage") <- v
   out

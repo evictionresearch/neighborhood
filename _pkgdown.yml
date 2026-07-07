@@ -32,6 +32,7 @@ reference:
     contents:
       - nt_map
       - nt_map_sync
+      - nt_sync_maps
       - nt_declutter_basemap
       - nt_hprm_map
       - nt_hprm_pal
@@ -68,11 +69,27 @@ reference:
       - scale_ern
       - ern_palette
       - ern_swatch
-  - title: Crosswalks
+  - title: Model reading aids
+    desc: >
+      Partial-dependence extraction and the ERN house-style dependence plot,
+      for reading fitted models (bartMachine) behind the precarity maps.
+    contents:
+      - nt_pd_bart
+      - nt_pd_plot
+  - title: Geography utilities
+    desc: >
+      Crosswalks and cleaner tract maps — block-exact tract/place/ZIP weights,
+      PUMA correspondence, water clipping, and boundary interpolation.
     contents:
       - get_co_puma
       - nt_areal_weight
       - nt_zcta_weights
+      - nt_erase_water
+      - nt_tract_interpolate
+  - title: External data
+    desc: Pull external datasets used in ERN work, cached locally.
+    contents:
+      - nt_apartmentlist_rents
   - title: Datasets
     contents:
       - us_nt_tracts2024

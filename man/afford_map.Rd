@@ -13,6 +13,7 @@ afford_map(
   legend_title = NULL,
   height = NULL,
   declutter = TRUE,
+  active = tier[1],
   ...
 )
 }
@@ -21,7 +22,14 @@ afford_map(
 \code{verdict} column (\code{\link[=afford_verdict]{afford_verdict()}}; derived automatically when both
 \code{supply} and \code{supply_stretch} are present).}
 
-\item{tier}{Which AMI tier to map (default \code{"VLI"}, the pilot group).}
+\item{tier}{Which AMI tier(s) to map (default \code{"VLI"}, the pilot group).
+A vector (e.g. \code{c("ELI", "VLI", "LI")}) stacks one categorical layer per
+tier on the same map -- layer ids \verb{afford_<tier>} -- with only \code{active}
+visible, ready for a tier switcher (\code{\link[=nt_sync_maps]{nt_sync_maps()}}'s \code{switcher}
+argument, or \code{\link[mapgl:add_layers_control]{mapgl::add_layers_control()}}). Each layer carries its own
+legend, tied to the layer via \code{layer_id}; a switcher/control shows one at
+a time (standalone multi-tier maps will stack legends until one is
+wired).}
 
 \item{verdict_col}{Which verdict column to render: \code{"verdict"} (default,
 pane 1 -- incumbent prices), \code{"entry_verdict"} (pane 2 -- entry prices,
@@ -46,6 +54,10 @@ salmon \verb{#f4a582} -- shared by all three panes).}
 \item{declutter}{Hide the basemap's decorative land tints (parks,
 landcover, hillshade) that wash out the fills -- see
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}}. Default \code{TRUE}.}
+
+\item{active}{With multiple \code{tier}s, the tier whose layer starts visible
+(default the first). The displacement hatch, when requested, is computed
+from the active tier's tracts.}
 
 \item{...}{Passed to \code{\link[=nt_add_choropleth]{nt_add_choropleth()}} via \code{\link[=nt_map]{nt_map()}} (e.g. \code{popup},
 \code{tooltip}, \code{opacity}; \code{before_id} defaults to \code{"water"} so fills sit

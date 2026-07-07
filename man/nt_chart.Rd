@@ -17,6 +17,13 @@ nt_chart(
   band_label = NULL,
   palette = NULL,
   value_fmt = c("comma", "percent", "currency", "multiple", "none"),
+  digits = NULL,
+  tooltip_count = NULL,
+  tooltip_count_suffix = "",
+  tooltip_trigger = c("axis", "item"),
+  isolate = FALSE,
+  bar_labels = FALSE,
+  flip = FALSE,
   smooth = NULL,
   crosshair = TRUE,
   yaxis = c("always", "hover", "none"),
@@ -25,6 +32,8 @@ nt_chart(
   line_styles = NULL,
   source = NULL,
   legend = !is.null(group),
+  legend_pos = c("top", "bottom"),
+  legend_nudge = c(0, 0),
   title = NULL,
   subtext = NULL,
   x_title = NULL,
@@ -65,6 +74,39 @@ the tooltip (all kept in agreement): one of \code{"comma"} (default), \code{"per
 \code{scales::percent()}. \code{"multiple"} renders a ratio as e.g. \verb{1.52×} (useful for
 a parity/disparity chart).}
 
+\item{digits}{Decimal places for formatted values (tooltip, crosshair,
+axis ticks, bar labels). Default \code{NULL} uses per-format defaults:
+0 for \code{"comma"}/\code{"currency"}, 1 for \code{"percent"}, 2 for \code{"multiple"}.}
+
+\item{tooltip_count}{Optional name of a column in \code{data} holding the
+count behind each plotted value. When set, the tooltip appends it in
+parentheses — e.g. a \code{value_fmt = "percent"} chart shows
+\verb{43.1\% (2,183 households)}. Pair with \code{tooltip_count_suffix}.}
+
+\item{tooltip_count_suffix}{Text appended after the count inside the
+parentheses (e.g. \code{" households"}, \code{" people"}). Default \code{""}.}
+
+\item{tooltip_trigger}{\code{"axis"} (default) shows one tooltip listing every
+series at the hovered x-position; \code{"item"} shows a tooltip only while
+hovering a line or bar itself — the right choice for line charts with
+many series (pair it with \code{crosshair = FALSE}).}
+
+\item{isolate}{Logical; when \code{TRUE}, double-clicking a series — its line
+or its end-of-line label — isolates it and dims the rest. Double-click
+it again (or empty space) to restore. Line charts with a \code{group}.}
+
+\item{bar_labels}{Logical; print each bar segment's value inside the bar
+(\code{value_fmt}/\code{digits} formatting). A label that doesn't fit its segment
+is hidden — except on the stack's LAST series (the right end of a
+flipped bar, the top of a column), where it moves just past the end of
+the bar instead. White numerals with a dark halo stay legible inside
+dark bars, inside pale bars, and outside on white. Bars only.}
+
+\item{flip}{Logical; draw bars horizontally (categories on the y-axis).
+Prefer this over piping \code{\link[echarts4r:e_flip_coords]{echarts4r::e_flip_coords()}} afterwards — the
+engine then knows the orientation, so \code{bar_labels} overflow placement
+and the crosshair land correctly.}
+
 \item{smooth}{Logical; smooth lines/areas (default \code{TRUE} for line/area,
 \code{FALSE} for bars).}
 
@@ -95,6 +137,18 @@ corner (e.g. a data-source credit line).}
 
 \item{legend}{Logical; show a legend (defaults to \code{TRUE} when \code{group} is set,
 and to \code{FALSE} when \code{end_label = TRUE}).}
+
+\item{legend_pos}{Where the legend sits: \code{"top"} (default, echarts'
+position) or \code{"bottom"}, which centers the legend beneath the plot and
+reserves bottom space so the x-axis labels, the legend, and the \code{source}
+credit each get their own row. Use \code{"bottom"} for stacked-bar charts whose
+legend would crowd the title. (Piping \code{e_grid()} after the fact does NOT
+work — echarts4r appends a second inert grid instead of editing this one.)}
+
+\item{legend_nudge}{Pixel offsets to fine-tune the legend from wherever
+\code{legend_pos} put it: \code{c(x, y)} with \code{x > 0} shifting right and \code{y > 0}
+shifting down (a single number is taken as \code{y}). E.g.
+\verb{legend_pos = "bottom", legend_nudge = -6} lifts the legend 6px.}
 
 \item{title, subtext}{Optional chart title and subtitle.}
 

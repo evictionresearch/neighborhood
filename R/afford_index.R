@@ -313,8 +313,10 @@ afford_index <- function(state, counties, year = 2024,
   state <- .afi_norm_state(state)
   counties <- .afi_norm_counties(state, counties)
 
-  # AMI tier cutoffs by county (also validates ami_source)
+  # AMI tier cutoffs by county (also validates ami_source). Record the source
+  # ami_cutoffs actually resolved, not the request ("auto" is not a provenance).
   cuts <- ami_cutoffs(state, counties, year, ami_source, ami_tiers, hud_hh_size)
+  if (!is.null(attr(cuts, "ami_source"))) ami_source <- attr(cuts, "ami_source")
   cuts$county <- cuts$GEOID
   tier_names <- names(ami_tiers)
 

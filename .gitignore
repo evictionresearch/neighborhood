@@ -47,3 +47,7 @@ docs
 
 # Local Claude Code session files
 .claude/
+
+# Orphaned htmlwidget render artifacts + testthat failure reports
+dev/_ml_test_files/
+tests/testthat/testthat-problems.rds

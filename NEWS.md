@@ -2,6 +2,39 @@
 
 ## New features
 
+* `nt_apartmentlist_rents()` — Apartment List's monthly *Rent Estimates*
+  release (metro/county/city median new-lease rents back to 2017), always the
+  newest vintage: checks the research page for a newer monthly file, keeps
+  dated CSVs in a local folder (default `~/data/apartment_list`), and falls
+  back to the newest local copy when offline (`refresh = "never"` skips the
+  check; `"force"` re-downloads). Replaces the hand-rolled link scrape in
+  `vignette("interactive-charts")` Part IV, which is now a two-metro
+  comparison.
+
+* `nt_chart()` grows a second round of levers, all demoed in
+  `vignette("interactive-charts")`: `digits` (one rounding override for
+  tooltip, crosshair, axis ticks, and bar labels), `tooltip_count` +
+  `tooltip_count_suffix` (append the raw count behind a plotted rate to the
+  tooltip), `tooltip_trigger = "item"` (per-series tooltips for many-line
+  charts), `isolate` (double-click a series to isolate it and dim the rest),
+  `bar_labels` (in-bar values with a fit-aware overflow rule), `flip`
+  (engine-aware horizontal bars — prefer over piping `e_flip_coords()`), and
+  `legend_pos`/`legend_nudge` (bottom-row legend placement with pixel
+  fine-tuning).
+
+* `nt_sync_maps()` (in development) — a standalone flex-row builder for saved
+  HTML pages: synchronized MapLibre panels with per-panel titles and a shared
+  cross-panel layer switcher. Overlaps `nt_map_sync()` in the synced-row role;
+  the switcher is the new capability.
+
+* Backfilled entries for utilities that shipped quietly earlier in 1.1.0:
+  `inflow_index()` (**experimental** revealed-destination layer — where
+  low-income households appear to be moving; trust its displacement/negative
+  tail only), `nt_areal_weight()` (block-exact tract → place weights),
+  `nt_erase_water()` (display-only shoreline clipping for tract maps), and
+  `nt_tract_interpolate()` (weight tract-level estimates onto arbitrary
+  boundaries).
+
 * **The affordability verdict and the free-will capacity readout.**
   `afford_index()` gains explicit burden lines — `burden` (default 0.30, the
   HUD standard) and `stretch` (default 0.50, HUD's severe-burden threshold) —
@@ -308,7 +341,33 @@
   non-overlapping bands (the 30–50%, 50–80% slices), recomputing
   `supply`/`ratio`/`rate` on the banded counts.
 
+## Bug fixes
+
+* `afford_index()` and `ami_cutoffs()` now record the AMI source **actually
+  resolved**, not the request: under `ami_source = "auto"` the output's
+  `ami_source` column (and a new `"ami_source"` attribute on `ami_cutoffs()`
+  results) reports `"hud"`, `"hud_acs"`, `"acs_fmr"`, or `"acs"` — never
+  `"auto"`, which is a request, not a provenance.
+
 ## Documentation
+
+* The stability rationale is now in the package docs, with verified sources:
+  `vignette("three-panes")` gains *Why stability — and not an "opportunity"
+  score* (the Opportunity Atlas demoted to a labeled, contested secondary
+  lens; Reid 2019, Carlson 2020, Chapple 2017, Goetz 2018, Sampson 2008, and
+  Chetty et al. w25147 cited, DOIs included), and `?afford_stability` carries
+  the condensed argument with full references.
+* `vignette("affordability-index")` gains a worked **two-region walkthrough**
+  (San Francisco vs. Salt Lake County, VLI renters, computed 2026-07-05):
+  income ceilings first, engine output second, verdict and capacity third —
+  the high-cost-adjustment and `ami_source` lessons shown with real dollars.
+* Every vignette now walks through at least one real-place example, and the
+  comparative ones read two or more regions against each other: two-metro
+  Apartment List rents in `interactive-charts`, CA vs. MD typology structure
+  in `neighborhood-typologies`, a two-city block-exact crosswalk with real
+  boundary-straddling weights in `geography-utilities`, a two-city layout
+  pattern in `mapping-with-maplibre`, and a port-the-recipe-to-Fulton-County
+  section in `precarity-mapping`.
 
 * New vignette `affordability-index` documenting the `afford()` methodology,
   output schema, and known limitations.

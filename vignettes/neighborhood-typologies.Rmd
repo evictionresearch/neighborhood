@@ -191,6 +191,28 @@ us_nt_tracts2024 |>
   count(nt_conc, sort = TRUE)
 ```
 
+Because the table is national, comparing the racial structure of two states is
+one `count()` — and the contrast does real analytical work. California and
+Maryland, each state's four most common tract types by share:
+
+```{r, eval=TRUE}
+us_nt_tracts2024 |>
+  filter(state %in% c("CA", "MD")) |>
+  count(state, nt_conc) |>
+  group_by(state) |>
+  mutate(share = round(n / sum(n), 3)) |>
+  slice_max(share, n = 4) |>
+  ungroup()
+```
+
+Both states lead with three-group mixed tracts, but the mixes are different
+mixes: California's integration runs through its Latine population
+(Latine–White is its second-largest type, Mostly Latine its third), while
+Maryland's runs Black–White (Mostly White, then Black–White, then Mostly
+Black). The same typology grammar, applied to two states, surfaces two
+different segregation regimes — which is exactly the kind of two-region read
+the `afford_index()` pairing in §6 turns into policy analysis.
+
 ## 4. Color and map
 
 ### Leaflet, via `nt_pal()`

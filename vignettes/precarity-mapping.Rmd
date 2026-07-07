@@ -453,6 +453,31 @@ pd <- nt_pd_bart(fit, "med_rent")   # posterior PD table from the fitted model
 nt_pd_plot(pd, training_data$med_rent)
 ```
 
+## 9. Porting the recipe to a second region
+
+Nothing above is Hennepin-specific except the `get_acs()` state and county
+strings. The same pipeline runs anywhere — Fulton County, Georgia (Atlanta),
+say — with the variable map and every downstream step unchanged; the
+percentile ranking recomputes *within the new county* automatically:
+
+```{r}
+tr <- get_acs(geography = "tract", state = "GA", county = "Fulton",
+              variables = acs_vars, year = 2022, output = "wide",
+              geometry = TRUE) |>
+  st_transform(4326)
+# ...identical from here: derive the components, pctl(), the nt_maplibre() pipeline
+```
+
+Two cautions when the second region arrives. First, percentile composites are
+**within-region statements** — "more precarious than 80% of Fulton County" and
+"more precarious than 80% of Hennepin County" are not the same amount of
+pressure — so compare *patterns* across regions, not scores; for an absolute
+cross-region read use measures anchored to fixed thresholds (the affordability
+verdicts of `vignette("three-panes")`, or ERN's modeled HPRM layers). Second,
+tract reliability differs with county size and population — re-examine the
+margins of error in the new county rather than assuming the first county's
+noise profile travels.
+
 ## Acknowledgments
 
 Mapping is built on Kyle Walker's **mapgl** and **tidycensus**; tiles use
@@ -467,5 +492,3 @@ deterministic and require no AI to run.
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
-</content>
-</invoke>

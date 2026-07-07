@@ -298,6 +298,30 @@ nt_chart(race_counts, "date", "filings", group = "race", type = "bar",
          stack = "total")
 ```
 
+## Bars: `bar_labels` and `flip`
+
+Two bar-only switches. `bar_labels = TRUE` prints each segment's value inside
+the bar — white numerals with a dark halo, legible on dark fills, pale fills,
+and white space alike. A label that doesn't fit its segment is hidden rather
+than smeared across it, except on the stack's *last* series, whose label moves
+just past the end of the bar. `flip = TRUE` draws the bars horizontally
+(categories on the y-axis); prefer it over piping
+`echarts4r::e_flip_coords()` afterwards, because when the engine knows the
+orientation the label-overflow rule and the crosshair land on the right axis.
+
+```{r}
+# yearly totals, values printed on the bars
+nt_chart(yearly, "year", "filings", type = "bar", bar_labels = TRUE)
+
+# one year by race, horizontal, labeled
+race24 <- mn_evictions |>
+  filter(year == 2024) |>
+  summarise(across(c(filings_black, filings_white, filings_latine, filings_other), sum)) |>
+  tidyr::pivot_longer(everything(), names_to = "race", values_to = "filings")
+
+nt_chart(race24, "race", "filings", type = "bar", flip = TRUE, bar_labels = TRUE)
+```
+
 ## `value_fmt` — all five formats
 
 `value_fmt` formats the y-axis ticks, the hover crosshair box, and the tooltip,
@@ -328,6 +352,21 @@ nt_chart(ratio, "date", "ratio", group = "race", value_fmt = "multiple")
 
 # none — show the raw number with no separators or symbols
 nt_chart(yearly, "year", "filings", type = "bar", value_fmt = "none")
+```
+
+## `digits`, and the count behind a rate: `tooltip_count`
+
+`digits` overrides the per-format rounding defaults (0 for comma/currency, 1
+for percent, 2 for multiple) everywhere at once — tooltip, crosshair, axis
+ticks, bar labels. And when the plotted value is a *rate*, `tooltip_count`
+names the column holding the raw count behind each point, so the tooltip reads
+like a sentence instead of a naked percentage — `43.1% (2,183 filings)`:
+
+```{r}
+nt_chart(share, "date", "share", value_fmt = "percent", digits = 2)
+
+nt_chart(share, "date", "share", value_fmt = "percent",
+         tooltip_count = "filings", tooltip_count_suffix = " filings")
 ```
 
 ## `yaxis` and `crosshair` — the no-axis read
@@ -376,6 +415,25 @@ nt_chart(counties, "year", "filings", group = "county", type = "line",
 A **named** palette (`c(Hennepin = "#19222C", ...)`) instead pins each color to a
 specific group regardless of order — the technique used in the race plates.
 
+## Many series: `tooltip_trigger = "item"` and `isolate`
+
+The default tooltip (`tooltip_trigger = "axis"`) lists **every** series at the
+hovered x-position — right for two to five lines, unreadable for eighty-seven.
+`"item"` shows a tooltip only while hovering a line itself (pair it with
+`crosshair = FALSE`). `isolate = TRUE` adds the reading aid dense charts need:
+double-click a line (or its end-of-line label) to isolate it and dim the rest;
+double-click again, or on empty space, to restore.
+
+```{r}
+all_counties <- mn_evictions |>
+  group_by(county, year) |>
+  summarise(filings = sum(filings), .groups = "drop")
+
+nt_chart(all_counties, "year", "filings", group = "county", type = "line",
+         tooltip_trigger = "item", crosshair = FALSE,
+         isolate = TRUE, legend = FALSE)
+```
+
 ## `legend`
 
 A legend appears automatically when `group` is set (and is suppressed when
@@ -384,6 +442,25 @@ A legend appears automatically when `group` is set (and is suppressed when
 ```{r}
 nt_chart(counties, "year", "filings", group = "county", legend = TRUE)   # explicit on
 nt_chart(counties, "year", "filings", group = "county", legend = FALSE)  # hide it
+```
+
+Where the legend *sits* is `legend_pos`: the default keeps echarts' top
+placement; `"bottom"` centers it beneath the plot and reserves bottom space so
+the x-axis labels, the legend, and the `source` credit each get their own row —
+the right home for stacked-bar legends that would otherwise crowd the title.
+(Piping `echarts4r::e_grid()` afterwards does **not** work — echarts4r appends
+a second, inert grid instead of editing this one.) `legend_nudge` then
+fine-tunes in pixels: `c(x, y)` with positive x shifting right and positive y
+shifting down, or a single number for vertical only.
+
+```{r}
+nt_chart(race_counts, "date", "filings", group = "race", type = "bar",
+         stack = "total", legend_pos = "bottom",
+         source = "Data: Eviction Research Network")
+
+# same, legend lifted 6px
+nt_chart(race_counts, "date", "filings", group = "race", type = "bar",
+         stack = "total", legend_pos = "bottom", legend_nudge = -6)
 ```
 
 ## Titles: `title`, `subtext`, `x_title`, `y_title`
@@ -499,44 +576,45 @@ nt_spark(yearly$filings, type = "line", color = "#F9322B",
 A common workflow is to pull a public dataset straight from the web, reshape it,
 and chart it. Here we use [Apartment List's Rent
 Estimates](https://www.apartmentlist.com/research/category/data-rent-estimates) —
-median new-lease rents by metro/city/county — to chart a metro's rent over time.
+median new-lease rents by metro/city/county — and compare **two metros on one
+axis**, which is what a shared-scale line chart is for.
 
-The download links are content-hashed and change with each monthly release, so we
-scrape the current link off the data page, then read the CSV directly:
+`nt_apartmentlist_rents()` handles the fetch. Apartment List's download links
+are content-hashed and change with every monthly release, so the function reads
+the current link off their data page, keeps a dated copy in a local folder
+(`~/data/apartment_list` by default), and quietly falls back to the newest
+local file when you are offline (`refresh = "never"` skips the online check
+entirely; `"force"` re-downloads).
 
 ```{r}
-library(readr); library(tidyr); library(stringr); library(lubridate)
+library(tidyr); library(lubridate)
 
-# 1. Resolve the current CSV link off the data page. The hash in the path
-#    changes each monthly release, so scrape the link rather than hard-coding it
-#    (and keep a pinned fallback in case the page serves bot-filtered content).
-page <- "https://www.apartmentlist.com/research/category/data-rent-estimates"
-html <- paste(readLines(url(page), warn = FALSE), collapse = "\n")
-csv_url <- str_extract(
-  html,
-  "https://assets\\.ctfassets\\.net/[^\"\\\\]*Apartment_List_Rent_Estimates_2[0-9_]+\\.csv"
-)
-if (is.na(csv_url)) {
-  csv_url <- paste0("https://assets.ctfassets.net/jeox55pd4d8n/2nz8cro1T1bopNPDG6Sbsf/",
-                    "54e7e1745db655de15aaa99c5570e6ea/Apartment_List_Rent_Estimates_2026_05.csv")
-}
+al <- nt_apartmentlist_rents()   # latest monthly release, cached locally
+attr(al, "vintage")              # e.g. "2026_06"
 
-# 2. Read it (keep FIPS as character to preserve leading zeros)
-rent <- read_csv(csv_url, col_types = cols(location_fips_code = col_character()))
-
-# 3. Pick a metro (by CBSA code) and bed size, reshape wide -> long
-mpls <- rent |>
+# Two metros by CBSA code, overall bed size, wide months -> long
+two <- al |>
   filter(location_type == "Metro",
-         location_fips_code == "33460",   # Minneapolis-St. Paul-Bloomington, MN-WI
+         location_fips_code %in% c("33460",    # Minneapolis-St. Paul, MN-WI
+                                   "41620"),   # Salt Lake City, UT
          bed_size == "overall") |>
   pivot_longer(matches("^\\d{4}_\\d{2}$"), names_to = "month", values_to = "rent") |>
   mutate(date = ym(month)) |>
   filter(!is.na(rent))
 
-# 4. Chart it
-nt_chart(mpls, "date", "rent", type = "line", value_fmt = "currency",
-         yaxis = "hover", title = "Median new-lease rent — Minneapolis metro")
+nt_chart(two, "date", "rent", group = "location_name", type = "line",
+         value_fmt = "currency", yaxis = "hover",
+         title  = "Median new-lease rent, two metros",
+         source = "Data: Apartment List Rent Estimates")
 ```
+
+The comparison is the point. In the June 2026 release the two metros end close
+together — Minneapolis–St. Paul at $1,536, Salt Lake City at $1,450 — but they
+got there by opposite paths: Salt Lake ran up to a $1,596 peak in August 2022
+and has given back about 9% since, while Minneapolis climbed a steady 14% from
+late 2019 and sits at its high today. Levels similar, diagnoses different —
+the same lesson as the affordability walkthrough in
+`vignette("affordability-index")`.
 
 ```{r apt-rent, eval=TRUE, echo=FALSE, out.width="100%", fig.cap="Median new-lease rent for the Minneapolis-St. Paul metro from Apartment List Rent Estimates, pulled live from the URL (shown mid-hover). Data: Apartment List."}
 fig("chart-apartmentlist.png")
@@ -547,7 +625,7 @@ those rows and aggregate per month — population-weighting is the defensible
 choice since each row is already a median:
 
 ```{r}
-area <- rent |>
+area <- al |>
   filter(location_type == "City", bed_size == "overall",
          location_fips_code %in% c("2743000", "2758000")) |>   # Minneapolis, St. Paul
   pivot_longer(matches("^\\d{4}_\\d{2}$"), names_to = "month", values_to = "rent") |>

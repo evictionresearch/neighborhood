@@ -37,6 +37,14 @@ three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette
 supply engine) plus the first availability measures of **Gate 2** (`availability = TRUE`); the
 *Allowed* gate (discrimination, voucher rejection, eviction-record screening) is future work.
 
+One theoretical commitment shapes everything downstream of the engine and is worth naming here:
+the product built on this index measures destinations by **housing stability, not by an
+"opportunity" score** — the third pane is HPRM displacement/eviction risk, not the Opportunity
+Atlas. The full argument (aggregated individual outcomes vs. structural constraints on the
+choice set; whose definition of a "good" neighborhood the opportunity maps encode; the
+ecological-fallacy discipline), with sources, is in `vignette("three-panes")` under *Why
+stability — and not an "opportunity" score*, and in `?afford_stability`.
+
 > **This is the engine-room vignette.** The finished *product* built on this engine — the
 > three-pane maps and funnel (**affordability → availability → stability**: `afford_verdict()`,
 > `afford_entry()`, `afford_stability()`, `afford_capacity()`, `afford_map()`) — is explained,
@@ -92,6 +100,113 @@ bay <- afford_index(
   year     = 2023
 )
 ```
+
+## A worked example: San Francisco vs. Salt Lake County
+
+Nothing explains the index like running it on two very different markets and reading the
+results side by side. This section does exactly that — **San Francisco County, CA** (a
+high-cost coastal market) against **Salt Lake County, UT** (a fast-growing but
+ordinarily-priced market, home of the deployed Wasatch Front reports) — for **VLI renters**
+(very low income: at or below 50% of AMI). The code is shown as you would run it; the numbers
+were computed 2026-07-05 from the 2020–2024 ACS with HUD FY2024 limits (`ami_source` resolves
+to `"hud"`, the bundled snapshot — both counties are in it).
+
+### Step 1 — look at the income ceilings first
+
+Always start with `ami_cutoffs()`: every downstream number hinges on these dollars.
+
+```{r}
+ami_cutoffs("06", "075", 2024, ami_source = "hud")   # San Francisco
+#>   GEOID                                 NAME    ami cut_ELI cut_VLI cut_LI cut_MI
+#> 1 06075 San Francisco, CA HUD Metro FMR Area 186600   58750   97900 156650 223920
+
+ami_cutoffs("49", "035", 2024, ami_source = "hud")   # Salt Lake
+#>   GEOID                                  NAME    ami cut_ELI cut_VLI cut_LI cut_MI
+#> 1 49035 Salt Lake City, UT HUD Metro FMR Area 115500   34650   57750  92400 138600
+```
+
+Three lessons before any housing data enters:
+
+1. **You query a county; the answer arrives from HUD's income-limit area** (the `NAME`
+   column): San Francisco answers as the *San Francisco HMFA*, Salt Lake County as the *Salt
+   Lake City HMFA*.
+2. **"VLI = 50% of AMI" is the definition, not always the arithmetic.** Salt Lake's VLI
+   ceiling is exactly half of AMI ($57,750 on a $115,500 AMI). San Francisco's is
+   **52.5%** of AMI ($97,900 on a $186,600 AMI) — HUD's high-housing-cost adjustment is
+   binding there. The other tiers then cascade off VLI (ELI ≈ 0.6 × VLI, LI ≈ 1.6 × VLI,
+   with HUD's rounding and caps) — which is why LI in San Francisco ($156,650) is far above
+   80% of its nominal AMI.
+3. **The `ami_source` choice matters exactly where you'd guess.** Recomputing with
+   `ami_source = "acs"` (the county's own median family income, Census-only) gives a VLI
+   ceiling of $85,570 in San Francisco — **13% below** HUD's — but $58,341 in Salt Lake,
+   within 1% of HUD's. In ordinary-cost markets the Census reproduction is essentially exact;
+   in high-cost coastal markets it understates the thresholds, so use `"hud"` or `"auto"`
+   there (this is the callout from the `ami_source` section, now with receipts).
+
+### Step 2 — run the engine and read one slice
+
+```{r}
+sf_idx  <- afford_index("06", "075", 2024, tenure = "rent")
+slc_idx <- afford_index("49", "035", 2024, tenure = "rent")
+
+sf_vli  <- sf_idx[sf_idx$tenure == "rent" & sf_idx$ami_tier == "VLI", ]
+slc_vli <- slc_idx[slc_idx$tenure == "rent" & slc_idx$ami_tier == "VLI", ]
+```
+
+What comes back, summarized (VLI renters; medians across tracts):
+
+| | San Francisco | Salt Lake County |
+|---|---|---|
+| tracts | 244 | 251 |
+| VLI income ceiling (the denominator of "affordable") | $97,900 | $57,750 |
+| VLI share of renter households (`class_prop`) | 45.4% | 44.9% |
+| median tract `supply` (share of rentals a VLI household can carry at ≤ 30%) | 0.46 | 0.34 |
+| median tract `ratio` (supply ÷ fair share) | 1.02 | 0.75 |
+| tracts below fair share (`ratio < 1`) | 48% | 69% |
+
+The demand side is nearly identical — **about 45% of renter households in both counties are
+VLI**. Everything that differs is supply. In the median San Francisco tract, 46% of rentals
+are within reach *at the $97,900 ceiling*, and the median tract sits almost exactly at parity
+(`ratio` ≈ 1). In the median Salt Lake tract only 34% of rentals clear a $57,750 ceiling, and
+**69% of tracts hold less than their fair share** of VLI-affordable stock. Same question, two
+markets, opposite diagnoses: San Francisco's VLI problem is not (mostly) the standing rent
+roll — Salt Lake's is.
+
+Remember what `supply` is relative to: **the tier's own regional income ceiling**. A San
+Francisco tract is "affordable to VLI" against a ceiling that would be middle-income in Utah.
+The index is deliberately region-relative — that is what *area* median income means.
+
+### Step 3 — the verdict and the capacity arithmetic
+
+The product layer (`vignette("three-panes")`) turns those continuous columns into the
+three-class verdict and the per-100-households funnel:
+
+```{r}
+sf_v  <- afford_verdict(sf_idx);  slc_v <- afford_verdict(slc_idx)
+afford_capacity(sf_v);            afford_capacity(slc_v)
+```
+
+| VLI renters | San Francisco | Salt Lake County |
+|---|---|---|
+| verdict: affordable / roughly / not | 105 / 109 / 26 | 57 / 169 / 21 |
+| affordable units per 100 VLI households | 105.3 | 86.9 |
+| …that open up per year (turnover) | 21.5 | 25.6 |
+| regional shortfall at ≤ 30% | −5,451 (a nominal surplus) | 8,531 units short |
+
+Two readings worth pausing on:
+
+- **Salt Lake's mass sits in the middle class** — 169 of the 247 tracts that receive a
+  verdict are "roughly affordable" (the four tracts with no rental stock get none):
+  attainable only by stretching to 30–50% of income. That stretch band is the story a
+  continuous map hides, and it is why the verdict grammar exists.
+- **San Francisco shows a nominal *surplus* at the ceiling** (105 affordable units per 100
+  VLI households). That is not a clean bill of health — it is the strongest possible
+  illustration of what Gate 1 deliberately assumes: a household at the *top* of the tier,
+  facing *incumbent* rents, with *no competition* from higher-income households for the same
+  units. Price the doors instead of the leases and the Bay's green class collapses (the entry
+  premium, `afford_entry()`); net out competition and the surplus goes with it (the CHAS
+  layer, planned). The three-pane product exists precisely to walk that surplus back down,
+  honestly, stage by stage — see `vignette("three-panes")`.
 
 ## The full argument reference
 
@@ -627,5 +742,3 @@ stack. Thanks to the ERN team and collaborators who pressure-tested the methodol
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
-</content>
-</invoke>

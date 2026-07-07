@@ -265,6 +265,62 @@ Model:
 afford_caption("VLI", pane = "stability")
 ```
 
+## Why stability — and not an "opportunity" score
+
+The expected third pane is an opportunity index — Chetty's Opportunity Atlas, the Child
+Opportunity Index, the opportunity maps California uses to steer affordable-housing siting.
+Pane 3 measures **housing stability instead**, and the choice is a position, not an omission.
+Four reasons, each of which shapes how the pane should be read.
+
+**1. Opportunity scores aggregate individual outcomes; the question here is about structural
+constraints.** The Opportunity Atlas is the average adult outcome of children raised in a tract
+decades earlier, published at tract scale. Its authors are careful about what that can support:
+conventional neighborhood characteristics explain only about half of the tract-to-tract
+variation in those outcomes, and their own experimental and quasi-experimental analysis
+attributes about 60% of the variation to causal neighborhood effects — the remainder is
+families sorting themselves (Chetty et al. 2018, rev. 2025). Meanwhile the forces that decide
+*who lives where* — widening income inequality, stagnant wages, restructured metropolitan labor
+markets — are systemic, not tract amenities (Chapple 2017). Systems create inequality, not
+individuals; so the thing this product measures is the **structural constraint on a household's
+choice set** — what it can afford, enter, and keep — not an aggregate of individual outcomes
+read as a property of land.
+
+**2. "High-opportunity" encodes a contested definition of good.** The tracts those maps score
+highest are disproportionately suburban, single-family, and white — a one-way definition of
+where low-income families of color should go (Goetz 2018). When Reid (2019) asked the people
+the California maps are deployed for — residents of LIHTC housing — the opportunity domains
+tracked residents' own assessments of their neighborhoods weakly or backwards and did not
+predict their employment outcomes; residents located their barriers in labor- and
+housing-market structures, and what they valued was affordability, predictability, and the
+ability to stay. Affordable, stable housing is itself the platform for economic mobility — that
+finding is the empirical warrant for this pane.
+
+**3. Relocation-to-opportunity is not the lever it promises to be.** The Moving to Opportunity
+experiment moved individual families to lower-poverty tracts; the sorted metropolitan structure
+they moved within stayed put, and movers largely re-encountered it (Sampson 2008). Routing
+households toward designated "good" tracts also carries the mirror-image risk — recreating
+segregation under a nicer name. That is why the product's headline is the **funnel per 100
+households** (the size of the constrained choice set), never a prescribed destination.
+
+**4. Measurement discipline.** Displacement research is proxy-dependent: tract-composition
+("population") measures, individual-mobility measures, and motivational measures rank the same
+places differently, and studies using compositional change repeatedly find displacement is *not*
+more likely in gentrifying tracts — a proxy artifact, not a reassurance (Carlson 2020). HPRM's
+displacement and eviction signals are estimated from **household-level panel data and court
+records** — the individual approach in Carlson's typology — rather than inferred from tract
+composition change. The residual honesty: the published output is still a tract rate, so pane 3
+is a **place-level risk descriptor, never an individual prediction** (the first question in the
+Q&A below).
+
+What survives of "opportunity" in this product: nothing is hidden, one signal is defensible.
+The share of resident adults who are employed — the one opportunity measure that tracks
+residents' own outcomes in Reid's data — can ride along as a clearly labeled side variable, and
+an Atlas or COI layer can be added as a **secondary, contested lens** where a client requires
+it, with its vintage and sorting caveats stated. But the spine is stability: *a place you can
+afford and enter but cannot keep is not a destination.* The full design argument, with the
+citation trail, is in `dev/good-place-design.md` (this repo) and the ERN manuscript *A Good
+Place* (`hprm` repo).
+
 ## How stability is computed
 
 `afford_stability()` joins two HPRM fields onto the result and maps each to a 0–1 score using
@@ -290,6 +346,10 @@ s[, c("GEOID", "stability", "stable_cat", "available_turnover", "stable_dest")]
 
 ## Questions people ask
 
+- **"Why isn't this pane an opportunity index?"** By design — see *Why stability — and not an
+  "opportunity" score* above. Short version: opportunity scores aggregate individual outcomes
+  onto tracts and encode a contested definition of "good"; the destination question needs the
+  structural constraints on where a household can go and stay.
 - **"Is this a prediction about my lease?"** No. HPRM is built from individual-level records but
   published as **tract rates** — it describes the neighborhood's pressure, not any one
   household's outcome.
@@ -369,5 +429,27 @@ nt_map_sync(
 - `vignette("mapping-with-maplibre")` — the mapping toolkit (`nt_map()`, synced maps,
   decluttering).
 - In the source repo, `dev/affordability-deep-dive.md` (the v1 autopsy and replication),
-  `dev/availability-design.md` (the entry-price layer design), and `dev/report_style_maps.Rmd`
-  (the four-market evaluation document that produced the numbers above).
+  `dev/availability-design.md` (the entry-price layer design), `dev/good-place-design.md` (the
+  full stability-vs-opportunity design argument), and `dev/report_style_maps.Rmd` (the
+  four-market evaluation document that produced the numbers above).
+
+## References
+
+- Carlson, H. Jacob. 2020. "Measuring Displacement: Assessing Proxies for Involuntary
+  Residential Mobility." *City & Community* 19(3): 573–592.
+  [doi:10.1111/cico.12482](https://doi.org/10.1111/cico.12482)
+- Chapple, Karen. 2017. "Income Inequality and Urban Displacement: The New Gentrification."
+  *New Labor Forum* 26(1): 84–93.
+  [doi:10.1177/1095796016682018](https://doi.org/10.1177/1095796016682018)
+- Chetty, Raj, John N. Friedman, Nathaniel Hendren, Maggie R. Jones, and Sonya R. Porter. 2018
+  (revised 2025). "The Opportunity Atlas: Mapping the Childhood Roots of Social Mobility."
+  [NBER Working Paper 25147](https://www.nber.org/papers/w25147).
+- Goetz, Edward G. 2018. *The One-Way Street of Integration: Fair Housing and the Pursuit of
+  Racial Justice in American Cities.* Ithaca, NY: Cornell University Press.
+- Reid, Carolina K. 2019. "Rethinking 'Opportunity' in the Siting of Affordable Housing in
+  California: Resident Perspectives on the Low-Income Housing Tax Credit." *Housing Policy
+  Debate* 29(4): 645–669.
+  [doi:10.1080/10511482.2019.1582549](https://doi.org/10.1080/10511482.2019.1582549)
+- Sampson, Robert J. 2008. "Moving to Inequality: Neighborhood Effects and Experiments Meet
+  Social Structure." *American Journal of Sociology* 114(1): 189–231.
+  [doi:10.1086/589843](https://doi.org/10.1086/589843)

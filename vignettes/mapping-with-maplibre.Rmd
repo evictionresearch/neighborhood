@@ -659,6 +659,28 @@ re-entrancy guard), so it works in R Markdown, Quarto, the RStudio viewer, and
 saved standalone HTML alike. The three-pane affordability comparisons
 (`vignette("three-panes")`) are built on it.
 
+### Two different cities: lay out, don't lock
+
+`nt_map_sync()` locks *cameras*, so it is for one geography read under several
+layers. To compare two different places — Baltimore and Washington, D.C., say —
+each map needs its own camera; share only the row:
+
+```{r}
+balt <- ntdf(state = "MD", county = "Baltimore City", geometry = TRUE)
+dc   <- ntdf(state = "DC", geometry = TRUE)
+
+htmltools::browsable(htmltools::div(
+  style = "display:flex; gap:8px;",
+  htmltools::div(style = "flex:1;", nt_map(balt)),
+  htmltools::div(style = "flex:1;", nt_map(dc))
+))
+```
+
+The comparison still works because the *colors* are shared even though the
+cameras are not: the typology palette is fixed package-wide (the same 19
+`nt_conc` levels and hex codes everywhere), so "Mostly Black" is the same color
+in Baltimore as in D.C.
+
 ## 11. Decluttering the basemap: `nt_declutter_basemap()`
 
 Basemap styles tint parks, landcover, and hillshade. Under a semi-transparent
@@ -712,5 +734,3 @@ deterministic R code and require no AI to run.
 Hit a bug, or have a feature request or feedback? Please
 [open a GitHub issue](https://github.com/evictionresearch/neighborhood/issues) —
 problem reports and suggestions are always welcome.
-</content>
-</invoke>

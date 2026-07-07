@@ -88,6 +88,9 @@
 #'   state profiles — the y-axis labels and dashed gridlines are hidden until the
 #'   reader hovers the chart, then appear), or `"none"` (never; rely on the
 #'   hover crosshair value alone).
+#' @param y_max Optional fixed maximum for the value axis. Echarts otherwise
+#'   picks the next "nice" tick above the data — on a 100%-stacked bar that
+#'   reads as empty headroom to 120%; pass `y_max = 1` there.
 #' @param highlight_last Logical; mark the most recent point in the accent color.
 #'   With a `group`, the leading series (largest latest value) is accented.
 #' @param end_label Logical; draw a direct label at the end of each line — the
@@ -150,6 +153,7 @@ nt_chart <- function(data, x, y, group = NULL,
                      smooth = NULL,
                      crosshair = TRUE,
                      yaxis = c("always", "hover", "none"),
+                     y_max = NULL,
                      highlight_last = FALSE,
                      end_label = FALSE,
                      line_styles = NULL,
@@ -263,7 +267,8 @@ nt_chart <- function(data, x, y, group = NULL,
 
   e <- .nt_ern_chart_style(e, pal, value_fmt, crosshair, legend,
                            x_title, y_title, !is.null(baseline) || !is.null(band),
-                           yaxis = yaxis, end_label = isTRUE(end_label),
+                           yaxis = yaxis, y_max = y_max,
+                           end_label = isTRUE(end_label),
                            legend_pos = legend_pos, legend_nudge = legend_nudge,
                            grid_top = grid_top, digits = digits,
                            tooltip_count = count_map,
@@ -396,6 +401,7 @@ nt_spark <- function(values, type = c("line", "bar"),
 # ---------------------------------------------------------------------------
 .nt_ern_chart_style <- function(e, pal, value_fmt, crosshair, legend,
                                 x_title, y_title, has_marks, yaxis = "always",
+                                y_max = NULL,
                                 end_label = FALSE, legend_pos = "top",
                                 legend_nudge = c(0, 0), grid_top = 30,
                                 digits = NULL, tooltip_count = NULL,
@@ -444,6 +450,7 @@ nt_spark <- function(values, type = c("line", "bar"),
     # format the boxed value the crosshair prints on the value axis
     y_args$axisPointer <- list(label = list(formatter = .nt_pointer_js(value_fmt, digits)))
   }
+  if (!is.null(y_max)) y_args$max <- y_max
   e <- do.call(echarts4r::e_y_axis, y_args)
 
   # tooltip: dark navy bubble, crosshair axisPointer, ERN-formatted values.

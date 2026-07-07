@@ -54,6 +54,7 @@ devtools::install_github("evictionresearch/neighborhood", ref = "main")
 |---|---|
 | `nt_map()` | One-line choropleth of an `sf` layer |
 | `nt_map_sync()` | Two-plus maps side by side with locked (synchronized) views |
+| `nt_sync_maps()` | Synced flex-row for saved HTML pages with a cross-panel layer switcher (in development; overlaps `nt_map_sync()`) |
 | `nt_maplibre()` | Start a map (basemap, controls, fit to data) |
 | `nt_add_choropleth()` | Add a colored layer + legend + popup/tooltip |
 | `nt_add_labels()` | Add text labels |
@@ -99,6 +100,13 @@ devtools::install_github("evictionresearch/neighborhood", ref = "main")
 | `nt_areal_weight()` | Block-exact tract ↔ place population/housing weights |
 | `nt_zcta_weights()` | Block-exact ZCTA → tract housing-unit weights (the ZIP→tract crosswalk) |
 | `nt_erase_water()` | Clip water out of tract geometries for cleaner maps |
+| `nt_tract_interpolate()` | Weight tract-level estimates onto arbitrary boundaries |
+
+**External data**
+
+| Function | What it does |
+|---|---|
+| `nt_apartmentlist_rents()` | Apartment List's monthly Rent Estimates release, newest vintage, cached locally with an offline fallback |
 
 **Bundled data:** `us_nt_tracts2024` (typologies for every US tract), `mn_evictions` (MN county-month filings).
 

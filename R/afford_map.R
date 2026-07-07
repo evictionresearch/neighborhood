@@ -34,6 +34,12 @@
   "elevated"   = "Elevated risk (0.5\u20130.8)",
   "precarious" = "Precarious (<0.5)")
 
+# indefinite article for an initialism read letter-by-letter ("an ELI/LI/MI
+# household", "a VLI household") -- letter *names* starting with a vowel sound
+.afi_article <- function(w) {
+  if (grepl("^[AEFHILMNORSUX]", toupper(substr(w, 1, 1)))) "an" else "a"
+}
+
 #' The affordability verdict map (pane 1 of three)
 #'
 #' @description
@@ -62,7 +68,17 @@
 #' @param x An [afford_index()] result with geometry (`geometry = TRUE`) and a
 #'   `verdict` column ([afford_verdict()]; derived automatically when both
 #'   `supply` and `supply_stretch` are present).
-#' @param tier Which AMI tier to map (default `"VLI"`, the pilot group).
+#' @param tier Which AMI tier(s) to map (default `"VLI"`, the pilot group).
+#'   A vector (e.g. `c("ELI", "VLI", "LI")`) stacks one categorical layer per
+#'   tier on the same map -- layer ids `afford_<tier>` -- with only `active`
+#'   visible, ready for a tier switcher ([nt_sync_maps()]'s `switcher`
+#'   argument, or [mapgl::add_layers_control()]). Each layer carries its own
+#'   legend, tied to the layer via `layer_id`; a switcher/control shows one at
+#'   a time (standalone multi-tier maps will stack legends until one is
+#'   wired).
+#' @param active With multiple `tier`s, the tier whose layer starts visible
+#'   (default the first). The displacement hatch, when requested, is computed
+#'   from the active tier's tracts.
 #' @param verdict_col Which verdict column to render: `"verdict"` (default,
 #'   pane 1 -- incumbent prices), `"entry_verdict"` (pane 2 -- entry prices,
 #'   from [afford_entry()]), or `"stable_cat"` (pane 3 -- stability, from
@@ -101,7 +117,7 @@ afford_map <- function(x, tier = "VLI", verdict_col = "verdict",
                        displacement = NULL,
                        colors = c("#74b56e", "#fbf2b4", "#f4a582"),
                        legend_title = NULL, height = NULL, declutter = TRUE,
-                       ...) {
+                       active = tier[1], ...) {
   if (!inherits(x, "sf"))
     stop("`x` must be an sf object -- run afford_index(..., geometry = TRUE).",
          call. = FALSE)
@@ -120,38 +136,61 @@ afford_map <- function(x, tier = "VLI", verdict_col = "verdict",
   if (!"ami_tier" %in% names(x))
     stop("`x` needs an `ami_tier` column (an afford_index() result).", call. = FALSE)
   stopifnot(length(colors) == 3L)
-  tier <- as.character(tier)[1]
-  v <- x[!is.na(x[[verdict_col]]) & as.character(x$ami_tier) == tier, ]
-  if (nrow(v) == 0L)
-    stop("No rows for ami_tier = \"", tier, "\" with a non-missing `",
-         verdict_col, "`.", call. = FALSE)
+  tiers  <- unique(as.character(tier))
+  active <- as.character(active)[1]
+  if (!active %in% tiers)
+    stop("`active` (\"", active, "\") is not among `tier`.", call. = FALSE)
 
-  vals <- stats::na.omit(unique(as.character(v[[verdict_col]])))
-  lmap <- if (all(vals %in% names(.afi_verdict_labels))) .afi_verdict_labels
-          else if (all(vals %in% names(.afi_stability_labels))) .afi_stability_labels
-          else stop("`", verdict_col, "` must hold verdict classes (affordable /",
-                    " roughly affordable / not affordable) or stability classes",
-                    " (stable / elevated / precarious).", call. = FALSE)
-  lv <- unname(lmap)
-  v$verdict <- factor(unname(lmap[as.character(v[[verdict_col]])]), levels = lv)
-  # keep each class's color even when a class is absent from this region
-  present <- lv[lv %in% unique(as.character(v$verdict))]
-  cols <- unname(colors)[match(present, lv)]
-  v <- v[, intersect(c("GEOID", "county", "verdict", "supply", "supply_stretch"),
-                     names(v))]
-
-  if (is.null(legend_title))
-    legend_title <-
-      if (identical(unname(lmap), unname(.afi_stability_labels)))
+  # one filtered, labelled layer per tier (all share the same 3-class scheme)
+  layer_one <- function(t) {
+    v <- x[!is.na(x[[verdict_col]]) & as.character(x$ami_tier) == t, ]
+    if (nrow(v) == 0L)
+      stop("No rows for ami_tier = \"", t, "\" with a non-missing `",
+           verdict_col, "`.", call. = FALSE)
+    vals <- stats::na.omit(unique(as.character(v[[verdict_col]])))
+    lmap <- if (all(vals %in% names(.afi_verdict_labels))) .afi_verdict_labels
+            else if (all(vals %in% names(.afi_stability_labels))) .afi_stability_labels
+            else stop("`", verdict_col, "` must hold verdict classes (affordable /",
+                      " roughly affordable / not affordable) or stability classes",
+                      " (stable / elevated / precarious).", call. = FALSE)
+    lv <- unname(lmap)
+    v$verdict <- factor(unname(lmap[as.character(v[[verdict_col]])]), levels = lv)
+    # keep each class's color even when a class is absent from this region
+    present <- lv[lv %in% unique(as.character(v$verdict))]
+    cols <- unname(colors)[match(present, lv)]
+    v <- v[, intersect(c("GEOID", "county", "verdict", "supply", "supply_stretch"),
+                       names(v))]
+    lt <- legend_title
+    if (is.null(lt))
+      lt <- if (identical(unname(lmap), unname(.afi_stability_labels)))
         "stability verdict (can they stay?)"
       else sprintf(
-        if (verdict_col == "entry_verdict") "entry verdict for a %s household"
-        else "verdict for a %s household", tier)
+        if (verdict_col == "entry_verdict") "entry verdict for %s %s household"
+        else "verdict for %s %s household", .afi_article(t), t)
+    list(v = v, cols = cols, legend_title = lt)
+  }
+
   dots <- list(...)
   if (!"before_id" %in% names(dots)) dots$before_id <- "water"
-  m <- do.call(nt_map, c(list(v, color = "verdict", type = "categorical",
-                              colors = cols, legend_title = legend_title),
-                         dots))
+
+  m <- NULL
+  for (t in tiers) {
+    ly <- layer_one(t)
+    args <- c(list(data = ly$v, column = "verdict", type = "categorical",
+                   colors = ly$cols, legend_title = ly$legend_title,
+                   id = paste0("afford_", t), visible = identical(t, active)),
+              dots)
+    m <- if (is.null(m)) {
+      do.call(nt_map, c(list(ly$v, color = "verdict", type = "categorical",
+                             colors = ly$cols, legend_title = ly$legend_title,
+                             id = paste0("afford_", t),
+                             visible = identical(t, active)),
+                        dots))
+    } else {
+      do.call(nt_add_choropleth, c(list(map = m), args))
+    }
+  }
+  v <- layer_one(active)$v   # the hatch (below) keys off the active tier
 
   if (!is.null(displacement)) {
     d <- .afi_read_tabular(displacement)

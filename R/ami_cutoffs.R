@@ -335,7 +335,11 @@ ami_cutoffs <- function(state, counties, year = 2024,
     acs     = .afi_acs_cutoffs(state, counties, year, ami_tiers, hud_hh_size,
                                fmr_bump = FALSE))
 
-  if (ami_source != "auto") return(resolve(ami_source))
+  if (ami_source != "auto") {
+    res <- resolve(ami_source)
+    attr(res, "ami_source") <- ami_source
+    return(res)
+  }
 
   for (src in c("hud", "hud_acs", "acs_fmr", "acs")) {       # most-exact first
     res <- tryCatch(resolve(src), error = function(e) NULL)
@@ -343,6 +347,7 @@ ami_cutoffs <- function(state, counties, year = 2024,
       if (src != "hud")
         message("ami_cutoffs(): ami_source='auto' used '", src,
                 "' (exact HUD limits unavailable). Pass ami_source explicitly to override.")
+      attr(res, "ami_source") <- src
       return(res)
     }
   }
