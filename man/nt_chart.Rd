@@ -27,6 +27,7 @@ nt_chart(
   smooth = NULL,
   crosshair = TRUE,
   yaxis = c("always", "hover", "none"),
+  y_max = NULL,
   highlight_last = FALSE,
   end_label = FALSE,
   line_styles = NULL,
@@ -118,6 +119,11 @@ always visible), \code{"hover"} (the "newspaper graphic" style used in the ERN
 state profiles — the y-axis labels and dashed gridlines are hidden until the
 reader hovers the chart, then appear), or \code{"none"} (never; rely on the
 hover crosshair value alone).}
+
+\item{y_max}{Optional fixed maximum for the value axis. Normalized (100\%)
+stacked percent bars are capped at 1 automatically — ECharts would
+otherwise pick the next "nice" tick and render a phantom 120\% ceiling — so
+this is only needed to override that (or to cap a non-percent chart).}
 
 \item{highlight_last}{Logical; mark the most recent point in the accent color.
 With a \code{group}, the leading series (largest latest value) is accented.}

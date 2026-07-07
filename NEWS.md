@@ -1,5 +1,12 @@
 # neighborhood 1.1.0 (development version)
 
+## Bug fixes
+
+* `nt_chart()` now caps the value axis at 100% for normalized (100%) stacked
+  percent bars, instead of letting ECharts round up to a phantom 120% ceiling.
+  A new `y_max` argument overrides the cap (or caps any chart); percent charts
+  that legitimately exceed 100% are left alone.
+
 ## New features
 
 * `nt_apartmentlist_rents()` — Apartment List's monthly *Rent Estimates*

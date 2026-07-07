@@ -88,9 +88,10 @@
 #'   state profiles — the y-axis labels and dashed gridlines are hidden until the
 #'   reader hovers the chart, then appear), or `"none"` (never; rely on the
 #'   hover crosshair value alone).
-#' @param y_max Optional fixed maximum for the value axis. Echarts otherwise
-#'   picks the next "nice" tick above the data — on a 100%-stacked bar that
-#'   reads as empty headroom to 120%; pass `y_max = 1` there.
+#' @param y_max Optional fixed maximum for the value axis. Normalized (100%)
+#'   stacked percent bars are capped at 1 automatically — ECharts would
+#'   otherwise pick the next "nice" tick and render a phantom 120% ceiling — so
+#'   this is only needed to override that (or to cap a non-percent chart).
 #' @param highlight_last Logical; mark the most recent point in the accent color.
 #'   With a `group`, the leading series (largest latest value) is accented.
 #' @param end_label Logical; draw a direct label at the end of each line — the
@@ -185,6 +186,22 @@ nt_chart <- function(data, x, y, group = NULL,
     }
   }
   if (is.null(smooth)) smooth <- type != "bar"
+
+  # Auto-cap the value axis at 100% for normalized (100%) stacked percent bars.
+  # ECharts otherwise rounds the max up to the next "nice" tick, so a chart
+  # whose stacks sum to exactly 1 renders a phantom 120% ceiling. Fires only for
+  # a stacked percent chart on the 0-1 scale whose tallest stack is <= ~100%; an
+  # explicit `y_max` always wins, and percent charts that legitimately exceed
+  # 100% (max stack > 1) are left alone.
+  if (is.null(y_max) && value_fmt == "percent" && !is.null(stack)) {
+    yv <- suppressWarnings(as.numeric(data[[y]]))
+    if (length(yv) && any(is.finite(yv)) && all(yv >= -1e-9, na.rm = TRUE)) {
+      stack_sums <- tapply(yv, as.character(data[[x]]), sum, na.rm = TRUE)
+      top <- suppressWarnings(max(stack_sums, na.rm = TRUE))
+      if (is.finite(top) && top > 0 && top <= 1.02) y_max <- 1
+    }
+  }
+
   pal <- palette %nt||% .nt_chart_palette
 
   # Axis type: dates -> time axis (continuous); everything else -> category.
