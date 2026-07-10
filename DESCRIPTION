@@ -52,7 +52,8 @@ Suggests:
     tidyr,
     hudr,
     bartMachine,
-    arrow
+    arrow,
+    forecast
 SystemRequirements: tippecanoe (optional, for building PMTiles vector tiles)
 VignetteBuilder: knitr
 Config/testthat/edition: 3

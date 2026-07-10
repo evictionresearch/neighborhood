@@ -28,6 +28,7 @@ nt_chart(
   crosshair = TRUE,
   yaxis = c("always", "hover", "none"),
   y_max = NULL,
+  y_min = NULL,
   highlight_last = FALSE,
   end_label = FALSE,
   line_styles = NULL,
@@ -124,6 +125,11 @@ hover crosshair value alone).}
 stacked percent bars are capped at 1 automatically — ECharts would
 otherwise pick the next "nice" tick and render a phantom 120\% ceiling — so
 this is only needed to override that (or to cap a non-percent chart).}
+
+\item{y_min}{Optional fixed minimum for the value axis. Auto-capped percent
+stacks (see \code{y_max}) are pinned to 0 automatically so an all-high stacked
+bar (e.g. every value 80-98\%) starts at 0 rather than floating up to the
+data floor; supply this to override that or to set a floor elsewhere.}
 
 \item{highlight_last}{Logical; mark the most recent point in the accent color.
 With a \code{group}, the leading series (largest latest value) is accented.}

@@ -5,9 +5,29 @@
 * `nt_chart()` now caps the value axis at 100% for normalized (100%) stacked
   percent bars, instead of letting ECharts round up to a phantom 120% ceiling.
   A new `y_max` argument overrides the cap (or caps any chart); percent charts
-  that legitimately exceed 100% are left alone.
+  that legitimately exceed 100% are left alone. The same auto-cap now also pins
+  the baseline to 0 (the value axis carries `scale = TRUE`, which otherwise let
+  an all-high stacked bar — e.g. every value 80–98% — start at 78% instead of
+  0); a new `y_min` argument overrides that floor.
 
 ## New features
+
+* State-profile builders (`nt_profile_*`) — the inline-SVG charts and
+  interactive shells of the ERN state-profile pages
+  (evictionresearch.net/washington/ is the reference implementation), as
+  raw-HTML string builders for the profiles' Quarto template:
+  `nt_profile_trend_svg()` (monthly trend line with moratoria band +
+  baseline), `nt_profile_yearly_svg()` (yearly bars with SARIMA projection
+  overlay), `nt_profile_project_year()` (the year-end SARIMA projection
+  itself), `nt_profile_fourps_svg()` (the "four P's" policy-lever diagram),
+  `nt_profile_county_trend()` / `nt_profile_county_trend_data()` (the
+  county-trend chart shell + its embedded data payload),
+  `nt_profile_map_explorer()` (the MapLibre + PMTiles county explorer with
+  time slider and readout card), `nt_profile_county_table()` (the
+  searchable/sortable all-counties table), `nt_profile_monthly_js()` (the
+  Figure 1 data payload), and `nt_raw_html()` (emit any of the above from a
+  Quarto chunk). Output is byte-compatible with the shipped Washington
+  profile; the interaction JS lives with the page template, not the package.
 
 * `nt_apartmentlist_rents()` — Apartment List's monthly *Rent Estimates*
   release (metro/county/city median new-lease rents back to 2017), always the

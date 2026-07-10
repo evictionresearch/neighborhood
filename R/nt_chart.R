@@ -92,6 +92,10 @@
 #'   stacked percent bars are capped at 1 automatically — ECharts would
 #'   otherwise pick the next "nice" tick and render a phantom 120% ceiling — so
 #'   this is only needed to override that (or to cap a non-percent chart).
+#' @param y_min Optional fixed minimum for the value axis. Auto-capped percent
+#'   stacks (see `y_max`) are pinned to 0 automatically so an all-high stacked
+#'   bar (e.g. every value 80-98%) starts at 0 rather than floating up to the
+#'   data floor; supply this to override that or to set a floor elsewhere.
 #' @param highlight_last Logical; mark the most recent point in the accent color.
 #'   With a `group`, the leading series (largest latest value) is accented.
 #' @param end_label Logical; draw a direct label at the end of each line — the
@@ -155,6 +159,7 @@ nt_chart <- function(data, x, y, group = NULL,
                      crosshair = TRUE,
                      yaxis = c("always", "hover", "none"),
                      y_max = NULL,
+                     y_min = NULL,
                      highlight_last = FALSE,
                      end_label = FALSE,
                      line_styles = NULL,
@@ -187,18 +192,25 @@ nt_chart <- function(data, x, y, group = NULL,
   }
   if (is.null(smooth)) smooth <- type != "bar"
 
-  # Auto-cap the value axis at 100% for normalized (100%) stacked percent bars.
-  # ECharts otherwise rounds the max up to the next "nice" tick, so a chart
-  # whose stacks sum to exactly 1 renders a phantom 120% ceiling. Fires only for
-  # a stacked percent chart on the 0-1 scale whose tallest stack is <= ~100%; an
-  # explicit `y_max` always wins, and percent charts that legitimately exceed
+  # Normalize the value axis for 100% stacked percent bars. Two fixes, same gate:
+  #   * max -> 1: ECharts otherwise rounds up to the next "nice" tick, so a chart
+  #     whose stacks sum to exactly 1 renders a phantom 120% ceiling.
+  #   * min -> 0: the value axis carries scale = TRUE (so non-percent charts can
+  #     zoom), which otherwise lets the min float up to the data floor -- an
+  #     all-high stacked bar (e.g. every value 80-98%) would start at 78%, not 0.
+  # Fires only for a stacked percent chart whose tallest stack is <= ~100%;
+  # explicit y_max / y_min each win independently (so a caller can pin the max at
+  # 1 and still get the auto 0 baseline), and stacks that legitimately exceed
   # 100% (max stack > 1) are left alone.
-  if (is.null(y_max) && value_fmt == "percent" && !is.null(stack)) {
+  if (value_fmt == "percent" && !is.null(stack) && (is.null(y_max) || is.null(y_min))) {
     yv <- suppressWarnings(as.numeric(data[[y]]))
     if (length(yv) && any(is.finite(yv)) && all(yv >= -1e-9, na.rm = TRUE)) {
       stack_sums <- tapply(yv, as.character(data[[x]]), sum, na.rm = TRUE)
       top <- suppressWarnings(max(stack_sums, na.rm = TRUE))
-      if (is.finite(top) && top > 0 && top <= 1.02) y_max <- 1
+      if (is.finite(top) && top > 0 && top <= 1.02) {
+        if (is.null(y_max)) y_max <- 1
+        if (is.null(y_min)) y_min <- 0
+      }
     }
   }
 
@@ -284,7 +296,7 @@ nt_chart <- function(data, x, y, group = NULL,
 
   e <- .nt_ern_chart_style(e, pal, value_fmt, crosshair, legend,
                            x_title, y_title, !is.null(baseline) || !is.null(band),
-                           yaxis = yaxis, y_max = y_max,
+                           yaxis = yaxis, y_max = y_max, y_min = y_min,
                            end_label = isTRUE(end_label),
                            legend_pos = legend_pos, legend_nudge = legend_nudge,
                            grid_top = grid_top, digits = digits,
@@ -418,7 +430,7 @@ nt_spark <- function(values, type = c("line", "bar"),
 # ---------------------------------------------------------------------------
 .nt_ern_chart_style <- function(e, pal, value_fmt, crosshair, legend,
                                 x_title, y_title, has_marks, yaxis = "always",
-                                y_max = NULL,
+                                y_max = NULL, y_min = NULL,
                                 end_label = FALSE, legend_pos = "top",
                                 legend_nudge = c(0, 0), grid_top = 30,
                                 digits = NULL, tooltip_count = NULL,
@@ -468,6 +480,7 @@ nt_spark <- function(values, type = c("line", "bar"),
     y_args$axisPointer <- list(label = list(formatter = .nt_pointer_js(value_fmt, digits)))
   }
   if (!is.null(y_max)) y_args$max <- y_max
+  if (!is.null(y_min)) y_args$min <- y_min
   e <- do.call(echarts4r::e_y_axis, y_args)
 
   # tooltip: dark navy bubble, crosshair axisPointer, ERN-formatted values.
