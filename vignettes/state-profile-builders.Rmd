@@ -1,0 +1,196 @@
+---
+title: "State-profile page builders: the nt_profile_* family"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{State-profile page builders: the nt_profile_* family}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(neighborhood)
+# a peek helper: show the head of a long markup string
+peek <- function(s, n = 400) cat(substr(paste(s, collapse = ""), 1, n), "…\n")
+```
+
+The ERN state-profile pages (`evictionresearch.net/<state>/` — Washington is
+the reference implementation) are **not** htmlwidget pages. Their figures are
+hand-tuned inline SVG, and their interactivity (hover tooltips, the
+constant-px chart text, the MapLibre county explorer, the sortable table) is
+a vanilla-JS layer that ships with the page template and binds to specific
+element ids and classes.
+
+The `nt_profile_*` builders generate those exact fragments as plain character
+strings, from the same d3/o3 pipeline outputs the profiles have always used.
+A profile's Quarto document calls them from `results: asis` chunks via
+`nt_raw_html()`, which wraps the markup in a pandoc `{=html}` block so it
+passes through untouched. The complete working page — frontmatter, prose,
+chunks, and the format extension carrying the interaction JS — lives in
+`evictionresearch/library/templates/state_profile_qmd/`; this vignette
+documents each builder on its own.
+
+**The markup is a contract.** The page JS looks up ids like
+`chart-monthly-svg` and classes like `.data`, `.focal`, `.moratoria-band`,
+`.hover-grid`; the `--sx` scale-watcher sizes in-SVG text via
+`font-size: calc(<px> / var(--sx, …))`. Renaming ids/classes in the output
+breaks the page's behavior, which is why these functions emit fixed markup
+and expose *data* as arguments, not structure.
+
+## Figure 1 — the monthly trend line
+
+`nt_profile_trend_svg()` draws the statewide monthly series: a shaded
+moratorium band, gridlines derived from the same value→pixel map as the data
+(so labels can never drift from the geometry), the dashed pre-pandemic
+baseline, the filings path, and a focal dot + callout on the latest month.
+
+```{r fig1}
+monthly <- data.frame(
+  date    = seq(as.Date("2019-01-01"), by = "month", length.out = 64),
+  filings = round(1500 + 400 * sin(seq_len(64) / 5))
+)
+svg <- nt_profile_trend_svg(monthly$date, monthly$filings,
+                            baseline   = 1378,
+                            band_start = as.Date("2020-03-01"),
+                            band_end   = as.Date("2021-11-01"))
+peek(svg)
+```
+
+The hover tooltips need the same series in JS. `nt_profile_monthly_js()`
+embeds it as a `window.*` global (the page JS reads
+`window.__waMonthly.filings` / `.yearBase` / `.monthBase` / `.yDiv`). The
+`y_div` argument **must equal** the y ceiling the SVG derived — the series
+max rounded up to `y_step` — or hover positions drift from the drawn line:
+
+```{r fig1-js}
+y_div <- max(500, ceiling(max(c(monthly$filings, 1378)) / 500) * 500)
+peek(nt_profile_monthly_js(monthly$filings, year_base = 2019, y_div = y_div), 160)
+```
+
+## Figure 2 — yearly bars with a projection
+
+`nt_profile_yearly_svg()` draws one labeled bar per year, accents the partial
+latest year, and (when given a projection) overlays the 80% prediction-
+interval band, the dashed extension to the point estimate, and its tick +
+label. Bars carry `data-key` / `data-label` / `data-value` (and
+`data-proj-*`) attributes for the tooltip JS.
+
+```{r fig2}
+years <- data.frame(year = 2016:2022,
+                    filings = c(18157, 17682, 16938, 15190, 4748, 3986, 6200))
+svg <- nt_profile_yearly_svg(years$year, years$filings,
+                             baseline = 16532, latest_month = 4,
+                             projection = list(total = 19500, lo = 17000, hi = 22000))
+peek(svg)
+```
+
+The projection itself comes from `nt_profile_project_year()`, which fits
+`forecast::auto.arima` (seasonal) to the monthly series from `fit_start`
+onward, forecasts the rest of the calendar year, and returns
+`list(total, lo, hi, ytd, h, order)` — or `NULL` once the year is complete,
+so the overlay (and any prose gated on it) disappears on its own:
+
+```{r sarima, eval = FALSE}
+proj <- nt_profile_project_year(state_agg$date, state_agg$filings,
+                                fit_start = "2023-01-01")
+proj$order   # e.g. "SARIMA(3,1,0)(1,0,0)[12]"
+```
+
+On the Washington data this refits deterministically — the same series and
+forecast version reproduce the shipped 26,314 (80% PI 22,874–29,754).
+
+## Figure 3 — the county-trend chart
+
+This chart is drawn client-side (d3, Catmull-Rom smoothing) from an embedded
+payload. Two builders split the work: `nt_profile_county_trend()` emits the
+shell (granularity toggle, county-highlight dropdown, the empty `<svg>`, the
+caption), and `nt_profile_county_trend_data()` computes the payload from the
+county-month aggregate — per-county yearly and monthly vectors plus a
+`rec` flag marking counties whose record full year fell in the last
+`record_window` years (the chart colors those lines red).
+
+```{r fig3}
+county_agg <- expand.grid(month = 1:12, year = 2016:2020,
+                          county_code = c("53033", "53053"))
+county_agg$county  <- ifelse(county_agg$county_code == "53033", "King", "Pierce")
+county_agg$filings <- rpois(nrow(county_agg), 40)
+
+peek(nt_profile_county_trend(
+  label = "Figure 3 · Counties on the rise",
+  caption_num = "Figure 3",
+  caption_desc = "Monthly filings by county.",
+  caption_src = "source · demo"), 200)
+peek(nt_profile_county_trend_data(county_agg), 220)
+```
+
+## Figure 4 — the MapLibre county explorer
+
+`nt_profile_map_explorer()` emits the full explorer section: the map node
+with PMTiles + choropleth configuration in `data-*` attributes, the address
+search, help/onboarding/loading affordances, the legend node, the time-window
+slider stack, and the readout card (stat tiles, sparkline, ACS county
+characteristics). Everything live about it — fetching the sidecars, painting
+bins with ckmeans, the slider — is the page template's explorer JS.
+
+```{r fig4}
+peek(nt_profile_map_explorer(
+  county_json = "data/o2b_county_monthly.json?v=1",
+  acs_json    = "data/o2c_county_acs.json?v=1",
+  pmtiles     = "assets/maps/o2_wa_counties.pmtiles?v=1",
+  center = c(-120.74, 47.55), zoom = 6,
+  bbox   = c(-124.85, 45.5, -116.92, 49.05)), 260)
+```
+
+Every piece of state-specific copy (search placeholder, disclosure text, the
+readout's ACS note) is an argument with the Washington wording as default.
+
+## Table 1 — the all-counties table
+
+`nt_profile_county_table()` emits the data payload (a `window.*` global the
+page JS renders rows from — and re-sums when the explorer's time window
+changes) plus the search/sort shell and caption. The top county by rate gets
+`hi: true` (the red highlight).
+
+```{r table1}
+co <- data.frame(county  = c("Clark", "Pierce", "King"),
+                 renters = c(65952, 123930, 419249),
+                 filings = c(2192, 3707, 8850))
+co$rate <- round(1000 * co$filings / co$renters, 1)
+peek(nt_profile_county_table(co[order(-co$rate), ],
+  caption_desc = "Demo counties.", caption_src = "source · demo"), 300)
+```
+
+## Figure 5 — the "four P's" diagram
+
+`nt_profile_fourps_svg()` builds the action section's policy-lever graphic:
+the eviction-to-displacement pathway, four bands (Prevent / Protect /
+Preserve / Produce) of tier-badged lever chips, the "strongest together"
+connector, and the footer. All content — bands, levers, tiers, the paired
+levers, footer lines — is an argument with the Washington graphic as the
+default, so calling it bare reproduces the shipped figure:
+
+```{r fig5}
+peek(nt_profile_fourps_svg(), 260)
+```
+
+One sizing rule to respect: the in-SVG text uses
+`calc(<px> / var(--sx, 8.2))`. The `8.2` fallback is the page CSS's 820px
+min-width divided by the 100-unit viewBox — it keeps labels sane before the
+page's scale-watcher runs. Don't reset it to 1.
+
+## Emitting from Quarto
+
+Each artifact is one chunk carrying the `results: asis` option:
+
+```{r quarto-pattern, eval = FALSE}
+# ```{r} chunk in the profile .qmd, with option `results: asis`
+nt_raw_html(
+  nt_profile_trend_svg(m$date, m$filings, baseline = pp_monthly,
+                       band_start = band0, band_end = band1), "\n",
+  nt_profile_monthly_js(m$filings, year_base = 2019, y_div = fig1_ymax)
+)
+```
+
+`nt_raw_html()` matters: chunk output is re-read as markdown, and indented
+HTML would otherwise be parsed into code blocks. The `{=html}` fence it
+writes makes pandoc pass the fragment through byte-for-byte.

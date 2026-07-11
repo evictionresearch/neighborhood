@@ -28,6 +28,8 @@
   Figure 1 data payload), and `nt_raw_html()` (emit any of the above from a
   Quarto chunk). Output is byte-compatible with the shipped Washington
   profile; the interaction JS lives with the page template, not the package.
+  Full walkthrough in `vignette("state-profile-builders")`; the working page
+  kit is `evictionresearch/library/templates/state_profile_qmd/`.
 
 * `nt_apartmentlist_rents()` — Apartment List's monthly *Rent Estimates*
   release (metro/county/city median new-lease rents back to 2017), always the

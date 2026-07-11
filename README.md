@@ -74,6 +74,20 @@ devtools::install_github("evictionresearch/neighborhood", ref = "main")
 | `nt_stacked_bar()` | Composition / 100%-stacked bars |
 | `nt_slope()` / `nt_scatter()` / `nt_waffle()` | Before-after slopes / scatter + trend / unit ("Du Bois") chart |
 
+**State-profile page builders (raw inline SVG/HTML)**
+
+| Function | What it does |
+|---|---|
+| `nt_profile_trend_svg()` | Figure 1: monthly filings line (moratoria band, baseline, focal callout) as inline SVG |
+| `nt_profile_yearly_svg()` | Figure 2: yearly bars with the SARIMA projection overlay (PI band + dashed extension) |
+| `nt_profile_project_year()` | The year-end SARIMA projection itself (`forecast::auto.arima` on the monthly series) |
+| `nt_profile_county_trend()` / `nt_profile_county_trend_data()` | Figure 3: the interactive county-trend chart shell + its embedded data payload |
+| `nt_profile_map_explorer()` | Figure 4: the MapLibre + PMTiles county explorer (time slider, readout card, ACS characteristics) |
+| `nt_profile_county_table()` | Table 1: the searchable/sortable all-counties table + its data payload |
+| `nt_profile_fourps_svg()` | Figure 5: the "four P's" policy-lever diagram |
+| `nt_profile_monthly_js()` | Figure 1's hover-JS data payload (`window.*` global) |
+| `nt_raw_html()` | Emit any of the above from a Quarto chunk (`results: asis`) untouched by pandoc |
+
 **Static charts (ggplot2)**
 
 | Function | What it does |
@@ -230,6 +244,33 @@ nt_chart(filings, "month", "filings", type = "line",
 
 See `vignette("interactive-charts")` for the full tour, which also replicates the
 Minnesota state-profile charts and pulls live Apartment List rent data from a URL.
+
+## State-profile page builders
+
+The ERN state-profile pages (`evictionresearch.net/<state>/`) draw their
+figures as **hand-tuned inline SVG** wired to the page's own vanilla-JS layer
+(hover tooltips, a constant-px text watcher, phone re-windowing) — not as
+htmlwidgets. The `nt_profile_*` family builds those exact fragments as plain
+strings, so a profile's Quarto document can generate every chart, the MapLibre
+county explorer, the all-counties table, and the embedded data payloads from
+the d3/o3 pipeline outputs in a few `results: asis` chunks:
+
+``` r
+monthly <- data.frame(date = seq(as.Date("2019-01-01"), by = "month", length.out = 64),
+                      filings = round(1500 + 400 * sin(seq_len(64) / 5)))
+svg <- nt_profile_trend_svg(monthly$date, monthly$filings, baseline = 1378,
+                            band_start = as.Date("2020-03-01"),
+                            band_end   = as.Date("2021-11-01"))
+# in a Quarto chunk with `results: asis`:
+nt_raw_html(svg)
+```
+
+Output is byte-compatible with the shipped Washington profile — the reference
+implementation and its porting kit live at
+`evictionresearch/library/templates/state_profile_qmd/`, and the interaction
+JS ships with that kit's page template, not with this package. See
+`vignette("state-profile-builders")` for the full walkthrough (every builder,
+the id/class contract with the page JS, and the SARIMA projection helper).
 
 ## Bundled data
 
