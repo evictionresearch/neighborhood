@@ -81,10 +81,10 @@
 
 # ---- internal: pull an ACS bracket-count table, labelled with [lo, hi) -------
 .afi_get_brackets <- function(geography, table, state, counties, year) {
-  vars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
+  vars <- tidycensus::load_variables(year, "acs5")
   raw <- tidycensus::get_acs(geography = geography, table = table,
                              state = state, county = counties,
-                             year = year, survey = "acs5", cache_table = TRUE)
+                             year = year, survey = "acs5")
   raw <- dplyr::left_join(raw, vars, by = c("variable" = "name"))
   bounds <- t(vapply(raw$label, .afi_parse_label, numeric(2)))
   raw$lo <- bounds[, 1]
@@ -125,10 +125,10 @@
 # owner/renter `tenure_grp` (parsed from the label) so the two universes are not
 # merged, and drops the "Owner/Renter occupied:" subtotals and the grand total.
 .afi_get_tenure_brackets <- function(geography, state, counties, year) {
-  vars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
+  vars <- tidycensus::load_variables(year, "acs5")
   raw <- tidycensus::get_acs(geography = geography, table = "B25118",
                              state = state, county = counties,
-                             year = year, survey = "acs5", cache_table = TRUE)
+                             year = year, survey = "acs5")
   raw <- dplyr::left_join(raw, vars, by = c("variable" = "name"))
   raw$tenure_grp <- ifelse(grepl("Owner occupied", raw$label), "owner",
                     ifelse(grepl("Renter occupied", raw$label), "renter", NA_character_))

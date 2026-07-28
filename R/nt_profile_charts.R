@@ -60,7 +60,7 @@
 #' @export
 nt_profile_trend_svg <- function(dates, values, baseline,
                                  band_start = NULL, band_end = NULL,
-                                 baseline_range_label = "Jan 2017 – Feb 2020",
+                                 baseline_range_label = "Jan 2017 \u2013 Feb 2020",
                                  y_step = 500,
                                  svg_id = "chart-monthly-svg",
                                  indicator_id = "chart-monthly-indicator",
@@ -81,7 +81,7 @@ nt_profile_trend_svg <- function(dates, values, baseline,
   )
 
   focal_x <- m_x[mN]; focal_y <- m_y[mN]
-  annot_label <- sprintf("%s · %s", .nt_fmt_int(values[mN]),
+  annot_label <- sprintf("%s \u00b7 %s", .nt_fmt_int(values[mN]),
                          format(dates[mN], "%B %Y"))
 
   # Moratoria band — mapped through the same date->x scale as the data line.
@@ -94,7 +94,7 @@ nt_profile_trend_svg <- function(dates, values, baseline,
     }
     band_svg <- sprintf(paste0(
       '        <!-- Pandemic moratoria band. X and width come from content.md\'s\n',
-      '             moratorium block; the band shades the start→end span of the\n',
+      '             moratorium block; the band shades the start\u2192end span of the\n',
       '             state\'s eviction moratorium in chart coordinate space. -->\n',
       '        <rect class="moratoria-band" x="%.1f" y="20" width="%.1f" height="280"/>\n'),
       x_of_date(band_start), x_of_date(band_end) - x_of_date(band_start))
@@ -129,7 +129,7 @@ nt_profile_trend_svg <- function(dates, values, baseline,
     '        </style>\n',
     band_svg,
     sprintf(paste0(
-      '        <!-- Y scale: 0 → y=%d (floor), %d → y=%d (data-driven).\n',
+      '        <!-- Y scale: 0 \u2192 y=%d (floor), %d \u2192 y=%d (data-driven).\n',
       '             Gridlines + labels are generated in render.R (grid_lines_svg) so\n',
       '             they always match the plotted line\'s scale. -->\n'),
       mY1, y_max, mY0),
@@ -208,7 +208,7 @@ nt_profile_yearly_svg <- function(years, values, baseline,
 
   is_partial <- years == latest_year & latest_month < 12
   year_data_label <- ifelse(is_partial,
-                            sprintf("%d (Jan–%s)", years, months_short[latest_month]),
+                            sprintf("%d (Jan\u2013%s)", years, months_short[latest_month]),
                             as.character(years))
   bar_class <- ifelse(is_partial, "ybar focal", "ybar")
   val_class <- ifelse(is_partial, "yval focal", "yval")
@@ -276,14 +276,14 @@ nt_profile_yearly_svg <- function(years, values, baseline,
     '          .ybar.focal { fill: #F9322B; }\n',
     '          .ybaseline { stroke: #6c7a89; stroke-width: 0.5; stroke-dasharray: 1 4; }\n',
     '          .yfloor { stroke: #19222C; stroke-width: 1; }\n',
-    '          /* Projection styles — pale band = 80% PI; dashed outline = point estimate */\n',
+    '          /* Projection styles \u2014 pale band = 80% PI; dashed outline = point estimate */\n',
     '          .yproj-pi    { fill: rgba(249, 50, 43, 0.07); stroke: none; }\n',
     '          .yproj-bar   { fill: none; stroke: #F9322B; stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.85; }\n',
     '          .yproj-tick  { stroke: #F9322B; stroke-width: 1.5; }\n',
     '          .yproj-label { font-family: \'Inter\', sans-serif; font-size: calc(11px / var(--sx, 1)); font-style: italic; fill: #CC2118; font-weight: 600; font-variant-numeric: tabular-nums; }\n',
     '        </style>\n',
     sprintf(paste0(
-      '        <!-- Y scale: 0 → y=%d (floor); ceiling is data-driven in render.R.\n',
+      '        <!-- Y scale: 0 \u2192 y=%d (floor); ceiling is data-driven in render.R.\n',
       '             Gridlines + labels generated there (grid_lines_svg) so they always\n',
       '             match the bar scale (previously hardcoded 5k/10k/15k drifted when\n',
       '             the projection pushed the ceiling past 18k). -->\n'), y_floor),
@@ -409,7 +409,7 @@ nt_profile_project_year <- function(dates, values, fit_start = "2023-01-01",
 nt_profile_fourps_svg <- function(
     bands = data.frame(
       P    = c("PREVENT", "PROTECT", "PRESERVE", "PRODUCE"),
-      num  = c("①", "②", "③", "④"),
+      num  = c("\u2460", "\u2461", "\u2462", "\u2463"),
       tag  = c("stop the eviction before it reaches court",
                "defend tenants & limit evictions",
                "keep today's low-cost homes",
@@ -431,13 +431,13 @@ nt_profile_fourps_svg <- function(
                     t1 = "T1 largest, fastest",
                     t2 = "T2 moderate / partial",
                     t3 = "T3 structural, slow"),
-    pathway_title = "FROM EVICTION TO DISPLACEMENT →",
+    pathway_title = "FROM EVICTION TO DISPLACEMENT \u2192",
     footer_lines = c(
       "Prevent and Protect interrupt the eviction; Preserve and Produce ease the rent pressure that starts it.",
       "Right to counsel needs both: substantial, sustained funding to meet today's caseload, and better ways to connect tenants to the lawyers.",
-      "Tiers and reinforcement reflect the eviction-prevention literature (HUD-ERA; Cassidy & Currie; Desmond; Colburn & Aldern). This profile's data\ndescribe filing trends, not causal policy effects.  ·  Eviction Research Network, UC Berkeley"),
+      "Tiers and reinforcement reflect the eviction-prevention literature (HUD-ERA; Cassidy & Currie; Desmond; Colburn & Aldern). This profile's data\ndescribe filing trends, not causal policy effects.  \u00b7  Eviction Research Network, UC Berkeley"),
     aria_label = paste0(
-      "The four P's of eviction prevention — Prevent, Protect, Preserve, Produce — ",
+      "The four P's of eviction prevention \u2014 Prevent, Protect, Preserve, Produce \u2014 ",
       "with documented-effect tiers (T1 largest, T3 structural), ",
       "along the path from a missed rent payment to displacement."),
     svg_id = "plate6-svg", svg_class = "plate6-svg",
@@ -504,7 +504,7 @@ nt_profile_fourps_svg <- function(
   py <- 79.5
   for (i in seq_len(length(pathway_x) - 1)) {
     mx <- (pathway_x[i] + pathway_x[i + 1]) / 2
-    add(text(mx, py, "→", 32, navy, anchor = "middle", baseline = "central", weight = "800"))
+    add(text(mx, py, "\u2192", 32, navy, anchor = "middle", baseline = "central", weight = "800"))
   }
   for (i in seq_along(pathway_x)) {
     w <- 11; h <- 3.6

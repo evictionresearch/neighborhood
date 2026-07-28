@@ -74,7 +74,7 @@ afford_zori <- function(month = NULL, path = NULL, refresh = FALSE,
 .afi_zcta_rent <- function(year) {
   d <- tidycensus::get_acs(geography = "zcta",
                            variables = c(standing = "B25064_001"),
-                           year = year, survey = "acs5", cache_table = TRUE)
+                           year = year, survey = "acs5")
   data.frame(zcta = as.character(d$GEOID), standing = as.numeric(d$estimate),
              stringsAsFactors = FALSE)
 }

@@ -10,6 +10,13 @@
   an all-high stacked bar — e.g. every value 80–98% — start at 78% instead of
   0); a new `y_min` argument overrides that floor.
 
+* Census pulls no longer emit deprecation warnings under current tidycensus:
+  the internal `get_acs()` and `load_variables()` calls dropped the retired
+  `cache_table` and `cache` arguments, which tidycensus now ignores (table
+  requests go through Census API groups, and variable metadata is no longer
+  cached locally). `ntdf()` keeps its `cache_table` argument so existing calls
+  keep working, but it is likewise ignored.
+
 ## New features
 
 * State-profile builders (`nt_profile_*`) — the inline-SVG charts and

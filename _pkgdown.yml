@@ -69,6 +69,23 @@ reference:
       - scale_ern
       - ern_palette
       - ern_swatch
+  - title: State-profile page builders
+    desc: >
+      The inline-SVG charts and interactive shells of the ERN state-profile
+      pages (evictionresearch.net/washington/ is the reference implementation),
+      as raw-HTML string builders for the profiles' Quarto template. Emit them
+      from `results: asis` chunks via nt_raw_html().
+    contents:
+      - nt_profile_trend_svg
+      - nt_profile_yearly_svg
+      - nt_profile_project_year
+      - nt_profile_county_trend
+      - nt_profile_county_trend_data
+      - nt_profile_map_explorer
+      - nt_profile_county_table
+      - nt_profile_fourps_svg
+      - nt_profile_monthly_js
+      - nt_raw_html
   - title: Model reading aids
     desc: >
       Partial-dependence extraction and the ERN house-style dependence plot,
@@ -102,6 +119,7 @@ articles:
       - mapping-with-maplibre
       - interactive-charts
       - chart-gallery
+      - state-profile-builders
       - ern-palettes
       - precarity-mapping
       - neighborhood-typologies

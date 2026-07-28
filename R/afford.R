@@ -69,20 +69,18 @@ afford <- function(
     tidycensus::get_acs(geography = "county",
             table = "B19001",
             state = state,
-            year = year,
-            cache_table = TRUE) %>%
+            year = year) %>%
     dplyr::filter(GEOID %in% paste0(state, counties)) %>%
-    dplyr::left_join(tidycensus::load_variables(year, "acs5", cache = TRUE), by = c("variable" = "name"))
+    dplyr::left_join(tidycensus::load_variables(year, "acs5"), by = c("variable" = "name"))
 
   med_inc <-
     tidycensus::get_acs(geography = "tract",
             variables = "B19013_001",
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE)
+            year = year)
 
-  acsvars <- tidycensus::load_variables(year, "acs5", cache = TRUE)
+  acsvars <- tidycensus::load_variables(year, "acs5")
 
   price <- dplyr::bind_rows(
     tidycensus::get_acs(geography = "tract",
@@ -93,14 +91,12 @@ afford <- function(
                           "B25085_021", "B25085_022", "B25085_023", "B25085_024"),
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE),
+            year = year),
     tidycensus::get_acs(geography = "tract",
             variables = c("B25085_025", "B25085_026", "B25085_027"),
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+            year = year)) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
     dplyr::arrange(GEOID, variable)
 
@@ -113,14 +109,12 @@ afford <- function(
                           "B25075_021", "B25075_022", "B25075_023", "B25075_024"),
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE),
+            year = year),
     tidycensus::get_acs(geography = "tract",
             variables = c("B25075_025", "B25075_026", "B25075_027"),
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+            year = year)) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
     dplyr::arrange(GEOID, variable)
 
@@ -133,14 +127,12 @@ afford <- function(
                           "B25063_021", "B25063_022", "B25063_023", "B25063_024", "B25063_025"),
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE),
+            year = year),
     tidycensus::get_acs(geography = "tract",
             variables = "B25063_026",
             state = state,
             county = counties,
-            year = year,
-            cache_table = TRUE)) %>%
+            year = year)) %>%
     dplyr::left_join(acsvars, by = c("variable" = "name")) %>%
     dplyr::arrange(GEOID, variable)
 

@@ -4,9 +4,11 @@
 #' @param geography Default "tract", see tidycensus for options
 #' @param county Study county or counties
 #' @param geometry Download sf spatial feature. Default is FALSE
-#' @param cache_table Default TRUE
+#' @param cache_table Deprecated and ignored (tidycensus now handles table
+#'   requests through Census API groups, with no local cache). Kept so existing
+#'   calls keep working.
 #' @param output Default "wide", other option is "tidy"
-#' @param year Default "NULL"
+#' @param year Default 2019
 #' @param ... Other keyword arguments
 #' @return A dataframe of racial segregated neighborhoods. When
 #'   `geometry = TRUE`, an `sf` object you can map directly with [nt_map()] /
@@ -47,7 +49,6 @@ acs_data <-
 		state = state,
 		county = county,
 		geometry = geometry,
-		cache_table = cache_table,
 		output = output,
 		year = year,
 		cb = TRUE

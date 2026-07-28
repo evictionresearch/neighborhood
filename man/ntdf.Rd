@@ -24,11 +24,13 @@ ntdf(
 
 \item{geometry}{Download sf spatial feature. Default is FALSE}
 
-\item{cache_table}{Default TRUE}
+\item{cache_table}{Deprecated and ignored (tidycensus now handles table
+requests through Census API groups, with no local cache). Kept so existing
+calls keep working.}
 
 \item{output}{Default "wide", other option is "tidy"}
 
-\item{year}{Default "NULL"}
+\item{year}{Default 2019}
 
 \item{...}{Other keyword arguments}
 }
