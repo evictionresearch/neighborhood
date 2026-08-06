@@ -72,11 +72,13 @@ nt_waffle(c(White = 52, Black = 23, Latine = 15, Asian = 10),
 \code{\link[=nt_stacked_bar]{nt_stacked_bar()}} for composition as a bar.
 
 Other ern_charts:
+\code{\link[=edr_regions]{edr_regions()}},
 \code{\link[=ern_palette]{ern_palette()}},
 \code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_bar]{nt_bar()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
+\code{\link[=nt_event_lines]{nt_event_lines()}},
 \code{\link[=nt_lollipop]{nt_lollipop()}},
 \code{\link[=nt_pd_bart]{nt_pd_bart()}},
 \code{\link[=nt_pd_plot]{nt_pd_plot()}},

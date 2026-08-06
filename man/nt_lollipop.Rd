@@ -102,11 +102,13 @@ nt_lollipop(disp, "race", "index", value_fmt = "multiple",
 \code{\link[=nt_bar]{nt_bar()}} for solid bars; \code{\link[=nt_dumbbell]{nt_dumbbell()}} for two-point gaps.
 
 Other ern_charts:
+\code{\link[=edr_regions]{edr_regions()}},
 \code{\link[=ern_palette]{ern_palette()}},
 \code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_bar]{nt_bar()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
+\code{\link[=nt_event_lines]{nt_event_lines()}},
 \code{\link[=nt_pd_bart]{nt_pd_bart()}},
 \code{\link[=nt_pd_plot]{nt_pd_plot()}},
 \code{\link[=nt_range]{nt_range()}},

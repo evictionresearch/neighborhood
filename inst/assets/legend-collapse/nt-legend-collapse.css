@@ -1,0 +1,31 @@
+/* nt-legend-collapse v1.0.2 — styles for collapsible mapgl legends.
+ * Pairs with nt-legend-collapse.js; canonical copy lives in the neighborhood
+ * package under inst/assets/legend-collapse/. The .nt-legend-title class is
+ * stamped by the JS on whatever title element the legend carries (h2 or
+ * .mapgl-legend-title, depending on the mapgl vintage). */
+
+.mapboxgl-legend .nt-legend-title { cursor: pointer; }
+
+.mapboxgl-legend .nt-legend-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  margin: 0;
+  padding: 0 0 0 8px;
+  cursor: pointer;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  opacity: 0.65;
+}
+.mapboxgl-legend .nt-legend-toggle:hover,
+.mapboxgl-legend .nt-legend-toggle:focus-visible { opacity: 1; }
+
+/* Collapsed: only the title line survives. !important outranks the per-id
+ * rules mapgl injects (#legend-xxxx h2 { margin-bottom: 10px }). */
+.mapboxgl-legend.nt-legend-collapsed > :not(.nt-legend-title) {
+  display: none !important;
+}
+.mapboxgl-legend.nt-legend-collapsed .nt-legend-title {
+  margin-bottom: 0 !important;
+}

@@ -86,11 +86,13 @@ nt_stacked_bar(tenure, "race", "hh", group = "tenure")
 \code{\link[=nt_bar]{nt_bar()}} for single-value bars.
 
 Other ern_charts:
+\code{\link[=edr_regions]{edr_regions()}},
 \code{\link[=ern_palette]{ern_palette()}},
 \code{\link[=ern_swatch]{ern_swatch()}},
 \code{\link[=nt_bar]{nt_bar()}},
 \code{\link[=nt_chart]{nt_chart()}},
 \code{\link[=nt_dumbbell]{nt_dumbbell()}},
+\code{\link[=nt_event_lines]{nt_event_lines()}},
 \code{\link[=nt_lollipop]{nt_lollipop()}},
 \code{\link[=nt_pd_bart]{nt_pd_bart()}},
 \code{\link[=nt_pd_plot]{nt_pd_plot()}},

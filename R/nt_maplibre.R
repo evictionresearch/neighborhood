@@ -67,7 +67,7 @@ nt_maplibre <- function(data = NULL, style = "positron", controls = TRUE,
   if (isTRUE(controls)) {
     map <- .nt_add_controls(map, search = search)
   }
-  map
+  nt_legend_collapse(map)
 }
 
 # Resolve a basemap argument to something mapgl::maplibre() accepts. Known
