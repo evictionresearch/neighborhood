@@ -51,6 +51,7 @@ Other ern_maps:
 \code{\link[=nt_hprm_map]{nt_hprm_map()}},
 \code{\link[=nt_hprm_pal]{nt_hprm_pal()}},
 \code{\link[=nt_layers_control]{nt_layers_control()}},
+\code{\link[=nt_legend_collapse]{nt_legend_collapse()}},
 \code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}},
