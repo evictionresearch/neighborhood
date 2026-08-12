@@ -45,6 +45,84 @@ test_that("nt_stacked_bar in-bar label formatter is orientation-aware", {
   expect_match(as.character(ev$x$opts$series[[1]]$label$formatter), "raw[1]", fixed = TRUE)
 })
 
+# Category order lives in the ROW order echarts4r serializes, not in the factor
+# levels, so these read the axis data the way the browser does.
+axis_cats <- function(e, orientation = "horizontal") {
+  ax <- if (orientation == "horizontal") e$x$opts$yAxis else e$x$opts$xAxis
+  as.character(unlist(ax[[1]]$data))
+}
+
+ranked <- function() data.frame(          # totals: White 1000, Black 250, Latine 700
+  race   = rep(c("White", "Black", "Latine"), each = 2),
+  tenure = rep(c("Own", "Rent"), 3),
+  hh     = c(620, 380,  100, 150,  300, 400),
+  stringsAsFactors = FALSE)
+
+test_that("nt_stacked_bar sorts bars by raw total, leader on top when horizontal", {
+  skip_if_not_installed("echarts4r")
+  d <- ranked()
+  e <- nt_stacked_bar(d, "race", "hh", group = "tenure", sort = "desc")
+  # horizontal: first category renders at the BOTTOM, so descending order reverses
+  expect_identical(axis_cats(e), c("Black", "Latine", "White"))
+
+  ev <- nt_stacked_bar(d, "race", "hh", group = "tenure", sort = "desc",
+                       orientation = "vertical")
+  expect_identical(axis_cats(ev, "vertical"), c("White", "Latine", "Black"))
+
+  ea <- nt_stacked_bar(d, "race", "hh", group = "tenure", sort = "asc")
+  expect_identical(axis_cats(ea), c("White", "Latine", "Black"))
+})
+
+test_that("nt_stacked_bar sort ranks on raw totals even when proportional", {
+  skip_if_not_installed("echarts4r")
+  # every bar is 100% once normalized; only the raw totals can rank them
+  d <- data.frame(race = rep(c("Small", "Big"), each = 2),
+                  tenure = rep(c("Own", "Rent"), 2),
+                  hh = c(1, 1, 500, 500))
+  e <- nt_stacked_bar(d, "race", "hh", group = "tenure", sort = "desc")
+  expect_identical(axis_cats(e), c("Small", "Big"))   # Big on top
+})
+
+test_that("nt_stacked_bar n keeps the leading categories and drops their rows", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(race = rep(c("A", "B", "C"), each = 2),
+                  tenure = rep(c("Own", "Rent"), 3),
+                  hh = c(10, 10, 500, 500, 100, 100))
+  e <- nt_stacked_bar(d, "race", "hh", group = "tenure", sort = "desc", n = 2)
+  expect_identical(axis_cats(e), c("C", "B"))
+  expect_length(e$x$opts$series[[1]]$data, 2L)   # rows for the dropped bar are gone
+})
+
+test_that("an unsorted chart keeps its data order (the new arguments change nothing)", {
+  skip_if_not_installed("echarts4r")
+  expect_identical(axis_cats(nt_stacked_bar(tenure(), "race", "hh", group = "tenure")),
+                   c("White", "Black", "Latine"))   # as supplied, first at the bottom
+})
+
+test_that("nt_stacked_bar tooltip names the hovered segment", {
+  skip_if_not_installed("echarts4r")
+  f <- as.character(nt_stacked_bar(tenure(), "race", "hh", group = "tenure")$x$opts$tooltip$formatter)
+  expect_match(f, "p.seriesName", fixed = TRUE)   # which segment, not just which bar
+  expect_false(grepl(" of ", f, fixed = TRUE))    # no counts unless asked for
+})
+
+test_that("nt_stacked_bar tooltip_count adds the count and the bar total", {
+  skip_if_not_installed("echarts4r")
+  e <- nt_stacked_bar(tenure(), "race", "hh", group = "tenure",
+                      tooltip_count = TRUE, tooltip_count_suffix = " households")
+  f <- as.character(e$x$opts$tooltip$formatter)
+  expect_match(f, "' of '", fixed = TRUE)
+  expect_match(f, "households", fixed = TRUE)
+  expect_match(f, "White__Own", fixed = TRUE)   # count lookup keyed category__series
+  expect_match(f, '"White":1000', fixed = TRUE) # White = 620 + 380, the bar total
+
+  # a named column counts something other than the stacked value
+  d <- tenure(); d$people <- d$hh * 3
+  f2 <- as.character(nt_stacked_bar(d, "race", "hh", group = "tenure",
+                                    tooltip_count = "people")$x$opts$tooltip$formatter)
+  expect_match(f2, '"White":3000', fixed = TRUE)
+})
+
 # ---- nt_slope -------------------------------------------------------------
 
 slope_df <- function() data.frame(

@@ -2,6 +2,17 @@
 
 ## Bug fixes
 
+* A long `source` credit no longer runs off the canvas and loses its opening
+  words. ECharts title text does not wrap, so any credit wider than the chart
+  was clipped at the left edge, silently dropping the front of the attribution
+  (issue #18). The credit is now measured and wrapped to the chart width when
+  the page renders, and the plot area (plus a bottom legend) gives up the rows
+  the extra lines need; it re-wraps when the chart is resized, and a credit
+  that already fits stays put in the lower-right. Applies everywhere a `source`
+  is accepted: `nt_chart()`, `nt_bar()`, `nt_lollipop()`, `nt_dumbbell()`,
+  `nt_range()`, `nt_stacked_bar()`, `nt_scatter()`, `nt_slope()`, and
+  `nt_waffle()`.
+
 * `nt_chart()` now caps the value axis at 100% for normalized (100%) stacked
   percent bars, instead of letting ECharts round up to a phantom 120% ceiling.
   A new `y_max` argument overrides the cap (or caps any chart); percent charts
@@ -18,6 +29,23 @@
   keep working, but it is likewise ignored.
 
 ## New features
+
+* `nt_stacked_bar()` gained `sort` and `n`, so ranking a composition no longer
+  means dropping to raw echarts4r (issue #14). Bars rank on their *raw* totals,
+  since normalizing to 100% makes the plotted values useless for ranking, and a
+  horizontal chart puts the leader on top. `n` keeps the leading categories.
+  Charts that do not pass `sort` keep the order they have today.
+
+* Counts can now ride along in a stacked tooltip instead of being intercepted in
+  the echarts4r JSON by hand (issue #13). `nt_stacked_bar(tooltip_count = TRUE)`
+  reads the counts off the column being stacked (or name another column) and the
+  hover shows the segment, its share, and the bar's total: `63.4%` over
+  `951 of 1,499 households`. On `nt_chart()`, an existing `tooltip_count` on a
+  stacked chart now also closes the tooltip with a `Total` row.
+
+* The `nt_stacked_bar()` tooltip now names the segment under the cursor. It
+  previously showed the bar's category and a bare value, which on a stack left
+  the reader to guess which band they were hovering.
 
 * State-profile builders (`nt_profile_*`) — the inline-SVG charts and
   interactive shells of the ERN state-profile pages

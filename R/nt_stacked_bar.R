@@ -17,6 +17,11 @@
 #' @param y Name of the numeric value column (counts or amounts).
 #' @param group Name of the column whose levels stack within each bar.
 #' @param proportional Logical; normalize each bar to 100% (default `TRUE`).
+#' @param sort Category order: `"none"` (default, data order), `"desc"`, or
+#'   `"asc"`. Bars are ranked by their *raw* totals, not the plotted values,
+#'   since a proportional chart makes every bar 100%. Horizontal charts put the
+#'   leading bar on top; vertical ones put it on the left.
+#' @param n Optional integer; keep only the first `n` categories after sorting.
 #' @param orientation `"horizontal"` (default) or `"vertical"`.
 #' @param palette Segment colors, one per `group` level. Defaults to a neutral
 #'   accent-free ramp (interpolated to the number of groups; the brand accent is
@@ -31,6 +36,12 @@
 #'   `"multiple"`, or `"none"`; applies when `proportional = FALSE` (ignored when
 #'   proportional — segments are always shown as percentages).
 #' @param yaxis Value-axis scale visibility (see [nt_bar()]).
+#' @param tooltip_count Put the counts behind the shares in the hover: `TRUE`
+#'   uses the `y` column (the usual case for a proportional chart), or name a
+#'   different column holding the count. The tooltip then reads
+#'   `63.4%` over `951 of 1,499`, so a reader sees the segment, its share, and
+#'   the bar's total at once. Default `NULL` shows the share alone.
+#' @param tooltip_count_suffix Text after the counts (e.g. `" households"`).
 #' @param legend Logical; show the group legend (default `TRUE`).
 #' @param title,subtext,source,height Standard editorial extras (see [nt_bar()]).
 #' @param ... Passed to [echarts4r::e_bar()].
@@ -47,24 +58,33 @@
 #' @export
 nt_stacked_bar <- function(data, x, y, group,
                            proportional = TRUE,
+                           sort = c("none", "desc", "asc"),
+                           n = NULL,
                            orientation = c("horizontal", "vertical"),
                            palette = NULL,
                            value_labels = TRUE, label_min = 0.05,
                            value_fmt = c("comma", "percent", "currency", "multiple", "none"),
                            yaxis = c("always", "hover", "none"),
+                           tooltip_count = NULL, tooltip_count_suffix = "",
                            legend = TRUE,
                            title = NULL, subtext = NULL, source = NULL,
                            height = NULL, ...) {
   orientation <- match.arg(orientation)
   value_fmt   <- match.arg(value_fmt)
   yaxis       <- match.arg(yaxis)
-  .nt_check_cols(data, c(x, y, group))
+  sort        <- match.arg(sort)
+  # TRUE means "the column already being stacked"; a string names another one.
+  if (isTRUE(tooltip_count)) tooltip_count <- y
+  if (isFALSE(tooltip_count)) tooltip_count <- NULL
+  .nt_check_cols(data, c(x, y, group, tooltip_count))
   n_groups <- length(unique(as.character(data[[group]])))
   pal <- palette %nt||% .nt_seq_ramp(n_groups)
 
   d <- as.data.frame(data, stringsAsFactors = FALSE)
+  # Raw bar totals: they normalize a proportional chart, rank the bars for
+  # `sort`, and give the tooltip its "of N" denominator.
+  tot <- tapply(d[[y]], as.character(d[[x]]), sum, na.rm = TRUE)
   if (isTRUE(proportional)) {
-    tot <- tapply(d[[y]], as.character(d[[x]]), sum, na.rm = TRUE)
     d$.value <- d[[y]] / tot[as.character(d[[x]])]
     # a category whose values sum to 0 gives 0/0 = NaN -> a silently blank bar;
     # surface it and show an (intentional) empty segment instead.
@@ -83,6 +103,17 @@ nt_stacked_bar <- function(data, x, y, group,
   }
 
   cats <- unique(as.character(d[[x]]))
+  if (sort != "none") cats <- cats[order(tot[cats], decreasing = (sort == "desc"))]
+  if (!is.null(n)) cats <- utils::head(cats, n)
+  d <- d[as.character(d[[x]]) %in% cats, , drop = FALSE]
+  if (sort != "none") {
+    # Order the ROWS, not just the factor levels: echarts4r reads the category
+    # axis off the data as it arrives and ignores levels. A horizontal chart
+    # renders its first category at the bottom, so the leader goes last.
+    # Only ranked charts are reordered; an unsorted chart keeps its data order.
+    ord <- if (orientation == "horizontal") rev(cats) else cats
+    d <- d[order(match(as.character(d[[x]]), ord)), , drop = FALSE]
+  }
   d[[x]] <- factor(as.character(d[[x]]),
                    levels = if (orientation == "horizontal") rev(cats) else cats)
   # stable group order for consistent stacking + colors
@@ -113,7 +144,14 @@ nt_stacked_bar <- function(data, x, y, group,
 
   e <- .nt_cat_chart_style(e, orientation, vfmt, yaxis, pal,
                            tooltip = TRUE, legend = legend, source = source,
-                           zero_base = TRUE)
+                           zero_base = TRUE,
+                           tooltip_js = .nt_stack_tooltip_js(
+                             vfmt, orientation,
+                             count_map = if (!is.null(tooltip_count))
+                               .nt_count_map(d[[x]], d[[group]], d[[tooltip_count]]),
+                             total_map = if (!is.null(tooltip_count))
+                               .nt_total_map(d[[x]], d[[tooltip_count]]),
+                             count_suffix = tooltip_count_suffix))
   # 100% stacks read as true part-to-whole pinned to [0, 1].
   if (isTRUE(proportional)) {
     ax <- if (orientation == "horizontal") "xAxis" else "yAxis"

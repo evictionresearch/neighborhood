@@ -62,6 +62,45 @@
     "}"), idx, fmt))
 }
 
+# Item-trigger tooltip for a stacked bar. The plain item tooltip above names the
+# hovered bar but not the hovered *segment*, which on a stack is what the cursor
+# is actually pointing at — so this one heads with the category and gives the
+# segment its own row. `count_map` / `total_map` (see .nt_count_map) add the
+# counts behind the shares, as "951 of 1,499".
+.nt_stack_tooltip_js <- function(value_fmt, orientation = "horizontal",
+                                 count_map = NULL, total_map = NULL,
+                                 count_suffix = "") {
+  idx <- .nt_value_index(orientation)
+  fmt <- .nt_js_number_expr(value_fmt, "v")
+  # Built with paste0 and handed to sprintf as a VALUE, never as format text:
+  # category labels like "<30% AMI" carry literal percent signs that would
+  # break sprintf parsing.
+  count_js <- if (is.null(count_map)) "''" else paste0(
+    "(function(){",
+    "  var __c = (", count_map, ")[(p.name || '') + '__' + (p.seriesName || '')];",
+    "  if(__c === undefined || __c === null || isNaN(+__c)) return '';",
+    "  var __s = (+__c).toLocaleString(undefined, {maximumFractionDigits: 0});",
+    if (is.null(total_map)) "" else paste0(
+      "  var __t = (", total_map, ")[p.name || ''];",
+      "  if(__t !== undefined && __t !== null && !isNaN(+__t)) {",
+      "    __s += ' of ' + (+__t).toLocaleString(undefined, {maximumFractionDigits: 0});",
+      "  }"),
+    "  return '<div style=\"font-size:11px;opacity:0.85;margin-top:2px\">'+__s+'",
+    count_suffix, "</div>';",
+    "})()"
+  )
+  htmlwidgets::JS(sprintf(paste0(
+    "function(p){",
+    "  var raw = p.value; var v = Array.isArray(raw) ? raw[%d] : raw;",
+    "  var fv = (v===null||v===undefined||isNaN(+v)) ? '\\u2014' : (%s);",
+    "  var dot = '<span style=\"display:inline-block;width:8px;height:8px;border-radius:50%%;margin-right:6px;background:'+(p.color||'#19222C')+'\"></span>';",
+    "  return '<div style=\"font-size:11px;opacity:0.85;margin-bottom:2px\">'+(p.name||'')+'</div>'+",
+    "    '<div style=\"display:flex;justify-content:space-between;gap:18px;line-height:1.5\">'+",
+    "    '<span>'+dot+(p.seriesName||'')+'</span>'+",
+    "    '<span style=\"font-weight:600\">'+fv+'</span></div>'+(%s);",
+    "}"), idx, fmt, count_js))
+}
+
 # Direct value-label formatter at the end of a bar / lollipop head.
 .nt_value_label_js <- function(value_fmt, orientation = "horizontal") {
   idx <- .nt_value_index(orientation)
@@ -78,7 +117,8 @@
 .nt_cat_chart_style <- function(e, orientation, value_fmt, yaxis, pal,
                                 tooltip = TRUE, legend = FALSE, source = NULL,
                                 zero_base = FALSE,
-                                grid_left = NULL, grid_right = NULL) {
+                                grid_left = NULL, grid_right = NULL,
+                                tooltip_js = NULL) {
   axis_label <- list(color = .ern_brand$muted, fontFamily = .ern_font, fontSize = 11)
   val_show   <- identical(yaxis, "always")
 
@@ -127,7 +167,7 @@
       e, trigger = "item",
       backgroundColor = .ern_brand$navy, borderWidth = 0,
       textStyle = list(color = "#ffffff", fontSize = 12, fontFamily = .ern_font),
-      formatter = .nt_item_tooltip_js(value_fmt, orientation))
+      formatter = tooltip_js %nt||% .nt_item_tooltip_js(value_fmt, orientation))
   }
   e <- echarts4r::e_legend(e, show = isTRUE(legend),
                            textStyle = list(fontFamily = .ern_font))
@@ -263,7 +303,8 @@
 #'   value axis always starts at zero (filled bars are honest about area).
 #' @param bar_width Optional bar width (e.g. `"62%"` or a pixel number).
 #' @param title,subtext Optional chart title and subtitle.
-#' @param source Optional attribution shown small in the lower-right.
+#' @param source Optional attribution shown small in the lower-right. Long
+#'   credits wrap to the chart width rather than run off the canvas.
 #' @param height Optional CSS height (e.g. `"420px"`).
 #' @param ... Passed to [echarts4r::e_bar()].
 #' @return An `echarts4r`/`htmlwidget` object.

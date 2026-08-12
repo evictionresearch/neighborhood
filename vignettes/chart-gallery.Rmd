@@ -296,7 +296,10 @@ fig("chart-stacked-renters.png")
 |---|---|---|
 | `group` | (required) | The column whose levels stack within each bar. |
 | `proportional` | `TRUE` | Normalize each bar to 100%. `FALSE` plots absolute stacked counts, which then honor `value_fmt`. |
+| `sort` | `"none"` | `"desc"` / `"asc"` rank the bars by their **raw** totals (every bar is 100% once proportional, so the plotted values can't rank anything). Horizontal puts the leader on top. |
+| `n` | `NULL` | Keep only the first `n` categories after sorting. |
 | `orientation` | `"horizontal"` | `"vertical"` for upright stacks. |
+| `tooltip_count` | `NULL` | `TRUE` puts the counts behind the shares in the hover, reading `951 of 1,499`; name another column to count something else. Pair with `tooltip_count_suffix`. |
 | `palette` | `NULL` | Defaults to a **neutral accent-free ramp** (the accent is reserved for a single highlight, not a whole band). A **named** vector matches groups — recommended for race compositions. |
 | `value_labels` | `TRUE` | Print each segment's share/value inside it. |
 | `label_min` | `0.05` | Minimum segment share (of its bar) to label, so slivers stay clean. Applies when `proportional = TRUE`. |
@@ -309,6 +312,16 @@ Compare passing nothing (neutral) versus a named race palette:
 
 ```{r}
 nt_stacked_bar(sc, "county", "renters", group = "race")   # neutral default ramp
+```
+
+**Ranked bars with the counts in the hover.** `sort = "desc"` puts the biggest
+category on top, and `tooltip_count = TRUE` answers the question a 100% stack
+always provokes, which is how many households each share stands for:
+
+```{r}
+nt_stacked_bar(sc, "county", "renters", group = "race",
+               sort = "desc", tooltip_count = TRUE,
+               tooltip_count_suffix = " renter households")
 ```
 
 **Absolute counts (`proportional = FALSE`) with `value_fmt` and `label_min`.**

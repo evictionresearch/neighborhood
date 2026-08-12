@@ -156,6 +156,31 @@ test_that("source adds a lower-right attribution title", {
   titles <- m$x$opts$title
   texts <- vapply(titles, function(t) t$text %||% "", character(1))
   expect_true("src · credit" %in% texts)
+  # tagged for the browser-side wrapper, which finds it by id
+  ids <- vapply(titles, function(t) t$id %||% "", character(1))
+  expect_true("ern-source" %in% ids)
+})
+
+test_that("a source credit ships the wrap hook that keeps it on the canvas", {
+  skip_if_not_installed("echarts4r")
+  plain <- nt_chart(trend_df(), "month", "filings")
+  expect_null(plain$jsHooks$render)
+
+  m <- nt_chart(trend_df(), "month", "filings", source = "src · credit")
+  code <- paste(vapply(m$jsHooks$render, function(h) h$code, character(1)),
+                collapse = "\n")
+  expect_match(code, "ern-source", fixed = TRUE)
+  expect_match(code, "measureText", fixed = TRUE)   # wraps to the measured width
+  expect_match(code, "ResizeObserver", fixed = TRUE)  # and re-wraps on resize
+  # the wrapped credit takes its rows out of the plot area, not the axis labels
+  expect_match(code, "gridBase + extra", fixed = TRUE)
+})
+
+test_that("the wrap hook only reclaims room from a shown, bottom-anchored legend", {
+  skip_if_not_installed("echarts4r")
+  code <- neighborhood:::.nt_source_wrap_js()
+  expect_match(code, "lg.show !== false", fixed = TRUE)
+  expect_match(code, "lg.top === null", fixed = TRUE)
 })
 
 test_that("value_fmt = 'multiple' formats values with a multiplication sign", {

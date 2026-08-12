@@ -83,7 +83,9 @@ axis ticks, bar labels). Default \code{NULL} uses per-format defaults:
 \item{tooltip_count}{Optional name of a column in \code{data} holding the
 count behind each plotted value. When set, the tooltip appends it in
 parentheses — e.g. a \code{value_fmt = "percent"} chart shows
-\verb{43.1\% (2,183 households)}. Pair with \code{tooltip_count_suffix}.}
+\verb{43.1\% (2,183 households)}. Pair with \code{tooltip_count_suffix}. On a
+stacked chart the tooltip also closes with a \code{Total} row, the counts
+summed across the bar's segments.}
 
 \item{tooltip_count_suffix}{Text appended after the count inside the
 parentheses (e.g. \code{" households"}, \code{" people"}). Default \code{""}.}
@@ -144,8 +146,10 @@ series — any of \code{"solid"}, \code{"dashed"}, \code{"dotted"} — for print
 grayscale-friendly differentiation. If the vector is named, names are matched
 to series (group) names; otherwise styles are applied in series order.}
 
-\item{source}{Optional short attribution string shown small in the lower-right
-corner (e.g. a data-source credit line).}
+\item{source}{Optional attribution shown small in the lower-right corner
+(e.g. a data-source credit line). A credit too long for one line is wrapped
+to the chart width when the page renders, and the plot area gives up the
+rows it needs, so a full method note stays on the canvas at any width.}
 
 \item{legend}{Logical; show a legend (defaults to \code{TRUE} when \code{group} is set,
 and to \code{FALSE} when \code{end_label = TRUE}).}

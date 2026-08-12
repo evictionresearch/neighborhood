@@ -59,7 +59,9 @@
 #' @param tooltip_count Optional name of a column in `data` holding the
 #'   count behind each plotted value. When set, the tooltip appends it in
 #'   parentheses — e.g. a `value_fmt = "percent"` chart shows
-#'   `43.1% (2,183 households)`. Pair with `tooltip_count_suffix`.
+#'   `43.1% (2,183 households)`. Pair with `tooltip_count_suffix`. On a
+#'   stacked chart the tooltip also closes with a `Total` row, the counts
+#'   summed across the bar's segments.
 #' @param tooltip_count_suffix Text appended after the count inside the
 #'   parentheses (e.g. `" households"`, `" people"`). Default `""`.
 #' @param tooltip_trigger `"axis"` (default) shows one tooltip listing every
@@ -106,8 +108,10 @@
 #'   series — any of `"solid"`, `"dashed"`, `"dotted"` — for print- and
 #'   grayscale-friendly differentiation. If the vector is named, names are matched
 #'   to series (group) names; otherwise styles are applied in series order.
-#' @param source Optional short attribution string shown small in the lower-right
-#'   corner (e.g. a data-source credit line).
+#' @param source Optional attribution shown small in the lower-right corner
+#'   (e.g. a data-source credit line). A credit too long for one line is wrapped
+#'   to the chart width when the page renders, and the plot area gives up the
+#'   rows it needs, so a full method note stays on the canvas at any width.
 #' @param legend Logical; show a legend (defaults to `TRUE` when `group` is set,
 #'   and to `FALSE` when `end_label = TRUE`).
 #' @param legend_pos Where the legend sits: `"top"` (default, echarts'
@@ -281,17 +285,15 @@ nt_chart <- function(data, x, y, group = NULL,
       (if (!is.null(subtext)) 16L else 0L)
   }
 
-  # Counts behind the plotted values, keyed "category__series" for the
-  # tooltip (echarts4r series rows carry only x and y, so the counts are
-  # embedded as a lookup instead). Series name falls back to the y column
-  # for ungrouped charts, matching echarts4r's naming.
+  # Counts behind the plotted values, for the tooltip. Series name falls back to
+  # the y column for ungrouped charts, matching echarts4r's naming. A stacked
+  # chart also gets its bar total, which is what the segments add up to.
   count_map <- NULL
+  total_map <- NULL
   if (!is.null(tooltip_count)) {
-    keys <- paste0(as.character(data[[x]]), "__",
-                   if (!is.null(group)) as.character(data[[group]]) else y)
-    cnts <- round(as.numeric(data[[tooltip_count]]))
-    count_map <- jsonlite::toJSON(
-      stats::setNames(as.list(cnts), keys), auto_unbox = TRUE)
+    count_map <- .nt_count_map(
+      data[[x]], if (!is.null(group)) data[[group]] else y, data[[tooltip_count]])
+    if (!is.null(stack)) total_map <- .nt_total_map(data[[x]], data[[tooltip_count]])
   }
 
   e <- .nt_ern_chart_style(e, pal, value_fmt, crosshair, legend,
@@ -302,6 +304,7 @@ nt_chart <- function(data, x, y, group = NULL,
                            grid_top = grid_top, digits = digits,
                            tooltip_count = count_map,
                            tooltip_count_suffix = tooltip_count_suffix,
+                           tooltip_total = total_map,
                            tooltip_trigger = tooltip_trigger)
 
   if (!is.null(baseline)) {
@@ -435,6 +438,7 @@ nt_spark <- function(values, type = c("line", "bar"),
                                 legend_nudge = c(0, 0), grid_top = 30,
                                 digits = NULL, tooltip_count = NULL,
                                 tooltip_count_suffix = "",
+                                tooltip_total = NULL,
                                 tooltip_trigger = "axis") {
   axis_label <- list(color = .ern_brand$muted, fontFamily = .ern_font, fontSize = 11)
   # y-axis labels start hidden for "hover" (revealed on hover via onRender) and
@@ -492,7 +496,8 @@ nt_spark <- function(values, type = c("line", "bar"),
     formatter = if (identical(tooltip_trigger, "item")) {
       .nt_tooltip_item_js(value_fmt, digits)
     } else {
-      .nt_tooltip_js(value_fmt, digits, tooltip_count, tooltip_count_suffix)
+      .nt_tooltip_js(value_fmt, digits, tooltip_count, tooltip_count_suffix,
+                     tooltip_total)
     }
   )
   if (isTRUE(crosshair) && identical(tooltip_trigger, "axis")) {
@@ -552,7 +557,7 @@ nt_spark <- function(values, type = c("line", "bar"),
 # "series  value" row per series, no color-dot dependence (matches the ERN
 # hand-built tooltips and stays legible on the dark background).
 .nt_tooltip_js <- function(value_fmt, digits = NULL, count_map = NULL,
-                           count_suffix = "") {
+                           count_suffix = "", total_map = NULL) {
   fmt <- .nt_js_number_expr(value_fmt, "val", digits)
   # Optional "(2,183 households)" appended after the formatted value. The
   # counts arrive as a lookup keyed "category__series" — echarts4r series
@@ -567,6 +572,20 @@ nt_spark <- function(values, type = c("line", "bar"),
     "      fv += ' (' + (+__cv).toLocaleString(undefined, {maximumFractionDigits: 0}) + '",
     count_suffix, ")';",
     "    }"
+  )
+  # A stacked chart's whole point is the part-to-whole, so when the counts are
+  # supplied the tooltip closes with the bar's total — the number every reader
+  # of a 100% stack asks for next (issue #13).
+  total_js <- if (is.null(total_map)) "''" else paste0(
+    "(function(){",
+    "  var __tv = (", total_map, ")[head];",
+    "  if(__tv === undefined || __tv === null || isNaN(+__tv)) return '';",
+    "  return '<div style=\"display:flex;justify-content:space-between;gap:18px;",
+    "line-height:1.5;margin-top:3px;padding-top:3px;border-top:1px solid rgba(255,255,255,0.25)\">'+",
+    "    '<span>Total</span>'+",
+    "    '<span style=\"font-weight:600\">'+(+__tv).toLocaleString(undefined, {maximumFractionDigits: 0})+'",
+    count_suffix, "</span></div>';",
+    "})()"
   )
   htmlwidgets::JS(sprintf(
     paste0(
@@ -583,11 +602,27 @@ nt_spark <- function(values, type = c("line", "bar"),
       "      '<span>'+dot+(p.seriesName||'')+'</span>'+",
       "      '<span style=\"font-weight:600\">'+fv+'</span></div>';",
       "  }).join('');",
-      "  return '<div style=\"font-size:11px;opacity:0.85;margin-bottom:2px\">'+head+'</div>'+rows;",
+      "  return '<div style=\"font-size:11px;opacity:0.85;margin-bottom:2px\">'+head+'</div>'+rows+(%s);",
       "}"
     ),
-    fmt, count_js
+    fmt, count_js, total_js
   ))
+}
+
+# Counts behind the plotted values, keyed "category__series" for a tooltip
+# lookup: echarts4r series rows carry only (x, y), so extra columns cannot ride
+# along in p.value. Returns JSON (a JS object literal) or NULL for no counts.
+.nt_count_map <- function(cats, series, counts) {
+  keys <- paste0(as.character(cats), "__", as.character(series))
+  jsonlite::toJSON(stats::setNames(as.list(round(as.numeric(counts))), keys),
+                   auto_unbox = TRUE)
+}
+
+# Stack totals for the same lookup, keyed by category alone.
+.nt_total_map <- function(cats, counts) {
+  tot <- tapply(as.numeric(counts), as.character(cats), sum, na.rm = TRUE)
+  jsonlite::toJSON(stats::setNames(as.list(round(unname(tot))), names(tot)),
+                   auto_unbox = TRUE)
 }
 
 # Tooltip for trigger = "item": one series at a time, headed by the hovered
@@ -709,8 +744,12 @@ nt_spark <- function(values, type = c("line", "bar"),
 
 # Add a small lower-right attribution. ECharts stores `title` as an array of
 # title objects, so a source credit is just one more title positioned bottom-right.
+# The id tags it for .nt_source_wrap_js(), which wraps long credits in the browser.
+.nt_source_id <- "ern-source"
+
 .nt_add_source <- function(e, source) {
   src <- list(
+    id = .nt_source_id,
     text = source, right = 10, bottom = 8,
     textStyle = list(color = .ern_brand$muted, fontFamily = .ern_font,
                      fontSize = 10, fontWeight = "normal")
@@ -721,7 +760,97 @@ nt_spark <- function(values, type = c("line", "bar"),
   } else {
     e$x$opts$title[[length(t) + 1L]] <- src
   }
-  e
+  htmlwidgets::onRender(e, .nt_source_wrap_js())
+}
+
+# JS (htmlwidgets::onRender) that keeps the source credit inside the canvas.
+# ECharts title text never wraps, so a credit wider than the chart runs off the
+# left edge and is silently clipped — the front of the attribution just
+# disappears. Only the browser knows the chart's pixel width, so the wrap
+# happens here: measure the credit in its own font, break it greedily to the
+# canvas width, then reserve the extra rows by pushing the grid (and a
+# bottom-anchored legend) up by a line each. A credit that already fits is left
+# exactly where it was, right-anchored; a wrapped one switches to left-anchored
+# so the block is not ragged on its left. Re-runs whenever the chart resizes.
+.nt_source_wrap_js <- function() {
+  paste0(
+    "function(el, x){\n",
+    "  var inst = (window.echarts && echarts.getInstanceByDom) ? echarts.getInstanceByDom(el) : null;\n",
+    "  if(!inst){ var c = el.querySelector('div'); if(c && window.echarts) inst = echarts.getInstanceByDom(c); }\n",
+    "  if(!inst) return;\n",
+    "  var ID = '", .nt_source_id, "', PAD = 10, LINE = 13, GAP = 8;\n",
+    "  var opt = inst.getOption(), titles = opt.title || [], idx = -1;\n",
+    "  for(var i = 0; i < titles.length; i++){ if(titles[i].id === ID) idx = i; }\n",
+    "  if(idx < 0) return;\n",
+    "  var ts = titles[idx].textStyle || {}, raw = titles[idx].text || '';\n",
+    "  var size = ts.fontSize || 10;\n",
+    "  var font = (ts.fontWeight || 'normal') + ' ' + size + 'px ' + (ts.fontFamily || 'sans-serif');\n",
+    # The grid and a bottom-anchored legend are only nudged from where the chart
+    # function put them, so stash those before the first wrap. ECharts 6 gives
+    # every legend a numeric `bottom` by default, hidden ones included, so a
+    # legend only counts as bottom-anchored if it is shown and has no `top`.
+    "  var g = (opt.grid || [])[0] || {}, lg = (opt.legend || [])[0] || {};\n",
+    "  var gridBase = (typeof g.bottom === 'number') ? g.bottom : null;\n",
+    "  var legBase = (lg.show !== false && typeof lg.bottom === 'number' &&\n",
+    "                 (lg.top === null || lg.top === undefined || lg.top === 'auto')) ? lg.bottom : null;\n",
+    "  var ctx = document.createElement('canvas').getContext('2d');\n",
+    "  function wrap(text, max){\n",
+    "    ctx.font = font;\n",
+    "    var out = [];\n",
+    "    String(text).split('\\n').forEach(function(para){\n",
+    "      var words = para.split(/\\s+/).filter(function(w){ return w.length; }), line = '';\n",
+    "      for(var i = 0; i < words.length; i++){\n",
+    "        var trial = line ? line + ' ' + words[i] : words[i];\n",
+    "        if(!line || ctx.measureText(trial).width <= max){ line = trial; }\n",
+    "        else { out.push(line); line = words[i]; }\n",
+    # One token wider than the whole canvas (a long URL, say): break it by
+    # character rather than let it overflow.
+    "        while(line.length > 1 && ctx.measureText(line).width > max){\n",
+    "          var cut = line.length;\n",
+    "          while(cut > 1 && ctx.measureText(line.slice(0, cut)).width > max) cut--;\n",
+    "          out.push(line.slice(0, cut)); line = line.slice(cut);\n",
+    "        }\n",
+    "      }\n",
+    "      if(line.length) out.push(line);\n",
+    "    });\n",
+    "    return out.length ? out : [''];\n",
+    "  }\n",
+    "  var last = raw;\n",
+    "  function layout(){\n",
+    "    if(inst.isDisposed && inst.isDisposed()) return;\n",
+    "    var w = inst.getWidth();\n",
+    "    if(!w || w <= 2 * PAD) return;\n",   # hidden container: retry on resize
+    "    var lines = wrap(raw, w - 2 * PAD), text = lines.join('\\n');\n",
+    "    if(text === last) return;\n",
+    "    last = text;\n",
+    "    var t = {id: ID, text: text, bottom: PAD - 2,\n",
+    "             left: lines.length > 1 ? PAD : null, right: lines.length > 1 ? null : PAD,\n",
+    "             textAlign: 'left',\n",
+    "             textStyle: {color: ts.color, fontFamily: ts.fontFamily, fontSize: size,\n",
+    "                         fontWeight: ts.fontWeight, lineHeight: LINE}};\n",
+    # A one-line credit already fits the space the chart reserved, so it moves
+    # nothing. Each wrapped line costs a row, plus GAP once, because that
+    # reserved space runs flush against the x-axis labels and a stacked block of
+    # small type needs to read as separate from them.
+    "    var patch = {title: t},\n",
+    "        extra = lines.length > 1 ? (lines.length - 1) * LINE + GAP : 0;\n",
+    "    if(gridBase !== null) patch.grid = {bottom: gridBase + extra};\n",
+    "    if(legBase !== null) patch.legend = {bottom: legBase + extra};\n",
+    "    inst.setOption(patch);\n",
+    "  }\n",
+    "  layout();\n",
+    # Shiny re-renders into the same element, so drop the previous watcher
+    # first — otherwise every re-render leaves one behind, holding the credit
+    # it was built with, and they fight over the title on the next resize.
+    "  if(el.ernSourceObs){ el.ernSourceObs.disconnect(); el.ernSourceObs = null; }\n",
+    "  if(el.ernSourceWin){ window.removeEventListener('resize', el.ernSourceWin); }\n",
+    "  if(window.ResizeObserver){\n",
+    "    el.ernSourceObs = new ResizeObserver(layout); el.ernSourceObs.observe(el);\n",
+    "  } else {\n",
+    "    el.ernSourceWin = layout; window.addEventListener('resize', layout);\n",
+    "  }\n",
+    "}"
+  )
 }
 
 # Editorial per-series styling, applied by post-processing the serialized series

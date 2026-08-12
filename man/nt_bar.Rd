@@ -80,7 +80,8 @@ value axis always starts at zero (filled bars are honest about area).}
 
 \item{title, subtext}{Optional chart title and subtitle.}
 
-\item{source}{Optional attribution shown small in the lower-right.}
+\item{source}{Optional attribution shown small in the lower-right. Long
+credits wrap to the chart width rather than run off the canvas.}
 
 \item{height}{Optional CSS height (e.g. \code{"420px"}).}
 

@@ -10,12 +10,16 @@ nt_stacked_bar(
   y,
   group,
   proportional = TRUE,
+  sort = c("none", "desc", "asc"),
+  n = NULL,
   orientation = c("horizontal", "vertical"),
   palette = NULL,
   value_labels = TRUE,
   label_min = 0.05,
   value_fmt = c("comma", "percent", "currency", "multiple", "none"),
   yaxis = c("always", "hover", "none"),
+  tooltip_count = NULL,
+  tooltip_count_suffix = "",
   legend = TRUE,
   title = NULL,
   subtext = NULL,
@@ -34,6 +38,13 @@ nt_stacked_bar(
 \item{group}{Name of the column whose levels stack within each bar.}
 
 \item{proportional}{Logical; normalize each bar to 100\% (default \code{TRUE}).}
+
+\item{sort}{Category order: \code{"none"} (default, data order), \code{"desc"}, or
+\code{"asc"}. Bars are ranked by their \emph{raw} totals, not the plotted values,
+since a proportional chart makes every bar 100\%. Horizontal charts put the
+leading bar on top; vertical ones put it on the left.}
+
+\item{n}{Optional integer; keep only the first \code{n} categories after sorting.}
 
 \item{orientation}{\code{"horizontal"} (default) or \code{"vertical"}.}
 
@@ -54,6 +65,14 @@ uncluttered (default \code{0.05}). Applies when \code{proportional = TRUE}.}
 proportional — segments are always shown as percentages).}
 
 \item{yaxis}{Value-axis scale visibility (see \code{\link[=nt_bar]{nt_bar()}}).}
+
+\item{tooltip_count}{Put the counts behind the shares in the hover: \code{TRUE}
+uses the \code{y} column (the usual case for a proportional chart), or name a
+different column holding the count. The tooltip then reads
+\verb{63.4\%} over \verb{951 of 1,499}, so a reader sees the segment, its share, and
+the bar's total at once. Default \code{NULL} shows the share alone.}
+
+\item{tooltip_count_suffix}{Text after the counts (e.g. \code{" households"}).}
 
 \item{legend}{Logical; show the group legend (default \code{TRUE}).}
 
