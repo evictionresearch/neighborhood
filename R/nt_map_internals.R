@@ -92,6 +92,21 @@
 .nt_chart_palette <- c("#223754", "#F9322B", "#7B96B5", "#2A8A86",
                        "#C8860D", "#5A3A88", "#2C6B3A", "#586573")
 
+# Height of one legend row, in px: the 14px swatch plus echarts' 5px padding
+# either side. Charts place their legend explicitly (ECharts 6 defaults it to
+# bottom-center, on top of the axis labels) and hand it this much of the plot.
+# A legend wide enough to wrap onto a second row will still crowd the plot.
+.nt_legend_row <- 24L
+
+# Height of the header strip a title (and optional subtext) needs, in px: the
+# plot starts below it, and a top legend sits in the gap between the two. One
+# title line = +26px, each extra "\n" line = +18px, a subtext = +16px.
+.nt_title_head <- function(title = NULL, subtext = NULL) {
+  if (is.null(title)) return(30L)
+  n_lines <- length(strsplit(title, "\n", fixed = TRUE)[[1]])
+  30L + 26L + 18L * (n_lines - 1L) + (if (!is.null(subtext)) 16L else 0L)
+}
+
 # Pre-1.1.0 qualitative palette, kept verbatim so published figures can be
 # reproduced exactly (ern_palette("legacy")).
 .nt_chart_palette_legacy <- c("#19222C", "#F9322B", "#223754", "#8BA3BE",

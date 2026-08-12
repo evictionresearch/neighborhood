@@ -116,9 +116,16 @@ nt_scatter <- function(data, x, y, group = NULL,
                             textStyle = list(color = "#ffffff", fontSize = 12,
                                              fontFamily = .ern_font),
                             formatter = tip)
-  e <- echarts4r::e_legend(e, show = isTRUE(legend) && grouped,
+  # Explicit top placement: ECharts 6 defaults a legend to bottom-center, on
+  # top of the x-axis labels. It sits clear of the title, and the plot gives up
+  # the row it occupies.
+  show_legend <- isTRUE(legend) && grouped
+  legend_top <- if (show_legend) .nt_title_head(title, subtext) else 30L
+  e <- echarts4r::e_legend(e, show = show_legend, top = legend_top,
+                           left = "center",
                            textStyle = list(fontFamily = .ern_font))
-  e <- echarts4r::e_grid(e, left = 58, right = 28, top = 30, bottom = 40)
+  e <- echarts4r::e_grid(e, left = 58, right = 28, bottom = 40,
+                         top = if (show_legend) legend_top + .nt_legend_row else 30L)
   if (!is.null(source)) e <- .nt_add_source(e, source)
   if (!is.null(title)) {
     e <- echarts4r::e_title(e, text = title, subtext = subtext %nt||% "",

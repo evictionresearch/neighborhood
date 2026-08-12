@@ -125,9 +125,15 @@ nt_waffle <- function(data, category = NULL, value = NULL,
                             textStyle = list(color = "#ffffff", fontSize = 12,
                                              fontFamily = .ern_font),
                             formatter = tip)
-  e <- echarts4r::e_legend(e, show = isTRUE(legend),
+  # Explicit top placement: ECharts 6 defaults a legend to bottom-center, which
+  # on a waffle prints the labels across the bottom rows of squares. The squares
+  # give up the row it occupies, and it clears the title.
+  legend_top <- if (isTRUE(legend)) max(36L, .nt_title_head(title, subtext)) else 36L
+  e <- echarts4r::e_legend(e, show = isTRUE(legend), top = legend_top,
+                           left = "center",
                            textStyle = list(fontFamily = .ern_font))
-  e <- echarts4r::e_grid(e, left = 12, right = 12, top = 36, bottom = 12)
+  e <- echarts4r::e_grid(e, left = 12, right = 12, bottom = 12,
+                         top = if (isTRUE(legend)) legend_top + .nt_legend_row else 36L)
   if (!is.null(source)) e <- .nt_add_source(e, source)
   if (!is.null(title)) {
     e <- echarts4r::e_title(e, text = title, subtext = subtext %nt||% "",

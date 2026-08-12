@@ -13,6 +13,17 @@
   `nt_range()`, `nt_stacked_bar()`, `nt_scatter()`, `nt_slope()`, and
   `nt_waffle()`.
 
+* Legends no longer render on top of the axis labels (issue #19). echarts4r
+  0.5.0 bundles ECharts 6, which moved the legend default to bottom-center, so
+  every chart that left the position to echarts started printing its legend
+  across the x-axis labels, or across the squares on a waffle. Charts now state
+  the position themselves: a top legend sits in the strip between the title and
+  the plot, and the plot gives up that row instead of sharing it. Affects
+  `nt_chart()` (whose documented `legend_pos = "top"` default was rendering at
+  the bottom), `nt_bar()`, `nt_lollipop()`, `nt_dumbbell()`, `nt_range()`,
+  `nt_stacked_bar()`, `nt_scatter()`, and `nt_waffle()`. Charts with no legend
+  keep the headroom they had.
+
 * `nt_chart()` now caps the value axis at 100% for normalized (100%) stacked
   percent bars, instead of letting ECharts round up to a phantom 120% ceiling.
   A new `y_max` argument overrides the cap (or caps any chart); percent charts

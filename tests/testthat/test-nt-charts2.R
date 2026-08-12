@@ -223,3 +223,62 @@ test_that("ERN ggplot scales return Scale objects", {
   expect_s3_class(scale_fill_ern_c(), "Scale")
   expect_identical(scale_colour_ern, scale_color_ern)
 })
+
+# ---- legend placement -----------------------------------------------------
+# ECharts 6 defaults a legend to bottom-center, on top of the axis labels, so
+# every chart states its own position instead of inheriting that default.
+
+test_that("chart legends are positioned explicitly, never left to the default", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(x = rep(c("A", "B"), 2), g = rep(c("p", "q"), each = 2),
+                  y = c(3, 5, 4, 2))
+  legs <- list(
+    bar     = nt_bar(d, "x", "y", group = "g"),
+    stacked = nt_stacked_bar(d, "x", "y", group = "g"),
+    waffle  = nt_waffle(data.frame(c = c("a", "b"), v = c(.4, .6)), "c", "v"),
+    scatter = nt_scatter(data.frame(x = 1:4, y = c(2, 4, 3, 5),
+                                    g = rep(c("p", "q"), 2)), "x", "y", group = "g"),
+    chart   = nt_chart(d, "x", "y", group = "g", type = "bar")
+  )
+  for (nm in names(legs)) {
+    lg <- legs[[nm]]$x$opts$legend
+    expect_true(is.numeric(lg$top), label = paste(nm, "legend has a numeric top"))
+    expect_null(lg$bottom)
+  }
+})
+
+test_that("a shown legend takes its row out of the plot, and a hidden one does not", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(x = rep(c("A", "B"), 2), g = rep(c("p", "q"), each = 2),
+                  y = c(3, 5, 4, 2))
+  with_leg <- nt_stacked_bar(d, "x", "y", group = "g")
+  no_leg   <- nt_stacked_bar(d, "x", "y", group = "g", legend = FALSE)
+  expect_equal(with_leg$x$opts$grid[[1]]$top, 30L + neighborhood:::.nt_legend_row)
+  expect_equal(no_leg$x$opts$grid[[1]]$top, 30L)   # unchanged from before the fix
+})
+
+test_that("a legend clears the title instead of landing on it", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(x = rep(c("A", "B"), 2), g = rep(c("p", "q"), each = 2),
+                  y = c(3, 5, 4, 2))
+  plain <- nt_stacked_bar(d, "x", "y", group = "g")
+  titled <- nt_stacked_bar(d, "x", "y", group = "g", title = "One line")
+  subbed <- nt_stacked_bar(d, "x", "y", group = "g", title = "One line",
+                           subtext = "and a subtitle")
+  expect_equal(plain$x$opts$legend$top, 30L)
+  expect_equal(titled$x$opts$legend$top, neighborhood:::.nt_title_head("One line"))
+  expect_gt(subbed$x$opts$legend$top, titled$x$opts$legend$top)
+  # a titled chart with no legend keeps the headroom it always had
+  expect_equal(nt_stacked_bar(d, "x", "y", group = "g", title = "One line",
+                              legend = FALSE)$x$opts$grid[[1]]$top, 30L)
+})
+
+test_that("nt_chart legend_pos still puts the legend below the plot on request", {
+  skip_if_not_installed("echarts4r")
+  d <- data.frame(x = rep(c("A", "B"), 2), g = rep(c("p", "q"), each = 2),
+                  y = c(3, 5, 4, 2))
+  below <- nt_chart(d, "x", "y", group = "g", type = "bar", legend_pos = "bottom")
+  expect_equal(below$x$opts$legend$bottom, 28)
+  expect_null(below$x$opts$legend$top)
+  expect_equal(below$x$opts$grid[[1]]$bottom, 96)   # room for labels, legend, source
+})

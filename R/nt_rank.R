@@ -118,7 +118,8 @@
                                 tooltip = TRUE, legend = FALSE, source = NULL,
                                 zero_base = FALSE,
                                 grid_left = NULL, grid_right = NULL,
-                                tooltip_js = NULL) {
+                                tooltip_js = NULL,
+                                title = NULL, subtext = NULL) {
   axis_label <- list(color = .ern_brand$muted, fontFamily = .ern_font, fontSize = 11)
   val_show   <- identical(yaxis, "always")
 
@@ -169,12 +170,19 @@
       textStyle = list(color = "#ffffff", fontSize = 12, fontFamily = .ern_font),
       formatter = tooltip_js %nt||% .nt_item_tooltip_js(value_fmt, orientation))
   }
-  e <- echarts4r::e_legend(e, show = isTRUE(legend),
+  # Place the legend explicitly: ECharts 6 defaults it to bottom-center, which
+  # drops it on the x-axis labels. It goes in the strip above the plot, clear of
+  # the title, and the plot gives up that row. Charts with no legend keep the
+  # headroom they have always had, title or not.
+  legend_top <- if (isTRUE(legend)) .nt_title_head(title, subtext) else 30L
+  e <- echarts4r::e_legend(e, show = isTRUE(legend), top = legend_top,
+                           left = "center",
                            textStyle = list(fontFamily = .ern_font))
 
   left  <- grid_left  %nt||% (if (orientation == "horizontal") 120 else 58)
   right <- grid_right %nt||% (if (orientation == "horizontal") 64 else 28)
-  e <- echarts4r::e_grid(e, left = left, right = right, top = 30, bottom = 40)
+  top   <- if (isTRUE(legend)) legend_top + .nt_legend_row else 30L
+  e <- echarts4r::e_grid(e, left = left, right = right, top = top, bottom = 40)
   if (!is.null(source)) e <- .nt_add_source(e, source)
   e
 }
@@ -379,7 +387,7 @@ nt_bar <- function(data, x, y, group = NULL,
 
   e <- .nt_cat_chart_style(e, orientation, value_fmt, yaxis, pal,
                            legend = grouped && isTRUE(legend), source = source,
-                           zero_base = TRUE)
+                           zero_base = TRUE, title = title, subtext = subtext)
 
   if (isTRUE(diverging) || !is.null(baseline)) {
     ref <- baseline %nt||% 0
@@ -645,7 +653,7 @@ nt_dumbbell <- function(data, x, low, high,
 
   e <- .nt_cat_chart_style(e, orientation, value_fmt, yaxis,
                            pal = cols, tooltip = TRUE, legend = isTRUE(legend),
-                           source = source)
+                           source = source, title = title, subtext = subtext)
   if (isTRUE(legend)) e$x$opts$legend$data <- list(lo_lab, hi_lab)
 
   if (!is.null(title)) {

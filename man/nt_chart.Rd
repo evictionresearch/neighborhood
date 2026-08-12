@@ -154,12 +154,13 @@ rows it needs, so a full method note stays on the canvas at any width.}
 \item{legend}{Logical; show a legend (defaults to \code{TRUE} when \code{group} is set,
 and to \code{FALSE} when \code{end_label = TRUE}).}
 
-\item{legend_pos}{Where the legend sits: \code{"top"} (default, echarts'
-position) or \code{"bottom"}, which centers the legend beneath the plot and
-reserves bottom space so the x-axis labels, the legend, and the \code{source}
-credit each get their own row. Use \code{"bottom"} for stacked-bar charts whose
-legend would crowd the title. (Piping \code{e_grid()} after the fact does NOT
-work — echarts4r appends a second inert grid instead of editing this one.)}
+\item{legend_pos}{Where the legend sits: \code{"top"} (default) centers it in the
+strip between the title and the plot, and \code{"bottom"} centers it beneath the
+plot and reserves bottom space so the x-axis labels, the legend, and the
+\code{source} credit each get their own row. Either way the plot gives up the
+room, rather than the legend being drawn over the chart. (Piping \code{e_grid()}
+after the fact does NOT work — echarts4r appends a second inert grid
+instead of editing this one.)}
 
 \item{legend_nudge}{Pixel offsets to fine-tune the legend from wherever
 \code{legend_pos} put it: \code{c(x, y)} with \code{x > 0} shifting right and \code{y > 0}

@@ -144,7 +144,7 @@ nt_stacked_bar <- function(data, x, y, group,
 
   e <- .nt_cat_chart_style(e, orientation, vfmt, yaxis, pal,
                            tooltip = TRUE, legend = legend, source = source,
-                           zero_base = TRUE,
+                           zero_base = TRUE, title = title, subtext = subtext,
                            tooltip_js = .nt_stack_tooltip_js(
                              vfmt, orientation,
                              count_map = if (!is.null(tooltip_count))

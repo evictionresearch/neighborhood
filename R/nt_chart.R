@@ -114,12 +114,13 @@
 #'   rows it needs, so a full method note stays on the canvas at any width.
 #' @param legend Logical; show a legend (defaults to `TRUE` when `group` is set,
 #'   and to `FALSE` when `end_label = TRUE`).
-#' @param legend_pos Where the legend sits: `"top"` (default, echarts'
-#'   position) or `"bottom"`, which centers the legend beneath the plot and
-#'   reserves bottom space so the x-axis labels, the legend, and the `source`
-#'   credit each get their own row. Use `"bottom"` for stacked-bar charts whose
-#'   legend would crowd the title. (Piping `e_grid()` after the fact does NOT
-#'   work — echarts4r appends a second inert grid instead of editing this one.)
+#' @param legend_pos Where the legend sits: `"top"` (default) centers it in the
+#'   strip between the title and the plot, and `"bottom"` centers it beneath the
+#'   plot and reserves bottom space so the x-axis labels, the legend, and the
+#'   `source` credit each get their own row. Either way the plot gives up the
+#'   room, rather than the legend being drawn over the chart. (Piping `e_grid()`
+#'   after the fact does NOT work — echarts4r appends a second inert grid
+#'   instead of editing this one.)
 #' @param legend_nudge Pixel offsets to fine-tune the legend from wherever
 #'   `legend_pos` put it: `c(x, y)` with `x > 0` shifting right and `y > 0`
 #'   shifting down (a single number is taken as `y`). E.g.
@@ -277,13 +278,8 @@ nt_chart <- function(data, x, y, group = NULL,
   )
 
   # Reserve grid headroom for the title so tall marks (e.g. stacked-100% bars)
-  # never run into it: one line = +26px, each extra "\n" line = +18px.
-  grid_top <- 30L
-  if (!is.null(title)) {
-    n_title_lines <- length(strsplit(title, "\n", fixed = TRUE)[[1]])
-    grid_top <- 30L + 26L + 18L * (n_title_lines - 1L) +
-      (if (!is.null(subtext)) 16L else 0L)
-  }
+  # never run into it.
+  grid_top <- .nt_title_head(title, subtext)
 
   # Counts behind the plotted values, for the tooltip. Series name falls back to
   # the y column for ungrouped charts, matching echarts4r's naming. A stacked
@@ -518,8 +514,14 @@ nt_spark <- function(values, type = c("line", "bar"),
   if (legend_below) {
     legend_args$bottom <- 28 - legend_nudge[2]   # y > 0 nudges down
     legend_args$left <- "center"
-  } else if (legend_nudge[2] != 0) {
-    legend_args$top <- legend_nudge[2]           # from the top edge
+  } else {
+    # A top legend is placed explicitly, never left to the echarts default:
+    # ECharts 6 moved that default to bottom-center, where the legend lands on
+    # the x-axis labels. It sits in the strip below the title (grid_top already
+    # carries the title's headroom), and the plot gives up that row.
+    legend_args$top <- grid_top + legend_nudge[2]
+    legend_args$left <- "center"
+    if (isTRUE(legend)) grid_top <- grid_top + .nt_legend_row
   }
   if (legend_nudge[1] != 0) {
     # A centered legend can't take an x offset directly; asymmetric padding
