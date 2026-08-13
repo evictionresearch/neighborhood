@@ -81,14 +81,24 @@ nt_hprm_pal <- function(model = c("edr", "eer", "divergence", "hprm")) {
   )
 }
 
+# Chip text color for a tier chip: white on dark tier colors, ink on light
+# ones (relative-luminance cut at 0.55 — the risk ramp's High and Extreme
+# fall below it, everything else above). Vectorized over hex codes.
+.nt_chip_text_col <- function(hex) {
+  rgb <- grDevices::col2rgb(hex) / 255
+  lum <- colSums(rgb * c(0.2126, 0.7152, 0.0722))
+  ifelse(lum < 0.55, "#ffffff", "#19222C")
+}
+
 #' The HPRM jurisdiction map (the report-page embed)
 #'
 #' @description
 #' Renders scored HPRM tract data as the jurisdiction-report interactive map:
 #' switchable choropleth layers for **displacement risk (EDR)**, **eviction
 #' risk (EER)**, the **HPRM composite (0-8)**, and **convergence** (tracts
-#' carrying both signals), each with its own legend, a rich per-tract popup,
-#' and the jurisdiction boundary drawn on top with the view framed to it.
+#' carrying both signals), each with its own legend, a rich per-tract popup
+#' (EDR and EER as side-by-side colored tier chips), and the jurisdiction
+#' boundary drawn on top with the view framed to it.
 #' The surface is drawn county-wide so boundary effects stay visible — the
 #' jurisdiction is framed, not clipped.
 #'
@@ -195,29 +205,56 @@ nt_hprm_map <- function(hprm, state = NULL, county = NULL, place = NULL,
 
   # --- Rich popup, shared by every layer -------------------------------------
   x$hprm_tract <- paste("Tract", x$GEOID)
-  fld_all <- c("Displacement risk (EDR)" = "dis_risk2",
-               "Eviction risk (EER)"     = "ev_risk2",
-               "HPRM composite (0-8)"    = "hprm_score",
-               "Convergence"             = "divergence",
-               "Low-income households"   = "p_li",
-               "Renter households"       = "renters_e",
-               "Neighborhood type"       = "nt_conc2",
-               "Data quality"            = "data_quality")
+  # EDR and EER render side by side as tier chips under the title — the tier
+  # text on its own layer color, so the popup reads like the legend
+  # (Tim, 2026-08-13). If either column is missing the chips are skipped and
+  # the tiers fall back to plain field rows.
+  has_chips <- all(c("dis_risk2", "ev_risk2") %in% names(x))
+  if (has_chips) {
+    chip <- function(v, pal) {
+      v   <- as.character(v)
+      bg  <- unname(pal[v])
+      out <- rep("&ndash;", length(v))
+      ok  <- !is.na(v) & !is.na(bg)
+      if (any(ok)) out[ok] <- paste0(
+        "<span style='background:", bg[ok], ";color:",
+        .nt_chip_text_col(bg[ok]),
+        ";padding:1px 7px;border-radius:3px;white-space:nowrap'>",
+        v[ok], "</span>")
+      out
+    }
+    lbl <- function(s) paste0(
+      "<span style='color:#586573;font-size:10px'>", s, "</span> ")
+    chip_row <- paste0(
+      "<div style='margin:4px 0 2px;line-height:2'>",
+      lbl("EDR"), chip(x$dis_risk2, nt_hprm_pal("edr")), "&ensp;",
+      lbl("EER"), chip(x$ev_risk2, nt_hprm_pal("eer")),
+      "</div>")
+  }
+  fld_all <- c(
+    if (!has_chips) c("EDR" = "dis_risk2", "EER" = "ev_risk2"),
+    c("HPRM composite (0-8)"  = "hprm_score",
+      "Convergence"           = "divergence",
+      "Low-income households" = "p_li",
+      "Renter households"     = "renters_e",
+      "Neighborhood type"     = "nt_conc2",
+      "Data quality"          = "data_quality"))
   flds <- fld_all[unname(fld_all) %in% names(x)]
+  fields_body <- if (length(flds)) nt_popup(x, fields = flds) else ""
   # Per-feature note (an `in_city_note` column travels through the geometry
   # join, so it stays row-aligned) + the shared region caveat, one styled div.
   row_note  <- if ("in_city_note" %in% names(x)) {
     dplyr::coalesce(as.character(x$in_city_note), "")
   } else ""
   combined <- paste0(row_note, if (is.null(popup_note)) "" else popup_note)
-  note_html <- if (any(nzchar(combined))) {
-    ifelse(nzchar(combined),
-           paste0("<div style='margin-top:6px;font-size:10px;color:#586573;max-width:250px'>",
-                  combined, "</div>"),
-           "")
-  } else NULL
-  x$hprm_popup <- nt_popup(x, title = "hprm_tract", prefix_title = FALSE,
-                           fields = flds, html = note_html)
+  note_html <- ifelse(nzchar(combined),
+    paste0("<div style='margin-top:6px;font-size:10px;color:#586573;max-width:250px'>",
+           combined, "</div>"),
+    "")
+  x$hprm_popup <- paste0(
+    "<b>", x$hprm_tract, "</b>",
+    if (has_chips) chip_row else "<br>",
+    fields_body, note_html)
   x$in_city_note <- NULL   # folded into the popup; drop from feature properties
 
   # --- Base map + switchable layers ------------------------------------------
