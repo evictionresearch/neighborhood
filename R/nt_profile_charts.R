@@ -120,7 +120,12 @@ nt_profile_trend_svg <- function(dates, values, baseline,
     '      <svg id="', svg_id, '" viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg">\n',
     '        <style>\n',
     '          .ax    { font-family: \'Inter\', sans-serif; font-size: calc(11px / var(--sx, 1)); fill: #586573; letter-spacing: 0.02em; }\n',
-    '          .annot { font-family: \'Inter\', sans-serif; font-style: italic; font-size: calc(13px / var(--sx, 1)); fill: #19222C; }\n',
+    '          /* The end-value label sits over the series, so it carries a\n',
+    '             white halo: paint-order draws the stroke first, then the fill,\n',
+    '             which keeps the text readable wherever the line happens to run.\n',
+    '             The halo is counter-scaled with the text so it stays even. */\n',
+    '          .annot { font-family: \'Inter\', sans-serif; font-style: italic; font-size: calc(13px / var(--sx, 1)); fill: #19222C;\n',
+    '                   paint-order: stroke; stroke: #ffffff; stroke-width: calc(4px / var(--sx, 1)); stroke-linejoin: round; }\n',
     '          .annot-line { stroke: #19222C; stroke-width: 0.5; stroke-dasharray: 2 3; }\n',
     '          .baseline { stroke: #6c7a89; stroke-width: 0.5; stroke-dasharray: 1 4; }\n',
     '          .data { fill: none; stroke: #19222C; stroke-width: 1.5; stroke-linejoin: round; }\n',
@@ -201,7 +206,13 @@ nt_profile_yearly_svg <- function(years, values, baseline,
                 ceiling(max(c(values, baseline, proj_hi), na.rm = TRUE) / y_ceiling_step) * y_ceiling_step)
   y_unit <- 220 / y_max
   y_of <- function(v) y_floor - v * y_unit
-  grid_svg <- .nt_grid_lines_svg(seq(y_grid_step, y_max, by = y_grid_step), 40, 970, 36,
+  # The bar row grows with the number of years. Anything past 11 or so runs
+  # off the fixed 1000-unit viewBox (Texas opens in 2012, Washington in
+  # 2016), so the right edge and the canvas follow the bars. max() keeps the
+  # short-series geometry byte-identical to what it was.
+  x_right  <- max(970, max(y_x) + ybW + 10)
+  vb_width <- max(1000, x_right + 30)
+  grid_svg <- .nt_grid_lines_svg(seq(y_grid_step, y_max, by = y_grid_step), 40, x_right, 36,
                                  y_of, function(v) paste0(v / 1000, "k"))
   y_height <- values * y_unit
   y_y <- y_floor - y_height
@@ -267,7 +278,7 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   )
 
   paste0(
-    '      <svg id="', svg_id, '" viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg">\n',
+    '      <svg id="', svg_id, '" viewBox="0 0 ', vb_width, ' 320" xmlns="http://www.w3.org/2000/svg">\n',
     '        <style>\n',
     '          .yax    { font-family: \'Inter\', sans-serif; font-size: calc(11px / var(--sx, 1)); fill: #586573; letter-spacing: 0.02em; }\n',
     '          .yval   { font-family: \'Inter\', sans-serif; font-size: calc(13px / var(--sx, 1)); fill: #19222C; font-weight: 600; font-variant-numeric: tabular-nums; }\n',
@@ -291,9 +302,9 @@ nt_profile_yearly_svg <- function(years, values, baseline,
     grid_svg, '\n',
     '        </g>\n',
     '        <!-- Pre-pandemic baseline line; label lives in the legend strip below the SVG. -->\n',
-    sprintf('        <line class="ybaseline" x1="40" y1="%.1f" x2="970" y2="%.1f"/>\n',
-            y_of(baseline), y_of(baseline)),
-    sprintf('        <line class="yfloor" x1="40" y1="%d" x2="970" y2="%d"/>\n', y_floor, y_floor),
+    sprintf('        <line class="ybaseline" x1="40" y1="%.1f" x2="%d" y2="%.1f"/>\n',
+            y_of(baseline), x_right, y_of(baseline)),
+    sprintf('        <line class="yfloor" x1="40" y1="%d" x2="%d" y2="%d"/>\n', y_floor, x_right, y_floor),
     '        <!-- Bars + value labels (one rect+text per year). -->\n',
     bars_svg, '\n',
     proj_svg,
