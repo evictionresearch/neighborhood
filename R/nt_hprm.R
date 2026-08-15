@@ -58,8 +58,9 @@
 #'   labels — the matching interior breaks are `c(1, 3, 5, 7)`).
 #' @return A named character vector of hex colors; names are the data values
 #'   (or bin labels, for `"hprm"`) in display order.
+#' @inheritSection nt_hprm_terms HPRM responsible use
 #' @family ern_maps
-#' @seealso [nt_hprm_map()]
+#' @seealso [nt_hprm_map()], [nt_hprm_terms()]
 #' @examples
 #' nt_hprm_pal("edr")
 #' nt_hprm_pal("hprm")
@@ -139,8 +140,10 @@ nt_hprm_pal <- function(model = c("edr", "eer", "divergence", "hprm")) {
 #'   labels).
 #' @return A `maplibregl` htmlwidget — save with [htmlwidgets::saveWidget()]
 #'   and iframe it from the report page.
+#' @inheritSection nt_hprm_terms HPRM responsible use
 #' @family ern_maps
-#' @seealso [nt_hprm_pal()], [nt_add_choropleth()], [nt_layers_control()]
+#' @seealso [nt_hprm_pal()], [nt_hprm_terms()], [nt_add_choropleth()],
+#'   [nt_layers_control()]
 #' @examples \dontrun{
 #' smc <- arrow::read_parquet("~/data/evictionresearch/hprm/hprm_v5_full_2022.parquet") |>
 #'   dplyr::filter(substr(geoid, 1, 5) == "06081", map)

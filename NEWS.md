@@ -1,5 +1,26 @@
 # neighborhood 1.1.0 (development version)
 
+## HPRM responsible use
+
+* The Do No Harm pledge that accompanies every release of Housing Precarity
+  Risk Model data now travels with the package. The HPRM is a tool for
+  protection, not a market signal, and it is not licensed for commercial
+  real-estate prospecting, speculation, tenant screening, rent-increase
+  justification, or use that targets vulnerable communities. New
+  `nt_hprm_terms()` prints the full pledge; a short form prints when the
+  package is attached; the terms are reproduced on the help page of every
+  function that reads HPRM data (`nt_hprm_map()`, `nt_hprm_pal()`,
+  `afford_stability()`, `inflow_index()`, `afford_map()`), and in the README,
+  the pkgdown reference index, and the three-panes vignette. The canonical
+  pledge is published at <https://evictionresearch.net/hprm/pledge.html>; the
+  in-package copy exists so the terms are available offline, and the published
+  pledge governs if the two diverge.
+
+* Documented explicitly that the package never ships or downloads HPRM data.
+  Every HPRM function takes data the user already holds, as a data frame or a
+  path to a local `.parquet`/`.rds` file. Tract-level data is requested
+  through the form linked from the pledge page.
+
 ## Bug fixes
 
 * A long `source` credit no longer runs off the canvas and loses its opening

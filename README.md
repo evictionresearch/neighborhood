@@ -12,6 +12,38 @@ usethis::use_pkgdown_github_pages() -->
 
 An R package with various functions to study neighborhood dynamics. 
 
+## ⚠️ HPRM responsible use — read before using the HPRM functions
+
+The Housing Precarity Risk Model (HPRM) identifies neighborhoods where
+low-income renters face elevated risk of displacement and formal eviction. **It
+is a tool for protection. It is not a market signal**, and it makes no
+prediction about any specific person, household, or property.
+
+Anyone who receives HPRM data signs a Do No Harm pledge. Using the HPRM
+functions in this package carries the same obligations. In particular:
+
+> **Do not use the HPRM for commercial real-estate prospecting or speculative
+> property activity.** That includes identifying acquisition targets, pricing
+> property, screening tenants, justifying rent increases, and developing
+> investment products. **The HPRM is not licensed for these uses.** Nor may it
+> be used to justify displacement, enforcement against vulnerable communities,
+> or exclusionary zoning that blocks housing for working-class and low-income
+> people, or to re-identify renters and households.
+
+Read the full pledge — all eight commitments, the citation, and scope limits —
+at **<https://evictionresearch.net/hprm/pledge.html>**. Run `nt_hprm_terms()`
+for the same text at the console. It is also reproduced on the help page of
+every function that touches HPRM data: `nt_hprm_map()`, `afford_stability()`,
+`inflow_index()`, and `afford_map()`.
+
+This is an honor system. The Eviction Research Network does not enforce it by
+contract; it relies on the integrity of data users to protect the communities
+these data describe. Report misuse to <timthomas@berkeley.edu>.
+
+**This package does not ship or download HPRM data.** Every HPRM function takes
+data you already hold. Request tract-level data through the form linked from the
+[pledge page](https://evictionresearch.net/hprm/pledge.html).
+
 ## Install
 
 ``` r

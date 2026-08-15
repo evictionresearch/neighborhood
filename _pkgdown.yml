@@ -3,6 +3,15 @@ template:
   bootstrap: 5
 
 reference:
+  - title: HPRM responsible use
+    desc: >
+      The Do No Harm pledge that travels with every release of Housing
+      Precarity Risk Model data. The HPRM is a tool for protection, not a
+      market signal: it may not be used for real-estate prospecting or
+      speculation, tenant screening, or to target vulnerable communities.
+      Read this before using any HPRM function.
+    contents:
+      - nt_hprm_terms
   - title: Neighborhood typologies
     desc: Build and summarize tract-level racial/ethnic typologies.
     contents:

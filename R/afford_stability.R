@@ -143,7 +143,8 @@
 #'   headline), `stable` (logical hard filter), and `stable_cat` (a
 #'   stable/elevated/precarious factor). Re-running on a result that already
 #'   carries these columns simply recomputes them (idempotent).
-#' @seealso [afford_index()], [afford_bands()]
+#' @inheritSection nt_hprm_terms HPRM responsible use
+#' @seealso [afford_index()], [afford_bands()], [nt_hprm_terms()]
 #' @examples \dontrun{
 #' idx <- afford_index("53", "033", 2024, tenure = "rent")        # King County
 #' sd  <- afford_stability(idx, hprm = "~/data/.../hprm_v5_full_2022.parquet")

@@ -101,9 +101,10 @@
 #'   `tooltip`, `opacity`; `before_id` defaults to `"water"` so fills sit
 #'   under the basemap's water and labels).
 #' @return A `maplibregl` htmlwidget -- composable with [nt_map_sync()].
+#' @inheritSection nt_hprm_terms HPRM responsible use
 #' @family ern_maps
 #' @seealso [afford_verdict()], [afford_capacity()], [afford_caption()],
-#'   [nt_map_sync()]
+#'   [nt_map_sync()], [nt_hprm_terms()]
 #' @examples \dontrun{
 #' idx <- afford_index("53", "033", 2024, tenure = "rent", geometry = TRUE) |>
 #'   afford_verdict()

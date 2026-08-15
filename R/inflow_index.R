@@ -111,7 +111,8 @@
 #' @return If `x` is `NULL`, a data.frame of `GEOID`, `tier`, `inflow` (the
 #'   net-migration value), `growth` (logical), and `inflow_cat`. If `x` is
 #'   supplied, `x` with those columns joined on.
-#' @seealso [afford_index()], [afford_stability()]
+#' @inheritSection nt_hprm_terms HPRM responsible use
+#' @seealso [afford_index()], [afford_stability()], [nt_hprm_terms()]
 #' @examples \dontrun{
 #' hprm <- "~/data/.../hprm_v5_full_2022.parquet"
 #' inflow_index(hprm)                       # overall low-income destinations (dis_value)

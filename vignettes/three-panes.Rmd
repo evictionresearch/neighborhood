@@ -13,6 +13,14 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 # Chunks marked eval=TRUE run offline (bundled snapshot / hand-built frames).
 ```
 
+> **⚠️ HPRM responsible use.** Pane 3 (`afford_stability()`) and the revealed-destination
+> layer (`inflow_index()`) read ERN's Housing Precarity Risk Model. The HPRM is a tool for
+> protection, **not a market signal**. It may **not** be used for commercial real-estate
+> prospecting or speculation, acquisition targeting, property pricing, tenant screening,
+> rent-increase justification, or to target vulnerable communities. Read the full Do No
+> Harm pledge at <https://evictionresearch.net/hprm/pledge.html>, or run
+> `nt_hprm_terms()` for the same text at the console.
+
 ## The simple version
 
 The three-pane product answers one question three times, each time more honestly:

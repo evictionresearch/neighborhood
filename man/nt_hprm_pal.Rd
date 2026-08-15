@@ -26,12 +26,80 @@ blue that means "no measured risk" on the report scale plates; the
 context grey; divergence keeps the purple/red/blue semantics of the HPRM
 site maps, with "Neither" on the same tint floor.
 }
+\section{HPRM responsible use}{
+
+The HPRM identifies neighborhoods where low-income renters face elevated
+risk of displacement and formal eviction. It is a tool for \strong{protection},
+built to err toward underestimating risk rather than overstating it. It
+makes no prediction about specific people, households, or properties; it is
+not a market signal; and it is not a basis for commercial advantage. Misuse
+of these data, particularly use that accelerates the very harms the HPRM
+measures, undermines both the science and the communities it represents.
+
+Recipients of HPRM data commit to the following.
+
+\enumerate{
+\item \strong{Read the \href{https://evictionresearch.net/hprm/}{HPRM Methods & Data User Guide} before drawing conclusions or
+producing derivative products.} The HPRM measures associations, not
+causation; tracks net migration, not the reasons people moved; and
+reports tract-level estimates, not facts about any specific person,
+household, or property.
+\item \strong{No commercial real-estate prospecting or speculative property
+activity.} This includes using HPRM scores to identify acquisition
+targets, price properties, screen tenants, justify rent increases,
+develop investment products, or otherwise treat displacement risk as a
+market signal. The HPRM is not licensed for these uses.
+\item \strong{No use that justifies displacement or enforcement action against
+vulnerable communities.} This includes upzoning or redevelopment
+decisions that displace existing low-income residents, immigration or
+housing-code enforcement targeting, landlord tenant-screening practices,
+or policing deployment grounded in HPRM scores.
+\item \strong{No use that justifies exclusionary zoning or blocks housing for
+working-class and low-income people.} Risk identification is not an
+argument for restricting development. Using the HPRM to freeze land use
+in ways that worsen long-run affordability inverts the model's intent.
+\item \strong{No attempt to re-identify renters or households.} Do not join
+HPRM data with parcel-level, address-level, or individually
+identifiable records in ways that could expose specific tenants,
+owners, or vulnerable populations to harm.
+\item \strong{Represent the HPRM accurately and within its scope.} Do not
+present HPRM scores as deterministic predictions, strip the model's
+caveats and limitations from derivative products, or use the HPRM
+beyond the geographic and temporal scope it covers (census-tract level,
+lower 48 states, 2018-2022 ACS 5-year estimates).
+\item \strong{Treat HPRM scores as a lower bound and ground-truth with local
+knowledge.} The model is intentionally conservative. Pair scores with
+community input, on-the-ground assessment, and current local data
+before making policy, investment, or programmatic decisions.
+\item \strong{Cite the HPRM in any work that uses it.}
+Thomas, T., Ramiller, A., Moore, H.C., Greenberg, J., & Chapple, K.
+(2026). \emph{Housing Precarity Risk Model (HPRM) 2.0.} Eviction Research
+Network, UC Berkeley. \url{https://evictionresearch.net/hprm/}
+Cite the underlying sources as applicable (ACS, LSC/HUD eviction
+filings, EPA Smart Location Database, HUD Picture of Subsidized
+Households).
+}
+
+This is an honor-system pledge. The Eviction Research Network does not
+enforce it through contract; it relies on the integrity of data recipients
+to protect the communities these data describe. Report misuse, your own or
+others', to \email{timthomas@berkeley.edu}.
+
+The HPRM is subject to periodic review and may be updated, corrected, or
+sunset. Check the current vintage at \url{https://evictionresearch.net/hprm/}
+before publishing derivative analyses.
+
+Canonical pledge: \url{https://evictionresearch.net/hprm/pledge.html}. The
+copy carried in this package is for offline reference; the published pledge
+governs. \code{\link[=nt_hprm_terms]{nt_hprm_terms()}} prints it at the console.
+}
+
 \examples{
 nt_hprm_pal("edr")
 nt_hprm_pal("hprm")
 }
 \seealso{
-\code{\link[=nt_hprm_map]{nt_hprm_map()}}
+\code{\link[=nt_hprm_map]{nt_hprm_map()}}, \code{\link[=nt_hprm_terms]{nt_hprm_terms()}}
 
 Other ern_maps:
 \code{\link[=afford_map]{afford_map()}},
