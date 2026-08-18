@@ -183,6 +183,9 @@ nt_profile_trend_svg <- function(dates, values, baseline,
 #'   gridlines draw every `y_grid_step` (default 5000).
 #' @param y_grid_step Gridline interval (default 5000, labeled "5k", "10k", …).
 #' @param svg_id Element id the page JS looks up.
+#' @param year_labels Optional character vector, one per `years`, replacing the
+#'   printed axis and hover text. For fiscal-year states, where the bar keyed
+#'   2016 covers FY 2015-16. `NULL` (default) prints the numeric years.
 #' @return Character scalar: the complete `<svg>...</svg>` block.
 #' @family state profile
 #' @export
@@ -191,7 +194,8 @@ nt_profile_yearly_svg <- function(years, values, baseline,
                                   projection = NULL,
                                   y_ceiling_step = 2500,
                                   y_grid_step = 5000,
-                                  svg_id = "chart-yearly-svg") {
+                                  svg_id = "chart-yearly-svg",
+                                  year_labels = NULL) {
   stopifnot(length(years) == length(values))
   yN <- length(years)
   yX0 <- 70; ybW <- 55; ybGap <- 20
@@ -218,9 +222,17 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   y_y <- y_floor - y_height
 
   is_partial <- years == latest_year & latest_month < 12
+  # `years` stays numeric because it drives bar geometry and the latest-year
+  # test, but states on a fiscal year need the axis to say what the bar
+  # actually covers: California's 2016 bar is FY 2015-16, and printing "2016"
+  # would quietly misdate the series by a year. year_labels overrides the
+  # printed text only; NULL keeps calendar-year output byte-identical.
+  stopifnot("year_labels must be one per year" =
+              is.null(year_labels) || length(year_labels) == length(years))
+  axis_labels <- if (is.null(year_labels)) as.character(years) else as.character(year_labels)
   year_data_label <- ifelse(is_partial,
-                            sprintf("%d (Jan\u2013%s)", years, months_short[latest_month]),
-                            as.character(years))
+                            sprintf("%s (Jan\u2013%s)", axis_labels, months_short[latest_month]),
+                            axis_labels)
   bar_class <- ifelse(is_partial, "ybar focal", "ybar")
   val_class <- ifelse(is_partial, "yval focal", "yval")
   has_proj <- is_partial & !is.null(projection)
@@ -269,11 +281,11 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   }
 
   axis_svg <- paste(
-    sprintf('        <text class="yax" x="%.0f" y="%d" text-anchor="middle"%s>%d</text>',
+    sprintf('        <text class="yax" x="%.0f" y="%d" text-anchor="middle"%s>%s</text>',
             y_x + ybW/2, 304,
             ifelse(years == latest_year,
                    ' style="font-weight: 600; fill: #19222C;"', ""),
-            years),
+            axis_labels),
     collapse = "\n"
   )
 

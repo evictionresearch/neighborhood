@@ -21,6 +21,20 @@
   path to a local `.parquet`/`.rds` file. Tract-level data is requested
   through the form linked from the pledge page.
 
+## Documentation
+
+* The income-limit architecture note (`dev/hud-income-limits-architecture.md`)
+  gained section 7, written and verified 2026-08-17 against primary sources:
+  statutory definitions of AMI and the ELI/VLI/LI tiers (42 U.S.C. 1437a(b)(2);
+  24 CFR 5.603(b)), the 4-person-anchor and family-size-factor mechanics
+  (reproduced all 24 published FY2024 San Mateo values exactly), the ELI
+  poverty-guideline floor and where it binds, and the state republication
+  layer, including a verified FY2025 case where California's hold-harmless
+  policy kept San Mateo VLI at $97,900 while HUD's fell to $96,700. Two
+  earlier claims in that note's section 3 were corrected with evidence (the
+  non-metro floor sits in HUD's own limits; HCD's ELI is HUD's ELI). A
+  compact version now sits on `?ami_cutoffs` as "The tiers".
+
 ## Bug fixes
 
 * A long `source` credit no longer runs off the canvas and loses its opening

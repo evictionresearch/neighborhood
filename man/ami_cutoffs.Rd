@@ -74,6 +74,33 @@ factor is bundled only for verified years (currently 2024-2025); other years
 error so \code{auto} falls back. \strong{Tiers are cumulative ceilings} -- a VLI
 household can use anything affordable at or below 50\% AMI.
 }
+\section{The tiers -- definitions and mechanics}{
+
+"AMI" as housing programs use it is HUD's \strong{median family income} (MFI)
+estimate for the FMR area containing the county -- not a Census
+household-income median. The tier ceilings are statutory: \strong{LI} (low
+income) is 80\% and \strong{VLI} (very low income) 50\% of area median, each "with
+adjustments for smaller and larger families" (42 U.S.C. 1437a(b)(2); 24 CFR
+5.603(b)), and HUD may set either higher or lower for unusual incomes or
+housing costs -- published limits are deliberately NOT plain fractions of
+the median. \strong{ELI} (extremely low income) is the greater of the
+size-adjusted 30\% limit or the HHS poverty guideline for that family size,
+capped at VLI (Consolidated Appropriations Act, 2014): a dollar floor, so
+in low-income areas ELI converges to the poverty line and stops tracking
+percentages. HUD builds everything from the \strong{4-person base} (every cap,
+floor, and high-cost bump applies there), then derives sizes 1-8 by fixed
+factors (70/80/90/base/108/116/124/132\%, +8 points per person past 8,
+rounded up to the nearest $50); eligibility is then determined at the
+household's \strong{actual} size against that schedule -- which is what
+\code{hud_hh_size} selects. \strong{MI} (120\%) is not among HUD's published Section 8
+limits (30/50/80 only); it is derived here from the median and labelled as
+such. State republications (e.g. California HCD) add categories and
+hold-harmless floors and can diverge from HUD's schedule in down years
+(verified for FY2025) -- validate against HUD itself. Full mechanics,
+verification, and primary-source citations:
+\code{dev/hud-income-limits-architecture.md} section 7.
+}
+
 \examples{
 \dontrun{
 # Default "auto": exact HUD limits when reachable, else Census fallback
