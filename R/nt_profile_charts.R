@@ -183,9 +183,20 @@ nt_profile_trend_svg <- function(dates, values, baseline,
 #'   gridlines draw every `y_grid_step` (default 5000).
 #' @param y_grid_step Gridline interval (default 5000, labeled "5k", "10k", …).
 #' @param svg_id Element id the page JS looks up.
+#' @param focal_last Colour the latest year's bar and value label with the focal
+#'   (red) treatment even when the year is complete. For annual-feed states,
+#'   where no year is ever partial but the current year should still read as
+#'   current. Does not imply partiality: the axis label and projection are
+#'   still governed by `latest_month`/`projection`.
 #' @param year_labels Optional character vector, one per `years`, replacing the
 #'   printed axis and hover text. For fiscal-year states, where the bar keyed
 #'   2016 covers FY 2015-16. `NULL` (default) prints the numeric years.
+#' @param fit_width Shrink the viewBox to the bars instead of padding it out to
+#'   the default 1000 units. Use for a series short enough to leave dead canvas
+#'   on the right (Florida opens in 2019 and its eight bars filled two-thirds of
+#'   the figure). Text keeps its pixel size because the page divides every
+#'   font-size by `--sx`, the rendered-to-viewBox scale. `FALSE` (default)
+#'   leaves Washington and Texas byte-identical.
 #' @return Character scalar: the complete `<svg>...</svg>` block.
 #' @family state profile
 #' @export
@@ -195,7 +206,9 @@ nt_profile_yearly_svg <- function(years, values, baseline,
                                   y_ceiling_step = 2500,
                                   y_grid_step = 5000,
                                   svg_id = "chart-yearly-svg",
-                                  year_labels = NULL) {
+                                  year_labels = NULL,
+                                  fit_width = FALSE,
+                                  focal_last = FALSE) {
   stopifnot(length(years) == length(values))
   yN <- length(years)
   yX0 <- 70; ybW <- 55; ybGap <- 20
@@ -212,10 +225,17 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   y_of <- function(v) y_floor - v * y_unit
   # The bar row grows with the number of years. Anything past 11 or so runs
   # off the fixed 1000-unit viewBox (Texas opens in 2012, Washington in
-  # 2016), so the right edge and the canvas follow the bars. max() keeps the
-  # short-series geometry byte-identical to what it was.
-  x_right  <- max(970, max(y_x) + ybW + 10)
-  vb_width <- max(1000, x_right + 30)
+  # 2016), so the right edge and the canvas follow the bars. The max() floors
+  # keep the short-series geometry byte-identical to what it was.
+  #
+  # fit_width drops those floors for a series short enough to leave dead
+  # canvas. Florida opens in 2019, so its eight bars end at x=660 while the
+  # axis ran on to 970, a third of the figure empty. Shrinking the viewBox
+  # is safe rather than clever: the page measures rendered width over viewBox
+  # width into --sx and every font-size in here divides by it, so the text
+  # holds its pixel size and only the bars render wider.
+  x_right  <- if (fit_width) max(y_x) + ybW + 10 else max(970, max(y_x) + ybW + 10)
+  vb_width <- if (fit_width) x_right + 30        else max(1000, x_right + 30)
   grid_svg <- .nt_grid_lines_svg(seq(y_grid_step, y_max, by = y_grid_step), 40, x_right, 36,
                                  y_of, function(v) paste0(v / 1000, "k"))
   y_height <- values * y_unit
@@ -233,8 +253,14 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   year_data_label <- ifelse(is_partial,
                             sprintf("%s (Jan\u2013%s)", axis_labels, months_short[latest_month]),
                             axis_labels)
-  bar_class <- ifelse(is_partial, "ybar focal", "ybar")
-  val_class <- ifelse(is_partial, "yval focal", "yval")
+  # The focal (red) bar normally marks a partial latest year, because that is
+  # the bar a reader must not compare like-for-like. An annual-feed state has
+  # no partial year but still wants the current year to read as current, so
+  # focal_last colours the last bar without claiming it is incomplete: the
+  # "(Jan-Mon)" data label and the projection stay tied to is_partial alone.
+  is_focal  <- is_partial | (focal_last & years == latest_year)
+  bar_class <- ifelse(is_focal, "ybar focal", "ybar")
+  val_class <- ifelse(is_focal, "yval focal", "yval")
   has_proj <- is_partial & !is.null(projection)
   proj_attr <- ifelse(has_proj,
     sprintf(' data-proj-total="%s" data-proj-lo="%s" data-proj-hi="%s"',
