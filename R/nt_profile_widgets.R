@@ -591,6 +591,9 @@ nt_profile_map_explorer <- function(county_json, acs_json,
 #' both `enacted`.
 #'
 #' @param path Path to the state's `policy_news.json`.
+#' @param form `"cards"` (default) draws the California credits grid Washington's
+#'   section uses, which is the form the spec calls for. `"list"` draws the
+#'   older dated list.
 #' @param max_items Most recent N to draw (default 8). The count of any
 #'   remainder is stated rather than silently dropped.
 #' @param state_name Full state name, for the empty-list sentence.
@@ -600,12 +603,14 @@ nt_profile_map_explorer <- function(county_json, acs_json,
 #' @family state profile
 #' @export
 nt_profile_news <- function(path,
+                            form = c("cards", "list"),
                             max_items = 8,
                             state_name = NULL,
                             label = "News · Eviction policy",
                             caption_num = "News",
                             caption_desc = "Recent movements in eviction policy.",
                             caption_src = "ern · policy review") {
+  form <- match.arg(form)
   stopifnot("policy_news.json not found" = file.exists(path))
   doc <- jsonlite::fromJSON(path, simplifyVector = FALSE)
 
@@ -635,6 +640,29 @@ nt_profile_news <- function(path,
   items <- doc$items
   n_total <- length(items)
   shown <- utils::head(items, max_items)
+
+  # The .credit-org line names the enacting document, which is the first of the
+  # section's three rules. Scope and instrument are optional, so a file written
+  # before they existed still renders.
+  org_line <- function(it) {
+    parts <- c(if (!is.null(it$scope) && nzchar(it$scope)) esc(it$scope),
+               if (!is.null(it$instrument) && nzchar(it$instrument)) esc(it$instrument),
+               paste0(esc(it$status), " ", mon(it$date)))
+    paste(parts, collapse = " &middot; ")
+  }
+  card <- function(it) {
+    paste0(
+      '<div class="credit-card">',
+      '<p class="credit-org">', org_line(it), '</p>',
+      '<h4>', esc(it$title), '</h4>',
+      '<p>', esc(it$summary), '</p>',
+      if (!is.null(it$effect) && nzchar(it$effect))
+        paste0('<p><strong>Effect on the counts:</strong> ', esc(it$effect), '</p>') else '',
+      '<p class="credit-meta">Source: <a href="', it$source_url,
+      '" class="unstyled" target="_blank" rel="noopener noreferrer">',
+      esc(it$source_name), '</a>. Verified ', .nt_long_date(it$verified_on), '.</p>',
+      '</div>')
+  }
 
   body <- if (n_total == 0) {
     paste0('<p class="news-empty">No change in ', esc(state_name),
@@ -668,11 +696,17 @@ nt_profile_news <- function(path,
         esc(it$source_name), '</a></p>',
         '</div></li>')
     }, character(1))
+    if (identical(form, "cards")) {
+      return_cards <- paste0('<div class="credit-grid">',
+                             paste(vapply(shown, card, character(1)), collapse = ""),
+                             '</div>')
+    }
     more <- if (n_total > length(shown))
       paste0('<p class="news-more">', n_total - length(shown),
              ' earlier item', if (n_total - length(shown) > 1) 's' else '',
              ' in the review window are in the page&rsquo;s data file.</p>') else ""
-    paste0('<ul class="news-list">', paste(rows, collapse = ""), '</ul>', more)
+    if (identical(form, "cards")) paste0(return_cards, more)
+    else paste0('<ul class="news-list">', paste(rows, collapse = ""), '</ul>', more)
   }
 
   paste0(

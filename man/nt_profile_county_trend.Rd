@@ -48,6 +48,7 @@ Other state profile:
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
 \code{\link[=nt_profile_rent_dumbbell_svg]{nt_profile_rent_dumbbell_svg()}},
+\code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
