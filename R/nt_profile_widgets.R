@@ -676,8 +676,10 @@ nt_profile_news <- function(path,
         need(!is.null(it[[f]]) && nzchar(it[[f]]),
              sprintf("news item is missing '%s'", f))
       }
-      need(it$verification != "search snippet only",
-           "an unfetched lead cannot be published; move it to quarantine")
+      need(it$verification %in% c("fetched full text", "fetched abstract/landing page"),
+           paste0("verification must be a known tag, not ", sQuote(it$verification),
+                  ". An unfetched lead belongs in quarantine; free-text detail ",
+                  "belongs in verification_note."))
       paste0(
         '<li class="news-item">',
         '<div class="news-meta">',
