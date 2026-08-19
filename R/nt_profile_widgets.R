@@ -568,3 +568,123 @@ nt_profile_map_explorer <- function(county_json, acs_json,
     '    </section>'
   )
 }
+
+# "August 19, 2026" without a platform-specific format string.
+.nt_long_date <- function(x) {
+  d <- as.Date(x)
+  paste0(format(d, "%B"), " ", as.integer(format(d, "%d")), ", ", format(d, "%Y"))
+}
+
+#' Recent eviction-policy movements (state-profile News section)
+#'
+#' Renders `data/policy_news.json` as a dated list. The file's contract, and
+#' the verification rules the review follows, are in
+#' `library/standards/policy-news-schema.md`. Nothing here invents content:
+#' the builder fails rather than render an item missing a source.
+#'
+#' A filing count without its policy context invites the wrong reading, since
+#' filings move with the law in both directions. This section is what lets a
+#' reader connect a step in the trend to the protection that arrived or lapsed.
+#'
+#' The status chip encodes whether the instrument is **in force**, not whether
+#' it is good news. A preemption statute and a right-to-counsel statute are
+#' both `enacted`.
+#'
+#' @param path Path to the state's `policy_news.json`.
+#' @param max_items Most recent N to draw (default 8). The count of any
+#'   remainder is stated rather than silently dropped.
+#' @param state_name Full state name, for the empty-list sentence.
+#' @param label,caption_num,caption_desc,caption_src Figure furniture. The
+#'   review date is appended to `caption_desc` automatically.
+#' @return Character scalar of HTML.
+#' @family state profile
+#' @export
+nt_profile_news <- function(path,
+                            max_items = 8,
+                            state_name = NULL,
+                            label = "News · Eviction policy",
+                            caption_num = "News",
+                            caption_desc = "Recent movements in eviction policy.",
+                            caption_src = "ern · policy review") {
+  stopifnot("policy_news.json not found" = file.exists(path))
+  doc <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+
+  # stopifnot() needs a literal name for its message, so dynamic field checks
+  # go through a helper instead.
+  need <- function(cond, msg) if (!isTRUE(cond)) stop(msg, call. = FALSE)
+  for (k in c("state", "reviewed_on", "window_months", "items", "quarantine")) {
+    need(!is.null(doc[[k]]), sprintf("policy_news.json is missing '%s'", k))
+  }
+  if (is.null(state_name)) state_name <- doc$state
+
+  esc <- function(x) {
+    x <- gsub("&", "&amp;", x, fixed = TRUE)
+    x <- gsub("<", "&lt;", x, fixed = TRUE)
+    gsub(">", "&gt;", x, fixed = TRUE)
+  }
+  # Chips group by whether the instrument is in force, never by valence.
+  chip_class <- function(s) {
+    if (s %in% c("enacted", "effective")) "in-force"
+    else if (s %in% c("repealed", "struck down", "expired")) "lapsed"
+    else "not-law"
+  }
+  # Month and year is the honest grain. A bill's "date" is the day it was
+  # signed or took effect, and a reader does not need the day.
+  mon <- function(d) format(as.Date(d), "%b %Y")
+
+  items <- doc$items
+  n_total <- length(items)
+  shown <- utils::head(items, max_items)
+
+  body <- if (n_total == 0) {
+    paste0('<p class="news-empty">No change in ', esc(state_name),
+           '&rsquo;s eviction law was recorded in the ', doc$window_months,
+           ' months to ', mon(doc$reviewed_on),
+           '. The review ran and found nothing to report.</p>')
+  } else {
+    rows <- vapply(shown, function(it) {
+      for (f in c("date", "title", "status", "summary", "source_url",
+                  "source_name", "verification", "verified_on")) {
+        need(!is.null(it[[f]]) && nzchar(it[[f]]),
+             sprintf("news item is missing '%s'", f))
+      }
+      need(it$verification != "search snippet only",
+           "an unfetched lead cannot be published; move it to quarantine")
+      paste0(
+        '<li class="news-item">',
+        '<div class="news-meta">',
+        '<span class="news-date">', mon(it$date), '</span>',
+        '<span class="news-chip news-chip-', chip_class(it$status), '">',
+        esc(it$status), '</span>',
+        '</div>',
+        '<div class="news-body">',
+        '<h4 class="news-title">', esc(it$title), '</h4>',
+        '<p class="news-summary">', esc(it$summary), '</p>',
+        if (!is.null(it$effect) && nzchar(it$effect))
+          paste0('<p class="news-effect"><strong>What it does to the count.</strong> ',
+                 esc(it$effect), '</p>') else '',
+        '<p class="news-src"><a href="', it$source_url,
+        '" class="unstyled" target="_blank" rel="noopener noreferrer">',
+        esc(it$source_name), '</a></p>',
+        '</div></li>')
+    }, character(1))
+    more <- if (n_total > length(shown))
+      paste0('<p class="news-more">', n_total - length(shown),
+             ' earlier item', if (n_total - length(shown) > 1) 's' else '',
+             ' in the review window are in the page&rsquo;s data file.</p>') else ""
+    paste0('<ul class="news-list">', paste(rows, collapse = ""), '</ul>', more)
+  }
+
+  paste0(
+    '    <div class="figure" style="margin-top: 32px;">\n',
+    '      <span class="plate-num">', label, '</span>\n',
+    body, '\n',
+    '      <div class="caption">',
+    '<span class="num">', caption_num, '</span>',
+    '<span class="desc">', caption_desc,
+    # %-d is glibc-only and prints literally on macOS, so the day is built
+    # from an integer instead.
+    ' Policy review current to ', .nt_long_date(doc$reviewed_on), '.</span>',
+    '<span class="src">', caption_src, '</span>',
+    '</div>\n    </div>')
+}
