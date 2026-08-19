@@ -493,7 +493,7 @@ nt_spark <- function(values, type = c("line", "bar"),
       .nt_tooltip_item_js(value_fmt, digits)
     } else {
       .nt_tooltip_js(value_fmt, digits, tooltip_count, tooltip_count_suffix,
-                     tooltip_total)
+                     tooltip_total, stacked = !is.null(stack))
     }
   )
   if (isTRUE(crosshair) && identical(tooltip_trigger, "axis")) {
@@ -558,8 +558,15 @@ nt_spark <- function(values, type = c("line", "bar"),
 # JS axis-trigger tooltip formatter: dark bubble, header = axis label, one
 # "series  value" row per series, no color-dot dependence (matches the ERN
 # hand-built tooltips and stays legible on the dark background).
+#
+# On a stacked chart the rows are reversed. echarts hands the formatter its
+# params in series order, which is the order the stack is built from the
+# axis outward, so an unreversed list reads bottom-to-top against the bar
+# the reader is pointing at. Unstacked charts keep series order, which is
+# also the legend's order.
 .nt_tooltip_js <- function(value_fmt, digits = NULL, count_map = NULL,
-                           count_suffix = "", total_map = NULL) {
+                           count_suffix = "", total_map = NULL,
+                           stacked = FALSE) {
   fmt <- .nt_js_number_expr(value_fmt, "val", digits)
   # Optional "(2,183 households)" appended after the formatted value. The
   # counts arrive as a lookup keyed "category__series" — echarts4r series
@@ -594,7 +601,8 @@ nt_spark <- function(values, type = c("line", "bar"),
       "function(params){",
       "  if(!params || !params.length){ return ''; }",
       "  var head = params[0].axisValueLabel || params[0].name || '';",
-      "  var rows = params.map(function(p){",
+      "  var rows = ", if (stacked) "params.slice().reverse()" else "params",
+      ".map(function(p){",
       "    var val = ", .nt_js_value_pick(), ";",
       "    if(val === null || val === undefined){ val = NaN; }",
       "    var fv = isNaN(+val) ? '\\u2014' : (%s);",
