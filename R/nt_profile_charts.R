@@ -617,3 +617,358 @@ nt_profile_fourps_svg <- function(
     paste0(unlist(el), collapse = ""), '</svg>')
   if (wrap) paste0('<div class="plate6-svg-wrap">', svg, '</div>') else svg
 }
+
+# ==============================================================================
+# Race charts (state-profile Figures 5 and 6)
+#
+# Ported from the Minnesota profile's hand-authored inline SVG, which was the
+# reference implementation and lived only in that repo's index.html with its
+# geometry precomputed by code/o1b_inline_svg_geometry.r. Two states needed it,
+# so it moves here. The markup contract (ids, classes, the multi-row tooltip)
+# matches Minnesota's, and the page template's attachMultiLineChart binds to
+# the emitted ids.
+# ==============================================================================
+
+# The four-way ERN categorization, in draw order (back to front) with the
+# visual weight Minnesota settled on. Line weight and dash carry the ranking,
+# so the chart survives greyscale and reads for anyone who cannot separate the
+# hues; colour is a second channel, never the only one.
+.NT_RACE_SPEC <- list(
+  other  = list(css = "rother",  stroke = "#8BA3BE", width = 0.75, dash = NULL,
+                swatch = "muted",  dot_r = 3,    dot_fill = "#8BA3BE",
+                dot_stroke = "#fff", dot_sw = 1.5),
+  white  = list(css = "rwhite",  stroke = "#19222C", width = 1,    dash = "4 4",
+                swatch = "dashed", dot_r = 3.5,  dot_fill = "#fff",
+                dot_stroke = "#19222C", dot_sw = 1.5),
+  latine = list(css = "rlatine", stroke = "#223754", width = 1.5,  dash = "1 3",
+                swatch = "",       dot_r = 3.25, dot_fill = "#223754",
+                dot_stroke = "#fff", dot_sw = 1.25),
+  black  = list(css = "rblack",  stroke = "#19222C", width = 2,    dash = NULL,
+                swatch = "focal",  dot_r = 4,    dot_fill = "#F9322B",
+                dot_stroke = "#fff", dot_sw = 1.25)
+)
+
+.nt_race_svg <- function(dates, series, labels, chart_id, y_max, grid_step,
+                         y_fmt, tip_fmt, label_fmt, focal, parity, aria,
+                         x0, x1, y_floor, y_top, y_min) {
+  stopifnot("series must be a named list" = !is.null(names(series)),
+            "every series must match the dates" =
+              all(vapply(series, length, integer(1)) == length(dates)),
+            "unknown series name" = all(names(series) %in% names(.NT_RACE_SPEC)))
+
+  n <- length(dates)
+  xs <- x0 + (seq_len(n) - 1) * (x1 - x0) / (n - 1)
+  yv <- function(v) y_floor - (v - y_min) * (y_floor - y_top) / (y_max - y_min)
+
+  grid_vals <- seq(y_min + grid_step, y_max, by = grid_step)
+  grid <- paste(vapply(grid_vals, function(g) paste0(
+    sprintf('<line class="grid-line" x1="%.0f" y1="%.1f" x2="%.0f" y2="%.1f"/>',
+            x0, yv(g), x1, yv(g)),
+    sprintf('<text class="grid-label" x="%.0f" y="%.1f" text-anchor="end">%s</text>',
+            x0 - 4, yv(g) + 4, y_fmt(g))), character(1)), collapse = "")
+
+  # A parity reference (the ratio chart's 1.0 line) sits under the data and
+  # says in words what the level means, so the reader is not left to infer it.
+  parity_svg <- if (!is.null(parity)) paste0(
+    sprintf('<line class="rparity" x1="%.0f" y1="%.1f" x2="%.0f" y2="%.1f"/>',
+            x0, yv(parity$at), x1, yv(parity$at)),
+    sprintf('<text class="rparity-label" x="%.0f" y="%.1f">%s</text>',
+            x0 + 6, yv(parity$at) - 5, parity$label)) else ""
+
+  draw <- names(.NT_RACE_SPEC)[names(.NT_RACE_SPEC) %in% names(series)]
+  paths <- paste(vapply(draw, function(g) {
+    s <- .NT_RACE_SPEC[[g]]
+    sprintf('<path class="%s" fill="none" stroke="%s" stroke-width="%s"%s d="M %s"/>',
+            s$css, s$stroke, s$width,
+            if (is.null(s$dash)) "" else sprintf(' stroke-dasharray="%s"', s$dash),
+            paste(sprintf("%.1f %.1f", xs, yv(series[[g]])), collapse = " L "))
+  }, character(1)), collapse = "")
+
+  # End labels, ordered by final value and nudged apart where two series
+  # finish within 11px. Without the nudge the middle labels overlap.
+  ends <- data.frame(g = draw,
+                     v = vapply(draw, function(g) series[[g]][n], numeric(1)),
+                     stringsAsFactors = FALSE)
+  ends <- ends[order(-ends$v), ]
+  ends$y <- yv(ends$v)
+  for (i in seq_len(nrow(ends))[-1]) {
+    if (ends$y[i] - ends$y[i - 1] < 11) ends$y[i] <- ends$y[i - 1] + 11
+  }
+  end_labels <- paste(vapply(seq_len(nrow(ends)), function(i) {
+    g <- ends$g[i]
+    # The reference group is set back: it is the thing being compared against,
+    # not one of the comparisons.
+    style <- if (identical(g, "white"))
+      ' style="font-style: italic; font-size: calc(12px / var(--sx, 1)); fill: #586573;"' else ""
+    sprintf('<text class="rlabel" x="%.0f" y="%.1f"%s>%s &middot; %s</text>',
+            x1 + 8, ends$y[i] + 4, style, labels[[g]], label_fmt(ends$v[i]))
+  }, character(1)), collapse = "")
+
+  focal_svg <- if (!is.null(focal) && focal %in% draw)
+    sprintf('<circle class="rfocal" cx="%.0f" cy="%.1f" r="3"/>',
+            x1, yv(series[[focal]][n])) else ""
+
+  # Axis: first year, a middle year, and the last, anchored so neither end
+  # label runs off the plot.
+  yrs <- as.integer(format(dates, "%Y"))
+  ticks <- unique(c(1, which(yrs == yrs[1] + ceiling((max(yrs) - yrs[1]) / 2))[1], n))
+  ticks <- ticks[!is.na(ticks)]
+  anchors <- ifelse(ticks == 1, "", ifelse(ticks == n, ' text-anchor="end"',
+                                           ' text-anchor="middle"'))
+  axis <- paste(sprintf('<text class="rax" x="%.1f" y="%.0f"%s>%d</text>',
+                        xs[ticks], y_floor - 3, anchors, yrs[ticks]), collapse = "")
+
+  dots <- paste(vapply(draw, function(g) {
+    s <- .NT_RACE_SPEC[[g]]
+    sprintf(paste0('<circle class="hover-dot rt-%s" cx="0" cy="0" r="%s" ',
+                   'style="fill: %s; stroke: %s; stroke-width: %s;"/>'),
+            g, s$dot_r, s$dot_fill, s$dot_stroke, s$dot_sw)
+  }, character(1)), collapse = "")
+
+  paste0(
+    sprintf('<svg id="%s-svg" viewBox="0 0 480 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s">',
+            chart_id, aria),
+    '<style>',
+    '.rax{font-family:Inter,sans-serif;font-size:calc(11px / var(--sx,1));fill:#586573}',
+    '.rlabel{font-family:Inter,sans-serif;font-style:italic;',
+    'font-size:calc(13px / var(--sx,1));fill:#19222C;font-weight:500}',
+    '.rfocal{fill:#F9322B}',
+    '.rparity{stroke:#8BA3BE;stroke-width:.75;stroke-dasharray:2 3}',
+    '.rparity-label{font-family:Inter,sans-serif;font-style:italic;',
+    'font-size:calc(10px / var(--sx,1));fill:#8A93A0}',
+    '</style>',
+    '<g class="hover-grid">', grid, '</g>',
+    parity_svg, paths, focal_svg, end_labels, axis,
+    sprintf('<g class="hover-indicator" id="%s-indicator">', chart_id),
+    sprintf('<line class="hover-vguide" x1="0" y1="%.0f" x2="0" y2="%.0f"/>',
+            y_top - 20, y_floor - 11),
+    dots, '</g></svg>',
+    sprintf('<div class="hover-tooltip" id="%s-tooltip"><div class="tip-date"></div><div class="tip-rows"></div></div>',
+            chart_id))
+}
+
+# Series payload the template's attachMultiLineChart reads. Kept beside the
+# SVG rather than re-derived from the path data, so the hover reports the
+# values the chart was drawn from.
+.nt_race_payload <- function(dates, series, labels, chart_id, tip_digits, tip_suffix,
+                             x0, x1, y_floor, y_top, y_min, y_max) {
+  draw <- names(.NT_RACE_SPEC)[names(.NT_RACE_SPEC) %in% names(series)]
+  arr <- function(v) paste0("[", paste(sprintf("%.4f", v), collapse = ","), "]")
+  cfg <- paste0(
+    '{ x0: ', x0, ', x1: ', x1, ', yFloor: ', y_floor, ', yTop: ', y_top,
+    ', yMin: ', y_min, ', yMax: ', y_max,
+    ', digits: ', tip_digits, ', suffix: ', jsonlite::toJSON(tip_suffix, auto_unbox = TRUE),
+    ', months: [', paste(sprintf('"%s"', format(dates, "%b %Y")), collapse = ","), ']',
+    ', series: [',
+    paste(vapply(draw, function(g) sprintf(
+      '{ key: "%s", label: %s, swatch: "%s", values: %s }',
+      g, jsonlite::toJSON(labels[[g]], auto_unbox = TRUE),
+      .NT_RACE_SPEC[[g]]$swatch, arr(series[[g]])), character(1)), collapse = ","),
+    '] }')
+  sprintf('<script>window.__ernRaceCharts = window.__ernRaceCharts || {}; window.__ernRaceCharts[%s] = %s;</script>',
+          jsonlite::toJSON(chart_id, auto_unbox = TRUE), cfg)
+}
+
+#' Filing rate by race over time (state-profile Figure 5) as inline SVG
+#'
+#' The Minnesota profile's race trend, generalized. Draws one line per
+#' race-ethnicity group over a monthly series, with end-of-line labels, a
+#' focal marker on the lead group, and the hover scaffolding the page
+#' template's `attachMultiLineChart` binds to: a shared vertical guide, one
+#' dot per series, and a multi-row tooltip reading every group at the hovered
+#' month.
+#'
+#' Line weight and dash carry the ranking so the chart reads in greyscale and
+#' for a reader who cannot separate the hues; colour is a second channel.
+#'
+#' @param dates Date vector, one per month, ascending.
+#' @param series Named list of numeric rate vectors, each the length of
+#'   `dates`. Names must be drawn from `black`, `latine`, `other`, `white`.
+#'   Pass only the groups whose denominator you are willing to publish.
+#' @param labels Named character vector of display labels for `series`.
+#' @param y_max Y ceiling; `NULL` rounds the series max up to `grid_step`.
+#' @param grid_step Gridline interval (default 10).
+#' @param chart_id Element id root. The SVG, indicator, and tooltip take
+#'   `<id>-svg`, `<id>-indicator`, `<id>-tooltip`.
+#' @param focal Series whose end point takes the red focal dot (default
+#'   `"black"`); `NULL` draws none.
+#' @param aria Accessible description of the chart.
+#' @return Character scalar: `<svg>`, tooltip `<div>`, and the `<script>`
+#'   payload the hover reads.
+#' @family state profile
+#' @export
+nt_profile_race_trend_svg <- function(dates, series,
+                                      labels = c(black = "Black", latine = "Latine",
+                                                 other = "Other", white = "White"),
+                                      y_max = NULL, grid_step = 10,
+                                      chart_id = "chart-race-trend",
+                                      focal = "black",
+                                      aria = paste("Twelve-month rolling eviction filing rate",
+                                                   "per 1,000 renter households by race")) {
+  if (is.null(y_max)) {
+    y_max <- ceiling(max(unlist(series), na.rm = TRUE) / grid_step) * grid_step
+  }
+  paste0(
+    .nt_race_svg(dates, series, labels, chart_id,
+                 y_max = y_max, grid_step = grid_step, y_min = 0,
+                 y_fmt = function(v) .nt_fmt_int(v),
+                 tip_fmt = function(v) sprintf("%.1f", v),
+                 label_fmt = function(v) sprintf("%.1f", v),
+                 focal = focal, parity = NULL, aria = aria,
+                 x0 = 40, x1 = 400, y_floor = 231, y_top = 71),
+    .nt_race_payload(dates, series, labels, chart_id, tip_digits = 1,
+                     tip_suffix = "", x0 = 40, x1 = 400,
+                     y_floor = 231, y_top = 71, y_min = 0, y_max = y_max))
+}
+
+#' Disparity gap: filing rate as a ratio of the reference group (Figure 6)
+#'
+#' The companion to [nt_profile_race_trend_svg()], and the Minnesota
+#' profile's Plate VI. Each line is a group's filing rate divided by the
+#' reference group's, so 1.0 is parity and the vertical distance from that
+#' line *is* the disparity. A rate chart shows four lines rising together
+#' during a wave; this one shows whether the gap between them moved, which is
+#' the question the rate chart cannot answer.
+#'
+#' @param dates Date vector, one per month, ascending.
+#' @param series Named list of numeric rate vectors (the same input as the
+#'   trend chart, not pre-divided). The reference group must be present.
+#' @param reference Series the others are divided by (default `"white"`).
+#' @param labels Named character vector of display labels.
+#' @param y_min,y_max Y bounds as ratios; `NULL` pads the observed range.
+#' @param grid_step Gridline interval in ratio units (default 0.25).
+#' @param chart_id Element id root.
+#' @param focal Series taking the red focal dot (default `"black"`).
+#' @param parity_label Text on the reference line.
+#' @param aria Accessible description of the chart.
+#' @return Character scalar: `<svg>`, tooltip `<div>`, and `<script>` payload.
+#' @family state profile
+#' @export
+nt_profile_race_ratio_svg <- function(dates, series, reference = "white",
+                                      labels = c(black = "Black", latine = "Latine",
+                                                 other = "Other", white = "White"),
+                                      y_min = NULL, y_max = NULL, grid_step = 0.25,
+                                      chart_id = "chart-race-ratio",
+                                      focal = "black",
+                                      parity_label = "parity with white renters",
+                                      aria = paste("Eviction filing rate of each group as a",
+                                                   "ratio of the white filing rate")) {
+  stopifnot("reference series missing" = reference %in% names(series))
+  ref <- series[[reference]]
+  stopifnot("reference rate hits zero, so a ratio is undefined" = all(ref > 0))
+
+  ratios <- lapply(series[setdiff(names(series), reference)], function(v) v / ref)
+  # The reference is drawn as a flat line at 1.0 rather than dropped, so the
+  # reader can see what the others are measured against.
+  ratios[[reference]] <- rep(1, length(ref))
+
+  rng <- range(unlist(ratios), na.rm = TRUE)
+  if (is.null(y_min)) y_min <- floor((rng[1] - 0.05) / grid_step) * grid_step
+  if (is.null(y_max)) y_max <- ceiling((rng[2] + 0.05) / grid_step) * grid_step
+
+  fmt_ratio <- function(v) sub("\\.?0+$", "", sprintf("%.2f", v))
+  paste0(
+    .nt_race_svg(dates, ratios, labels, chart_id,
+                 y_max = y_max, grid_step = grid_step, y_min = y_min,
+                 y_fmt = function(v) paste0(fmt_ratio(v), "×"),
+                 tip_fmt = function(v) sprintf("%.2f", v),
+                 label_fmt = function(v) paste0(sprintf("%.2f", v), "×"),
+                 focal = focal,
+                 parity = list(at = 1, label = parity_label),
+                 aria = aria,
+                 x0 = 40, x1 = 400, y_floor = 231, y_top = 71),
+    .nt_race_payload(dates, ratios, labels, chart_id, tip_digits = 2,
+                     tip_suffix = "×", x0 = 40, x1 = 400,
+                     y_floor = 231, y_top = 71, y_min = y_min, y_max = y_max))
+}
+
+#' Filing rate by race, one bar per group (state-profile Figure 6)
+#'
+#' The Minnesota profile's race bars, generalized. The trend and ratio charts
+#' answer how the gap moved; this one answers how big it is right now, which
+#' is the number a reader repeats. Geometry is Minnesota's, so the chart looks
+#' the same on any state that draws it.
+#'
+#' Bars carry `data-key`/`data-label`/`data-value`, which is what the page
+#' template's `attachBarChart` hover reads, so the tooltip needs no payload.
+#'
+#' @param values Named numeric vector of rates, drawn in the order given.
+#'   Sort before calling if a particular order is wanted.
+#' @param labels Named character vector of display labels. Defaults to the
+#'   four standard groups; names not present here fall back to the key.
+#' @param focal Series taking the red bar and the bold axis label
+#'   (default `"black"`).
+#' @param grid_step Gridline interval in rate units (default 10).
+#' @param y_max Top of the scale; `NULL` rounds the largest bar up to the
+#'   next `grid_step`.
+#' @param chart_id Element id root. The SVG is `<chart_id>-svg` and the
+#'   tooltip `<chart_id>-tooltip`.
+#' @param bar_w,x_start,x_step Bar width and horizontal placement, in viewBox
+#'   units. The defaults are Minnesota's hand-tuned values for four groups.
+#' @param aria Accessible description of the chart.
+#' @return Character scalar: the `<svg>` and its tooltip `<div>`.
+#' @family state profile
+#' @export
+nt_profile_race_bars_svg <- function(values,
+                                     labels = c(black = "Black", latine = "Latine",
+                                                other = "Other", white = "White"),
+                                     focal = "black",
+                                     grid_step = 10,
+                                     y_max = NULL,
+                                     chart_id = "chart-race-bars",
+                                     bar_w = 40, x_start = 80, x_step = 90,
+                                     aria = paste("Eviction filing rate per 1,000 renter",
+                                                  "households by race, most recent 12 months")) {
+  stopifnot("values must be named" = !is.null(names(values)),
+            "values must be finite" = all(is.finite(values)))
+
+  # Plot area, from the Minnesota original. y = 220 is zero, y = 50 the ceiling.
+  X0 <- 60; X1 <- 430; Y0 <- 220; Y1 <- 50
+  if (is.null(y_max)) y_max <- ceiling(max(values) / grid_step) * grid_step
+  y_of <- function(v) Y0 - v * (Y0 - Y1) / y_max
+
+  # Half-values round away from zero, as they were placed by hand on the
+  # Minnesota page; sprintf("%.0f") rounds half to even and shifts a gridline.
+  py <- function(v) floor(y_of(v) + 0.5)
+  grid <- paste0(vapply(rev(seq(grid_step, y_max, by = grid_step)), function(v) {
+    paste0(sprintf('<line class="grid-line" x1="%d" y1="%d" x2="%d" y2="%d"/>', X0, py(v), X1, py(v)),
+           sprintf('<text class="grid-label" x="%d" y="%d" text-anchor="end">%s</text>',
+                   X0 - 4, py(v) + 4, format(v, trim = TRUE)))
+  }, character(1)), collapse = "")
+
+  keys <- names(values)
+  bars <- paste0(vapply(seq_along(keys), function(i) {
+    k <- keys[i]
+    lab <- if (!is.na(labels[k])) unname(labels[k]) else k
+    x <- x_start + (i - 1) * x_step
+    cx <- x + bar_w / 2
+    top <- y_of(values[[k]])
+    # Value labels sit 8px clear of the bar, as they do on the Minnesota page.
+    paste0(
+      sprintf('<rect class="rbar%s" data-key="%s" data-label="%s" data-value="%s" x="%.0f" y="%.1f" width="%.0f" height="%.1f"/>',
+              if (identical(k, focal)) " focal" else "", k, lab,
+              format(round(values[[k]], 1), trim = TRUE), x, top, bar_w, Y0 - top),
+      sprintf('<text class="rbval" x="%.0f" y="%.1f" text-anchor="middle">%s</text>',
+              cx, top - 8, format(round(values[[k]], 1), trim = TRUE)),
+      sprintf('<text class="rbax" x="%.0f" y="%d" text-anchor="middle"%s>%s</text>',
+              cx, Y0 + 14,
+              if (identical(k, focal)) ' style="font-weight: 600; fill: #19222C;"' else "", lab))
+  }, character(1)), collapse = "")
+
+  paste0(
+    sprintf('<svg id="%s-svg" viewBox="0 0 480 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s">',
+            chart_id, aria),
+    '<style>',
+    '.rbax{font-family:Inter,sans-serif;font-size:calc(11px / var(--sx,1));fill:#586573}',
+    '.rbval{font-family:Inter,sans-serif;font-size:calc(13px / var(--sx,1));fill:#19222C;',
+    'font-weight:600;font-variant-numeric:tabular-nums}',
+    '.rbar{fill:#19222C}',
+    '.rbar.focal{fill:#F9322B}',
+    '.rbase{stroke:#19222C;stroke-width:1}',
+    '</style>',
+    '<g class="hover-grid">', grid, '</g>',
+    sprintf('<line class="rbase" x1="%d" y1="%d" x2="%d" y2="%d"/>', X0, Y0, X1, Y0),
+    bars, '</svg>',
+    sprintf('<div class="hover-tooltip" id="%s-tooltip"><div class="tip-date"></div><div class="tip-value"></div></div>',
+            chart_id))
+}

@@ -11,7 +11,9 @@ nt_profile_county_table(
   caption_src,
   filings_th = "Filings (12 mo.)",
   search_placeholder = "Search county…",
-  global = "__waCountyTable"
+  global = "__waCountyTable",
+  sub_labels = NULL,
+  change_th = NULL
 )
 }
 \arguments{
@@ -32,6 +34,18 @@ when the explorer window changes (default \code{"Filings (12 mo.)"}).}
 \item{search_placeholder}{Placeholder for the county filter box.}
 
 \item{global}{Name of the \code{window.} global holding the rows.}
+
+\item{sub_labels}{Optional named character vector of second-line column
+labels, keyed \code{county}, \code{renters}, \code{filings}, \code{rate}, \code{chg}. Renders as
+\verb{<span class="th-sub">} under the header, the way California's annual
+table names each column's period and vintage. \code{NULL} (default) emits the
+single-line headers unchanged.}
+
+\item{change_th}{Header for a change column comparing the displayed window
+against each county's pre-pandemic rate. Requires a \code{base_rate} column on
+\code{counties}, the same rate measured over the baseline period. \code{NULL}
+(default) omits the column entirely, so states that have no pre-pandemic
+baseline in their series are unaffected.}
 }
 \value{
 Character scalar: \verb{<script>} payload + \verb{<div class="table-wrap">}
@@ -52,6 +66,9 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
+\code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
+\code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}

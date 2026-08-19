@@ -12,7 +12,10 @@ nt_profile_yearly_svg(
   projection = NULL,
   y_ceiling_step = 2500,
   y_grid_step = 5000,
-  svg_id = "chart-yearly-svg"
+  svg_id = "chart-yearly-svg",
+  year_labels = NULL,
+  fit_width = FALSE,
+  focal_last = FALSE
 )
 }
 \arguments{
@@ -35,6 +38,23 @@ gridlines draw every \code{y_grid_step} (default 5000).}
 \item{y_grid_step}{Gridline interval (default 5000, labeled "5k", "10k", …).}
 
 \item{svg_id}{Element id the page JS looks up.}
+
+\item{year_labels}{Optional character vector, one per \code{years}, replacing the
+printed axis and hover text. For fiscal-year states, where the bar keyed
+2016 covers FY 2015-16. \code{NULL} (default) prints the numeric years.}
+
+\item{fit_width}{Shrink the viewBox to the bars instead of padding it out to
+the default 1000 units. Use for a series short enough to leave dead canvas
+on the right (Florida opens in 2019 and its eight bars filled two-thirds of
+the figure). Text keeps its pixel size because the page divides every
+font-size by \code{--sx}, the rendered-to-viewBox scale. \code{FALSE} (default)
+leaves Washington and Texas byte-identical.}
+
+\item{focal_last}{Colour the latest year's bar and value label with the focal
+(red) treatment even when the year is complete. For annual-feed states,
+where no year is ever partial but the current year should still read as
+current. Does not imply partiality: the axis label and projection are
+still governed by \code{latest_month}/\code{projection}.}
 }
 \value{
 Character scalar: the complete \verb{<svg>...</svg>} block.
@@ -56,6 +76,9 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
+\code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
+\code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }

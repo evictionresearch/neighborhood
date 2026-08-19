@@ -209,6 +209,16 @@ nt_profile_monthly_js <- function(values, year_base, month_base = 0,
 #'   when the explorer window changes (default `"Filings (12 mo.)"`).
 #' @param search_placeholder Placeholder for the county filter box.
 #' @param global Name of the `window.` global holding the rows.
+#' @param sub_labels Optional named character vector of second-line column
+#'   labels, keyed `county`, `renters`, `filings`, `rate`, `chg`. Renders as
+#'   `<span class="th-sub">` under the header, the way California's annual
+#'   table names each column's period and vintage. `NULL` (default) emits the
+#'   single-line headers unchanged.
+#' @param change_th Header for a change column comparing the displayed window
+#'   against each county's pre-pandemic rate. Requires a `base_rate` column on
+#'   `counties`, the same rate measured over the baseline period. `NULL`
+#'   (default) omits the column entirely, so states that have no pre-pandemic
+#'   baseline in their series are unaffected.
 #' @return Character scalar: `<script>` payload + `<div class="table-wrap">`
 #'   shell + caption.
 #' @family state profile
@@ -219,25 +229,51 @@ nt_profile_county_table <- function(counties,
                                     caption_src,
                                     filings_th = "Filings (12 mo.)",
                                     search_placeholder = "Search county\u2026",
-                                    global = "__waCountyTable") {
+                                    global = "__waCountyTable",
+                                    sub_labels = NULL,
+                                    change_th = NULL) {
   stopifnot(all(c("county", "renters", "filings", "rate") %in% names(counties)))
+  want_chg <- !is.null(change_th)
+  if (want_chg) {
+    stopifnot("change_th needs a base_rate column" = "base_rate" %in% names(counties))
+  }
+
+  # Second-line header labels. A missing key renders nothing, so a caller can
+  # label two columns and leave the rest alone.
+  sub <- function(key) {
+    if (is.null(sub_labels) || is.na(sub_labels[key]) || !nzchar(sub_labels[key])) return("")
+    sprintf('<span class="th-sub">%s</span>', sub_labels[[key]])
+  }
+
   hi_row <- which.max(counties$rate)
+  # base_rate travels with the row so the change can follow the slider: the
+  # window rate is recomputed in JS, the baseline is fixed, and the JS only
+  # has to divide. Keeping the baseline definition in R is the point, since
+  # what counts as pre-pandemic differs by state and belongs in the script
+  # that can be audited, not in the page.
+  base_js <- if (want_chg) sprintf(", base: %.4f", counties$base_rate) else ""
   rows_js <- paste0(
     "[\n",
     paste0(
       "      ",
-      sprintf('{ county: %s, renters: %d, filings: %d, rate: %.1f%s }',
+      sprintf('{ county: %s, renters: %d, filings: %d, rate: %.1f%s%s }',
               vapply(counties$county,
                      function(s) as.character(jsonlite::toJSON(s, auto_unbox = TRUE)),
                      character(1)),
               as.integer(round(counties$renters)),
               as.integer(counties$filings),
               counties$rate,
+              base_js,
               ifelse(seq_len(nrow(counties)) == hi_row, ", hi: true", "")),
       collapse = ",\n"
     ),
     "\n    ]"
   )
+
+  chg_th_html <- if (want_chg) {
+    paste0('                <th data-sort="chg" class="num-col col-chg" id="th-chg">',
+           change_th, sub("chg"), '</th>\n')
+  } else ""
 
   paste0(
     '      <script>window.', global, ' = ', rows_js, ';</script>\n',
@@ -257,10 +293,12 @@ nt_profile_county_table <- function(counties,
     '          <table class="county-table" id="county-table">\n',
     '            <thead>\n',
     '              <tr>\n',
-    '                <th data-sort="county">County</th>\n',
-    '                <th data-sort="renters" class="num-col col-renters">Renter HH</th>\n',
-    '                <th data-sort="filings" class="num-col col-filings" id="th-filings">', filings_th, '</th>\n',
-    '                <th data-sort="rate" class="num-col sort-desc col-rate">Rate / 1,000</th>\n',
+    '                <th data-sort="county">County', sub("county"), '</th>\n',
+    '                <th data-sort="renters" class="num-col col-renters">Renter HH', sub("renters"), '</th>\n',
+    '                <th data-sort="filings" class="num-col col-filings" id="th-filings">',
+    '<span class="th-main">', filings_th, '</span>', sub("filings"), '</th>\n',
+    '                <th data-sort="rate" class="num-col sort-desc col-rate">Rate / 1,000', sub("rate"), '</th>\n',
+    chg_th_html,
     '              </tr>\n',
     '            </thead>\n',
     '            <tbody id="county-tbody">\n',
@@ -307,6 +345,8 @@ nt_profile_county_table <- function(counties,
 #' @param caption_num,caption_desc,caption_src Figure caption fields.
 #' @param ec_note_html The `<p class="ec-note">…</p>` inner HTML: the ACS
 #'   vintage + model-driver note shown under the county characteristics.
+#' @param tract_note Clause completing the map-help "Zoom in" line, for a
+#'   state whose tract layer covers a different window than the slider.
 #' @param tract_json,tract_pmtiles Optional tract-level equivalents (empty
 #'   strings — the default — keep the explorer county-only).
 #' @return Character scalar: the `<section class="map-explorer">…</section>`
@@ -332,6 +372,7 @@ nt_profile_map_explorer <- function(county_json, acs_json,
                                       'one of the two factors the statistical model identified as most strongly tied to higher eviction-filing rates. ',
                                       'The other is a county\'s Black population share, a structural signal of where disinvestment and segregation concentrate, ',
                                       'not a statement about individuals. Affordability is shown as rent burden, not AMI.'),
+                                    tract_note = paste("the legend keeps its county-rate bins"),
                                     tract_json = "", tract_pmtiles = "") {
   json_vec <- function(x) as.character(jsonlite::toJSON(x))
   paste0(
@@ -369,7 +410,7 @@ nt_profile_map_explorer <- function(county_json, acs_json,
     '          <h4>How to use this map</h4>\n',
     '          <ul>\n',
     '            <li><strong>Drag the slider</strong> below the map to pick a time window; bins recompute live.</li>\n',
-    '            <li><strong>Zoom in</strong> on any region for closer reading; the legend keeps its county-rate bins.</li>\n',
+    '            <li><strong>Zoom in</strong> on any region for closer reading; ', tract_note, '.</li>\n',
     '            <li><strong>Hover</strong> any polygon for its window rate.</li>\n',
     '            <li><strong>Click</strong> any polygon to load its full profile in the card.</li>\n',
     '            <li><strong>Click a legend tier</strong> to isolate; <em>show all</em> resets.</li>\n',

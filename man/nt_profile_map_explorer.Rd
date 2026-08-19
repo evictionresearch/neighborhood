@@ -28,6 +28,7 @@ nt_profile_map_explorer(
     "one of the two factors the statistical model identified as most strongly tied to higher eviction-filing rates. ",
     "The other is a county's Black population share, a structural signal of where disinvestment and segregation concentrate, ",
     "not a statement about individuals. Affordability is shown as rent burden, not AMI."),
+  tract_note = paste("the legend keeps its county-rate bins"),
   tract_json = "",
   tract_pmtiles = ""
 )
@@ -66,6 +67,9 @@ county scale (data-feed constraint), used in the disclosure.}
 \item{ec_note_html}{The \verb{<p class="ec-note">…</p>} inner HTML: the ACS
 vintage + model-driver note shown under the county characteristics.}
 
+\item{tract_note}{Clause completing the map-help "Zoom in" line, for a
+state whose tract layer covers a different window than the slider.}
+
 \item{tract_json, tract_pmtiles}{Optional tract-level equivalents (empty
 strings — the default — keep the explorer county-only).}
 }
@@ -90,6 +94,9 @@ Other state profile:
 \code{\link[=nt_profile_fourps_svg]{nt_profile_fourps_svg()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
+\code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
+\code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
