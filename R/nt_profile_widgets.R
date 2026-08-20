@@ -660,8 +660,13 @@ nt_profile_news <- function(path,
       # and rulings since vacated, and a bare date beside those reads as though
       # they took effect. The status rides on the instrument line rather than
       # depending on whoever worded the title to have mentioned it.
+      # The instrument line links its enacting document, so the citation sits
+      # where the reader is already looking rather than only in the sources
+      # line beneath. No class: the sheet styles .pl-inst a to be quiet in the
+      # rail and wake to the text red on hover.
       if (!is.null(it$instrument) && nzchar(it$instrument))
-        paste0('<span class="pl-inst">', esc(it$instrument),
+        paste0('<span class="pl-inst"><a href="', it$source_url,
+               '" target="_blank" rel="noopener noreferrer">', esc(it$instrument), '</a>',
                if (!it$status %in% c("enacted", "effective"))
                  paste0(' &middot; ', esc(it$status)) else '',
                '</span>') else '',
@@ -735,10 +740,21 @@ nt_profile_news <- function(path,
         '</div></li>')
     }, character(1))
     if (identical(form, "ledger")) {
-      # Chronological, oldest first, because the rail is a date column and a
-      # reader scans it against the trend above. The data file stays
-      # newest-first; this is presentation only.
-      asc <- rev(shown)
+      # Latest first, Tim's order (2026-08-20): the rail reads as news, and the
+      # most recent movement is the one a reader came for.
+      #
+      # Sorted on the rail's OWN date rather than taken in storage order. The
+      # file is ordered by `date`, when the thing happened, while the rail
+      # shows `effective_date` where there is one. Those diverge: Texas SB 38
+      # was signed in June 2025 and binds in January 2026. Storage order
+      # happens to agree today, but an item signed before another and binding
+      # after it would print the rail out of sequence, which is the kind of
+      # fault nobody notices until the year a state has two of them.
+      rail_on <- function(it) as.Date(
+        if (!is.null(it$effective_date) && nzchar(it$effective_date))
+          it$effective_date else it$date)
+      asc <- shown[order(vapply(shown, function(it) as.numeric(rail_on(it)), numeric(1)),
+                        decreasing = TRUE)]
       srcs <- paste(vapply(asc, function(it)
         paste0('<a href="', it$source_url, '" class="unstyled" target="_blank" ',
                'rel="noopener noreferrer">', esc(it$source_name), '</a>'),
