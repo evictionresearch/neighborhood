@@ -589,9 +589,10 @@ nt_profile_map_explorer <- function(county_json, acs_json,
 #' both `enacted`.
 #'
 #' @param path Path to the state's `policy_news.json`.
-#' @param form `"cards"` (default) draws the California credits grid Washington's
-#'   section uses, which is the form the spec calls for. `"list"` draws the
-#'   older dated list.
+#' @param form `"ledger"` (default) draws the compact date-rail ledger that
+#'   replaced the cards on Washington's page. `"cards"` draws the superseded
+#'   credits grid and `"list"` the older dated list; both are kept for a page
+#'   that has not migrated.
 #' @param max_items Most recent N to draw (default 8). The count of any
 #'   remainder is stated rather than silently dropped.
 #' @param state_name Full state name, for the empty-list sentence.
@@ -601,7 +602,7 @@ nt_profile_map_explorer <- function(county_json, acs_json,
 #' @family state profile
 #' @export
 nt_profile_news <- function(path,
-                            form = c("cards", "list"),
+                            form = c("ledger", "cards", "list"),
                             max_items = 8,
                             state_name = NULL,
                             label = "News · Eviction policy",
@@ -638,6 +639,43 @@ nt_profile_news <- function(path,
   items <- doc$items
   n_total <- length(items)
   shown <- utils::head(items, max_items)
+
+  # Ledger row. Washington's form after Tim rejected the cards on 2026-08-20
+  # for taking a screen and a half: one hairline row per instrument, an
+  # effective-date rail on the left, mechanism and effect on the right, one
+  # sources line under the whole ledger instead of one per card. The rail keys
+  # on effective_date where the item has one, since when a rule starts binding
+  # is what a reader is placing against the trend, not when it was signed.
+  pl_row <- function(it) {
+    when <- if (!is.null(it$effective_date) && nzchar(it$effective_date))
+      it$effective_date else it$date
+    d <- as.Date(when)
+    paste0(
+      '<div class="pl-row">',
+      '<div class="pl-when">',
+      '<span class="pl-date">', format(d, "%b"), " ", as.integer(format(d, "%d")),
+      ", ", format(d, "%Y"), '</span>',
+      # Washington's ledger carries only instruments in force, so the date rail
+      # alone was unambiguous there. These files also hold bills that failed
+      # and rulings since vacated, and a bare date beside those reads as though
+      # they took effect. The status rides on the instrument line rather than
+      # depending on whoever worded the title to have mentioned it.
+      if (!is.null(it$instrument) && nzchar(it$instrument))
+        paste0('<span class="pl-inst">', esc(it$instrument),
+               if (!it$status %in% c("enacted", "effective"))
+                 paste0(' &middot; ', esc(it$status)) else '',
+               '</span>') else '',
+      if (!is.null(it$scope) && nzchar(it$scope))
+        paste0('<span class="pl-scope">', esc(it$scope), '</span>') else '',
+      '</div>',
+      '<div class="pl-what">',
+      '<h4>', esc(it$title), '</h4>',
+      '<p>', esc(it$summary), '</p>',
+      if (!is.null(it$effect) && nzchar(it$effect))
+        paste0('<p class="pl-effect"><strong>On the counts:</strong> ',
+               esc(it$effect), '</p>') else '',
+      '</div></div>')
+  }
 
   # The .credit-org line names the enacting document, which is the first of the
   # section's three rules. Scope and instrument are optional, so a file written
@@ -696,6 +734,21 @@ nt_profile_news <- function(path,
         esc(it$source_name), '</a></p>',
         '</div></li>')
     }, character(1))
+    if (identical(form, "ledger")) {
+      # Chronological, oldest first, because the rail is a date column and a
+      # reader scans it against the trend above. The data file stays
+      # newest-first; this is presentation only.
+      asc <- rev(shown)
+      srcs <- paste(vapply(asc, function(it)
+        paste0('<a href="', it$source_url, '" class="unstyled" target="_blank" ',
+               'rel="noopener noreferrer">', esc(it$source_name), '</a>'),
+        character(1)), collapse = " &middot; ")
+      return_ledger <- paste0(
+        '<div class="policy-ledger">',
+        paste(vapply(asc, pl_row, character(1)), collapse = ""),
+        '<p class="pl-sources">Sources, each opened in the review: ', srcs, '.</p>',
+        '</div>')
+    }
     if (identical(form, "cards")) {
       return_cards <- paste0('<div class="credit-grid">',
                              paste(vapply(shown, card, character(1)), collapse = ""),
@@ -705,7 +758,8 @@ nt_profile_news <- function(path,
       paste0('<p class="news-more">', n_total - length(shown),
              ' earlier item', if (n_total - length(shown) > 1) 's' else '',
              ' in the review window are in the page&rsquo;s data file.</p>') else ""
-    if (identical(form, "cards")) paste0(return_cards, more)
+    if (identical(form, "ledger")) paste0(return_ledger, more)
+    else if (identical(form, "cards")) paste0(return_cards, more)
     else paste0('<ul class="news-list">', paste(rows, collapse = ""), '</ul>', more)
   }
 

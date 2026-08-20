@@ -6,7 +6,7 @@
 \usage{
 nt_profile_news(
   path,
-  form = c("cards", "list"),
+  form = c("ledger", "cards", "list"),
   max_items = 8,
   state_name = NULL,
   label = "News · Eviction policy",
@@ -18,9 +18,10 @@ nt_profile_news(
 \arguments{
 \item{path}{Path to the state's \code{policy_news.json}.}
 
-\item{form}{\code{"cards"} (default) draws the California credits grid Washington's
-section uses, which is the form the spec calls for. \code{"list"} draws the
-older dated list.}
+\item{form}{\code{"ledger"} (default) draws the compact date-rail ledger that
+replaced the cards on Washington's page. \code{"cards"} draws the superseded
+credits grid and \code{"list"} the older dated list; both are kept for a page
+that has not migrated.}
 
 \item{max_items}{Most recent N to draw (default 8). The count of any
 remainder is stated rather than silently dropped.}
@@ -60,6 +61,8 @@ Other state profile:
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
+\code{\link[=nt_profile_rent_dumbbell_svg]{nt_profile_rent_dumbbell_svg()}},
+\code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
