@@ -232,11 +232,7 @@ nt_profile_county_table <- function(counties,
                                     global = "__waCountyTable",
                                     sub_labels = NULL,
                                     change_th = NULL) {
-  stopifnot(all(c("county", "renters", "filings", "rate") %in% names(counties)))
-  want_chg <- !is.null(change_th)
-  if (want_chg) {
-    stopifnot("change_th needs a base_rate column" = "base_rate" %in% names(counties))
-  }
+  stopifnot(all(c("county", "renters", "filings", "rate", "chg") %in% names(counties)))
 
   # Second-line header labels. A missing key renders nothing, so a caller can
   # label two columns and leave the rest alone.
@@ -246,12 +242,14 @@ nt_profile_county_table <- function(counties,
   }
 
   hi_row <- which.max(counties$rate)
-  # base_rate travels with the row so the change can follow the slider: the
-  # window rate is recomputed in JS, the baseline is fixed, and the JS only
-  # has to divide. Keeping the baseline definition in R is the point, since
-  # what counts as pre-pandemic differs by state and belongs in the script
-  # that can be audited, not in the page.
-  base_js <- if (want_chg) sprintf(", base: %.4f", counties$base_rate) else ""
+  # `chg` is the percent change in the annualized rate between the two ends of
+  # the window, comparing blocks of up to 12 months at each end rather than
+  # single months: most counties file single digits a month, and one unusual
+  # month at either end would otherwise swing the column and flip signs. The
+  # value here is the static one for the default window; the page recomputes it
+  # from the monthly series whenever the slider moves, by the same rule.
+  chg_js <- ifelse(is.na(counties$chg), ", chg: null",
+                   sprintf(", chg: %.1f", counties$chg))
   rows_js <- paste0(
     "[\n",
     paste0(
@@ -263,17 +261,17 @@ nt_profile_county_table <- function(counties,
               as.integer(round(counties$renters)),
               as.integer(counties$filings),
               counties$rate,
-              base_js,
+              chg_js,
               ifelse(seq_len(nrow(counties)) == hi_row, ", hi: true", "")),
       collapse = ",\n"
     ),
     "\n    ]"
   )
 
-  chg_th_html <- if (want_chg) {
-    paste0('                <th data-sort="chg" class="num-col col-chg" id="th-chg">',
-           change_th, sub("chg"), '</th>\n')
-  } else ""
+  if (is.null(change_th)) change_th <- "Change in rate"
+  chg_th_html <- paste0(
+    '                <th data-sort="chg" class="num-col col-chg" id="th-chg">',
+    change_th, sub("chg"), '</th>\n')
 
   paste0(
     '      <script>window.', global, ' = ', rows_js, ';</script>\n',
@@ -294,9 +292,9 @@ nt_profile_county_table <- function(counties,
     '            <thead>\n',
     '              <tr>\n',
     '                <th data-sort="county">County', sub("county"), '</th>\n',
-    '                <th data-sort="renters" class="num-col col-renters">Renter HH', sub("renters"), '</th>\n',
     '                <th data-sort="filings" class="num-col col-filings" id="th-filings">',
     '<span class="th-main">', filings_th, '</span>', sub("filings"), '</th>\n',
+    '                <th data-sort="renters" class="num-col col-renters">Renter HH', sub("renters"), '</th>\n',
     '                <th data-sort="rate" class="num-col sort-desc col-rate">Rate / 1,000', sub("rate"), '</th>\n',
     chg_th_html,
     '              </tr>\n',
