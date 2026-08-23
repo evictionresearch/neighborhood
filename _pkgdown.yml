@@ -47,6 +47,8 @@ reference:
       - nt_hprm_pal
       - nt_maplibre
       - nt_add_choropleth
+      - nt_add_bivariate
+      - nt_bivariate_pal
       - nt_add_labels
       - nt_layers_control
       - nt_popup
@@ -96,6 +98,8 @@ reference:
       - nt_profile_race_trend_svg
       - nt_profile_race_ratio_svg
       - nt_profile_race_bars_svg
+      - nt_profile_rent_trend_svg
+      - nt_profile_rent_dumbbell_svg
       - nt_profile_monthly_js
       - nt_raw_html
   - title: Model reading aids

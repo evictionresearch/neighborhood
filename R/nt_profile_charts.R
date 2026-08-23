@@ -972,3 +972,449 @@ nt_profile_race_bars_svg <- function(values,
     sprintf('<div class="hover-tooltip" id="%s-tooltip"><div class="tip-date"></div><div class="tip-value"></div></div>',
             chart_id))
 }
+
+# ==========================================================================
+# nt_profile_rent_dumbbell_svg() — rent then vs. now, one row per place
+# ==========================================================================
+
+#' Two-date rent comparison (state-profile rents figure) as inline SVG
+#'
+#' Builds the profile pages' rent plate: one row per geography, an open dot at
+#' the earlier rent, a filled dot at the later one, the connector between
+#' them, the current level printed at the dot and the percent change at the
+#' right edge. Rows sort by percent change, so the markets that moved most sit
+#' on top. The chart is static by design and carries no hover JS: every value
+#' it encodes is already printed on it, which is what makes a two-date
+#' comparison readable without interaction.
+#'
+#' Pairs with [nt_apartmentlist_rents()], but takes plain vectors, so any
+#' two-date rent or price series can drive it.
+#'
+#' @param labels Character vector of place names, one per row.
+#' @param from,to Numeric rents at the earlier and later date, same length as
+#'   `labels`.
+#' @param from_label,to_label Date labels for the key beneath the chart (e.g.
+#'   `"February 2020"`).
+#' @param accent Optional character vector of `labels` to draw in the focal
+#'   colour and bold, typically the statewide row.
+#' @param x_min,x_max Rent-axis bounds; default to the data rounded out to
+#'   `x_step`. Set them to hold one scale across states or releases.
+#' @param x_step Gridline interval in dollars (default 500).
+#' @param row_height Vertical pitch per row in design units (default 34).
+#' @param svg_id Element id, kept unique per page.
+#' @return Character scalar: the complete `<svg>...</svg>` block.
+#' @family state profile
+#' @export
+nt_profile_rent_dumbbell_svg <- function(labels, from, to,
+                                         from_label, to_label,
+                                         accent = NULL,
+                                         x_min = NULL, x_max = NULL,
+                                         x_step = 500, row_height = 34,
+                                         svg_id = "chart-rents-svg") {
+  stopifnot(length(labels) == length(from), length(from) == length(to),
+            length(labels) >= 1, all(from > 0))
+  pct <- 100 * (to - from) / from
+  ord <- order(pct, decreasing = TRUE)
+  labels <- labels[ord]; from <- from[ord]; to <- to[ord]; pct <- pct[ord]
+  n <- length(labels)
+
+  # The label gutter is fixed so the dot field starts in the same place
+  # regardless of the longest place name.
+  X0 <- 196; X1 <- 838
+  TOP <- 58
+  H <- TOP + n * row_height + 34
+  lo <- if (is.null(x_min)) floor(min(from, to) / x_step) * x_step else x_min
+  hi <- if (is.null(x_max)) ceiling(max(from, to) / x_step) * x_step else x_max
+  x_of <- function(v) X0 + (v - lo) * (X1 - X0) / (hi - lo)
+  y_of <- function(i) TOP + (i - 0.5) * row_height
+
+  dollars <- function(v) paste0("$", formatC(round(v), big.mark = ",", format = "d"))
+
+  ticks <- seq(lo, hi, by = x_step)
+  grid <- paste(sprintf(paste0(
+    '        <line class="rg" x1="%.1f" y1="%d" x2="%.1f" y2="%.1f"/>\n',
+    '        <text class="rax" x="%.1f" y="%d" text-anchor="middle">%s</text>'),
+    x_of(ticks), TOP - 24, x_of(ticks), TOP + n * row_height - 6,
+    x_of(ticks), TOP - 32, dollars(ticks)), collapse = "\n")
+
+  rows <- vapply(seq_len(n), function(i) {
+    cls <- if (!is.null(accent) && labels[i] %in% accent) " acc" else ""
+    y <- y_of(i)
+    paste0(
+      sprintf('        <g class="rrow%s">\n', cls),
+      sprintf('          <text class="rlab" x="%d" y="%.1f" text-anchor="end">%s</text>\n',
+              X0 - 22, y + 4, labels[i]),
+      sprintf('          <line class="rconn" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>\n',
+              x_of(from[i]), y, x_of(to[i]), y),
+      sprintf('          <circle class="rfrom" cx="%.1f" cy="%.1f" r="4.5"/>\n',
+              x_of(from[i]), y),
+      sprintf('          <circle class="rto" cx="%.1f" cy="%.1f" r="4.5"/>\n',
+              x_of(to[i]), y),
+      sprintf('          <text class="rval" x="%.1f" y="%.1f">%s</text>\n',
+              x_of(to[i]) + 11, y + 4, dollars(to[i])),
+      sprintf('          <text class="rpct" x="%d" y="%.1f" text-anchor="end">%+.0f%%</text>\n',
+              990, y + 4, pct[i]),
+      '        </g>')
+  }, character(1))
+
+  paste0(
+    '      <svg id="', svg_id, '" viewBox="0 0 1000 ', H,
+    '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="',
+    sprintf('Typical rent by place, %s compared with %s', from_label, to_label),
+    '">\n',
+    '        <style>\n',
+    '          .rax  { font-family: \'Inter\', sans-serif; font-size: calc(11px / var(--sx, 1)); fill: #586573; letter-spacing: 0.02em; }\n',
+    '          .rlab { font-family: \'Inter\', sans-serif; font-size: calc(13px / var(--sx, 1)); fill: #19222C; }\n',
+    '          .rval { font-family: \'Inter\', sans-serif; font-size: calc(12px / var(--sx, 1)); font-weight: 500; fill: #19222C; }\n',
+    '          .rpct { font-family: \'Inter\', sans-serif; font-size: calc(12px / var(--sx, 1)); font-weight: 500; fill: #586573; }\n',
+    '          .rg   { stroke: #19222C; stroke-width: 0.5; opacity: 0.12; }\n',
+    '          .rconn{ stroke: #19222C; stroke-width: 1.5; opacity: 0.45; }\n',
+    '          .rfrom{ fill: #ffffff; stroke: #6c7a89; stroke-width: 1.5; }\n',
+    '          .rto  { fill: #19222C; }\n',
+    '          .rrow.acc .rlab { font-weight: 700; }\n',
+    '          .rrow.acc .rto  { fill: #F9322B; }\n',
+    '          .rrow.acc .rval,\n',
+    '          .rrow.acc .rpct { fill: #F9322B; font-weight: 700; }\n',
+    '          .rkey { font-family: \'Inter\', sans-serif; font-size: calc(11.5px / var(--sx, 1)); fill: #586573; }\n',
+    '        </style>\n',
+    sprintf('        <!-- Rent scale %s to %s, gridlines every %s. -->\n',
+            dollars(lo), dollars(hi), dollars(x_step)),
+    grid, '\n',
+    paste(rows, collapse = "\n"), '\n',
+    '        <!-- Key: which dot is which date. -->\n',
+    sprintf('        <circle class="rfrom" cx="%d" cy="%d" r="4.5"/>\n', X0, H - 12),
+    sprintf('        <text class="rkey" x="%d" y="%d">%s</text>\n', X0 + 11, H - 8, from_label),
+    sprintf('        <circle class="rto" cx="%d" cy="%d" r="4.5"/>\n', X0 + 132, H - 12),
+    sprintf('        <text class="rkey" x="%d" y="%d">%s</text>\n', X0 + 143, H - 8, to_label),
+    '      </svg>'
+  )
+}
+
+# ==========================================================================
+# nt_profile_rent_trend_svg() — multi-series rent lines, focal + colored
+# ==========================================================================
+
+#' Rent-level line chart (state-profile rents figure) as interactive inline SVG
+#'
+#' Draws one line per geography with the focal series in the profile ink and
+#' the comparison series in a colorblind-aware categorical palette, end labels
+#' named, valued, and tinted to their lines, an optional dated reference line,
+#' and the same hover scaffolding as [nt_profile_race_trend_svg()]: a shared
+#' vertical guide and, in this chart's `nearest` hover mode, a single dot and
+#' a one-row tooltip on the line nearest the pointer (a ten-row column tooltip
+#' blocked the upper lines), bound by the page template's
+#' `attachMultiLineChart`. Series that start late (leading `NA`s) simply begin
+#' where their data does; the hover skips them in the months they lack.
+#'
+#' Palette colors are assigned to the non-focal series in descending order of
+#' their final value, so lines that end near each other take contrasting hues.
+#' The default palette is the house red-free qualitative set (see
+#' `ern_swatch()`), red-free so the focal series' red end dot stays the only
+#' red on the plate, plus the legacy burnt orange for a ninth series. End
+#' labels keep readable ink and carry a small dot in the line's color instead
+#' of tinted text (gold and steel fail contrast as small text).
+#'
+#' Pairs with [nt_apartmentlist_rents()], but takes plain vectors, so any
+#' monthly level series can drive it.
+#'
+#' @param dates Date vector, one per month, ascending, shared by all series.
+#' @param series Named list of numeric vectors, one per geography, each the
+#'   length of `dates`. `NA` runs are not drawn.
+#' @param focal Name of the series drawn in the profile ink with the red end
+#'   and hover dots; every other series takes the palette.
+#' @param palette Character vector of line colors for the non-focal series,
+#'   recycled if shorter. The default is a colorblind-aware categorical set.
+#' @param y_min,y_max Axis bounds; default to the data rounded out to
+#'   `y_step`.
+#' @param y_step Gridline interval in dollars (default 500).
+#' @param mark Optional `list(date =, label =)` — a dashed vertical reference
+#'   at that month (e.g. the last pre-pandemic month).
+#' @param chart_id Element id root; the SVG, indicator, and tooltip take
+#'   `<id>-svg`, `<id>-indicator`, `<id>-tooltip`, and the enclosing figure
+#'   div must carry `id="<chart_id>"` for the hover to bind.
+#' @param aria Accessible description of the figure.
+#' @return Character scalar: `<svg>`, tooltip `<div>`, and the `<script>`
+#'   payload the template's hover binder reads.
+#' @family state profile
+#' @export
+nt_profile_rent_trend_svg <- function(dates, series, focal,
+                                      palette = c("#2A8A86", "#C8860D", "#5A3A88",
+                                                  "#C95123", "#223754", "#7B96B5",
+                                                  "#2C6B3A", "#7A4A1E", "#586573"),
+                                      y_min = NULL, y_max = NULL, y_step = 500,
+                                      mark = NULL,
+                                      chart_id = "chart-rents",
+                                      aria = "Estimated median rent on new leases by place and month") {
+  stopifnot("series must be a named list" = !is.null(names(series)),
+            "every series must match the dates" =
+              all(vapply(series, length, integer(1)) == length(dates)),
+            "focal must name a series" = focal %in% names(series))
+  n <- length(dates)
+  X0 <- 52; X1 <- 830; Y_TOP <- 40; Y_FLOOR <- 310; VB_W <- 1000; VB_H <- 344
+  vals <- unlist(series)
+  lo <- if (is.null(y_min)) floor(min(vals, na.rm = TRUE) / y_step) * y_step else y_min
+  hi <- if (is.null(y_max)) ceiling(max(vals, na.rm = TRUE) / y_step) * y_step else y_max
+  x_of <- function(i) X0 + (i - 1) * (X1 - X0) / (n - 1)
+  y_of <- function(v) Y_FLOOR - (v - lo) * (Y_FLOOR - Y_TOP) / (hi - lo)
+  dollars <- function(v) paste0("$", formatC(round(v), big.mark = ",", format = "d"))
+  slug <- function(x) gsub("[^a-z0-9]+", "-", tolower(x))
+  last_val <- function(v) v[max(which(!is.na(v)))]
+
+  # Per-series keys, used as swatch classes, data-series attributes on the
+  # drawn elements, and the isolation dropdown's option values.
+  keys <- stats::setNames(paste0(slug(chart_id), "-", slug(names(series))), names(series))
+
+  # Colors: focal keeps the ink; the rest take the palette in descending
+  # end-value order, so near-neighbors at the right edge contrast.
+  others <- setdiff(names(series), focal)
+  others <- others[order(-vapply(series[others], last_val, numeric(1)))]
+  col <- stats::setNames(rep_len(palette, length(others)), others)
+  col[focal] <- "#19222C"
+
+  grid_vals <- seq(lo + y_step, hi, by = y_step)
+  grid <- paste(sprintf(paste0(
+    '        <line class="rtg" x1="%d" y1="%.1f" x2="%d" y2="%.1f"/>\n',
+    '        <text class="rtax" x="%d" y="%.1f" text-anchor="end">%s</text>'),
+    X0, y_of(grid_vals), X1, y_of(grid_vals),
+    X0 - 6, y_of(grid_vals) + 4, dollars(grid_vals)), collapse = "\n")
+
+  # One path per series; NA months break into separate segments rather than
+  # being interpolated across.
+  path_d <- function(v) {
+    ok <- !is.na(v)
+    runs <- split(seq_len(n)[ok], cumsum(!ok)[ok])
+    paste(vapply(runs, function(idx) paste0(
+      "M ", paste(sprintf("%.1f %.1f", x_of(idx), y_of(v[idx])), collapse = " L ")),
+      character(1)), collapse = " ")
+  }
+  paths <- paste(vapply(others, function(g) sprintf(
+    '        <path class="rt-line" data-series="%s" stroke="%s" d="%s"/>',
+    keys[[g]], col[[g]], path_d(series[[g]])), character(1)), collapse = "\n")
+  focal_v <- series[[focal]]
+  focal_path <- sprintf('        <path class="rt-focal" data-series="%s" d="%s"/>',
+                        keys[[focal]], path_d(focal_v))
+
+  # End labels: "Name · $X,XXX", ordered by final value, tinted to the line,
+  # nudged apart where two series finish within 11 design-px.
+  ends <- data.frame(g = names(series),
+                     v = vapply(series, last_val, numeric(1)))
+  ends <- ends[order(-ends$v), ]
+  ends$y <- y_of(ends$v)
+  for (i in seq_len(nrow(ends))[-1]) {
+    if (ends$y[i] - ends$y[i - 1] < 11) ends$y[i] <- ends$y[i - 1] + 11
+  }
+  end_labels <- paste(vapply(seq_len(nrow(ends)), function(i) {
+    g <- ends$g[i]
+    if (g == focal) sprintf(
+      '        <text class="rtlab focal" data-series="%s" x="%d" y="%.1f">%s &#183; %s</text>',
+      keys[[g]], X1 + 8, ends$y[i] + 4, g, dollars(ends$v[i]))
+    else paste0(
+      sprintf('        <circle class="rtlab-dot" data-series="%s" cx="%d" cy="%.1f" r="3" fill="%s"/>\n',
+              keys[[g]], X1 + 11, ends$y[i], col[[g]]),
+      sprintf('        <text class="rtlab" data-series="%s" x="%d" y="%.1f">%s &#183; %s</text>',
+              keys[[g]], X1 + 18, ends$y[i] + 4, g, dollars(ends$v[i])))
+  }, character(1)), collapse = "\n")
+  focal_dot <- sprintf('        <circle class="rt-dot" cx="%.1f" cy="%.1f" r="3.5"/>',
+                       x_of(max(which(!is.na(focal_v)))), y_of(last_val(focal_v)))
+
+  mark_svg <- ""
+  if (!is.null(mark)) {
+    mi <- which(dates == as.Date(mark$date))
+    if (length(mi) == 1) mark_svg <- sprintf(paste0(
+      '        <line class="rt-mark" x1="%.1f" y1="%d" x2="%.1f" y2="%d"/>\n',
+      '        <text class="rt-mark-label" x="%.1f" y="%d" text-anchor="middle">%s</text>\n'),
+      x_of(mi), Y_TOP - 8, x_of(mi), Y_FLOOR, x_of(mi), Y_TOP - 14, mark$label)
+  }
+
+  years <- sort(unique(as.integer(format(dates, "%Y"))))
+  tick_years <- unique(c(years[seq(1, length(years), by = 2)], max(years)))
+  tick_i <- match(as.Date(paste0(tick_years, "-01-01")), dates)
+  tick_x <- x_of(tick_i); tick_x[tick_years == max(tick_years)] <- X1
+  anchor <- ifelse(tick_years == min(tick_years), "",
+            ifelse(tick_years == max(tick_years), ' text-anchor="end"',
+                   ' text-anchor="middle"'))
+  axis_svg <- paste(sprintf(
+    '        <text class="rtax" x="%.0f" y="%d"%s>%d</text>',
+    tick_x, Y_FLOOR + 20, anchor, tick_years), collapse = "\n")
+
+  # Tooltip swatch colors. A <style> inside an inline SVG is document CSS, so
+  # these classes reach the HTML tooltip; the chart_id prefix keeps them from
+  # colliding with anything else on the page.
+  swatch_css <- paste(vapply(names(series), function(g) sprintf(
+    '          .tip-row .swatch.%s { background: %s; border-color: %s; }',
+    keys[[g]], col[[g]], col[[g]]), character(1)), collapse = "\n")
+
+  # Hover scaffolding: the template's attachMultiLineChart moves one dot per
+  # series, keyed rt-<key>, inside the indicator group.
+  hover_dots <- paste(vapply(names(series), function(g) sprintf(
+    '          <circle class="hover-dot rt-%s" cx="0" cy="0" r="%s" fill="%s" stroke="#fff" stroke-width="1.25"/>',
+    keys[[g]], if (g == focal) "4" else "3",
+    if (g == focal) "#F9322B" else col[[g]]), character(1)), collapse = "\n")
+
+  # Payload: counties in end-value order, the focal series LAST so the
+  # template treats it as the lead (tooltip anchor + first row). NAs become
+  # JS nulls; the binder hides that series' dot and row for those months.
+  arr <- function(v) paste0("[", paste(ifelse(is.na(v), "null",
+                                              sprintf("%.0f", v)), collapse = ","), "]")
+  ordered_for_payload <- c(rev(others), focal)   # reversed again by the binder
+  payload <- paste0(
+    '{ x0: ', X0, ', x1: ', X1, ', yFloor: ', Y_FLOOR, ', yTop: ', Y_TOP,
+    ', yMin: ', lo, ', yMax: ', hi, ', vbW: ', VB_W, ', vbH: ', VB_H,
+    ', digits: 0, prefix: "$", suffix: "", mode: "nearest"',
+    ', months: [', paste(sprintf('"%s"', format(dates, "%b %Y")), collapse = ","), ']',
+    ', series: [',
+    paste(vapply(ordered_for_payload, function(g) sprintf(
+      '{ key: "%s", label: %s, swatch: "%s", values: %s }',
+      keys[[g]], jsonlite::toJSON(g, auto_unbox = TRUE), keys[[g]],
+      arr(series[[g]])), character(1)), collapse = ","),
+    '] }')
+
+  # Isolation chooser, the Figure 3 control pattern: pick one place and every
+  # other line dims to a ghost field. The template binder wires it by id;
+  # options run focal first, then end-value order to match the labels.
+  sel_order <- c(focal, as.character(ends$g[ends$g != focal]))
+  select_html <- paste0(
+    '      <div class="ct-controls">\n',
+    '        <label class="ct-select-wrap">\n',
+    '          <span class="ct-select-label">Show:</span>\n',
+    '          <select id="', chart_id, '-select" class="ct-select">\n',
+    '            <option value="">&#8212; all places &#8212;</option>\n',
+    paste(sprintf('            <option value="%s">%s</option>',
+                  keys[sel_order], sel_order), collapse = "\n"), '\n',
+    '          </select>\n',
+    '        </label>\n',
+    '      </div>\n')
+
+  paste0(
+    select_html,
+    '      <svg id="', chart_id, '-svg" viewBox="0 0 ', VB_W, ' ', VB_H,
+    '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="', aria, '">\n',
+    '        <style>\n',
+    '          .rtax  { font-family: \'Inter\', sans-serif; font-size: calc(11px / var(--sx, 1)); fill: #586573; letter-spacing: 0.02em; }\n',
+    '          .rtg   { stroke: #19222C; stroke-width: 0.5; opacity: 0.12; }\n',
+    '          .rt-line { fill: none; stroke-width: 1.4; stroke-linejoin: round; opacity: 0.9; }\n',
+    '          .rt-focal { fill: none; stroke: #19222C; stroke-width: 2.25; stroke-linejoin: round; }\n',
+    '          .rt-dot { fill: #F9322B; }\n',
+    '          .rtlab { font-family: \'Inter\', sans-serif; font-size: calc(11.5px / var(--sx, 1)); fill: #586573; }\n',
+    '          .rtlab.focal { font-size: calc(12.5px / var(--sx, 1)); font-weight: 700; fill: #19222C; }\n',
+    '          .rt-mark { stroke: #19222C; stroke-width: 0.75; stroke-dasharray: 3 4; opacity: 0.55; }\n',
+    '          .rt-mark-label { font-family: \'Inter\', sans-serif; font-style: italic; font-size: calc(11px / var(--sx, 1)); fill: #586573; }\n',
+    '          .rt-dim { opacity: 0.12; }\n',
+    swatch_css, '\n',
+    '        </style>\n',
+    sprintf('        <!-- Rent scale %s to %s, gridlines every %s. -->\n',
+            dollars(lo), dollars(hi), dollars(y_step)),
+    grid, '\n', mark_svg, paths, '\n', focal_path, '\n', focal_dot, '\n',
+    end_labels, '\n', axis_svg, '\n',
+    '        <g class="hover-indicator" id="', chart_id, '-indicator">\n',
+    sprintf('          <line class="hover-vguide" x1="0" y1="%d" x2="0" y2="%d"/>\n',
+            Y_TOP - 8, Y_FLOOR),
+    hover_dots, '\n',
+    '        </g>\n',
+    '      </svg>\n',
+    sprintf('      <div class="hover-tooltip" id="%s-tooltip"><div class="tip-date"></div><div class="tip-rows"></div></div>\n',
+            chart_id),
+    sprintf('<script>window.__ernRaceCharts = window.__ernRaceCharts || {}; window.__ernRaceCharts[%s] = %s;</script>',
+            jsonlite::toJSON(chart_id, auto_unbox = TRUE), payload)
+  )
+}
+
+# ------------------------------------------------------------------------------
+# Two-measure scatter (state-profile comparison plate)
+# ------------------------------------------------------------------------------
+
+#' Two-measure county scatter as inline SVG
+#'
+#' Plots one county-level rate against another so a reader can see whether the
+#' two move together. Built for the question "does the county that files the
+#' most evictions have the most homelessness?", where the answer turns out to
+#' be no and the chart has to make that legible rather than argue it.
+#'
+#' Design choices that follow from that job:
+#' \itemize{
+#'   \item No trend line. Drawing one over an uncorrelated cloud invites the
+#'     reader to see a slope that the correlation says is not there. The
+#'     correlation belongs in the caption, in words.
+#'   \item Point area is proportional to `weight` (renter households), so a
+#'     county of 400 renters cannot read as loud as King.
+#'   \item Only `label` counties are named. Labelling all 39 turns the plate
+#'     into a word cloud; naming the extremes and the big five is what carries
+#'     the argument.
+#' }
+#'
+#' Static by design and carries no hover JS, like [nt_profile_rent_dumbbell_svg()]:
+#' the point of the plate is the shape of the cloud, not any single value.
+#'
+#' @param x,y Numeric vectors of the two rates, same length.
+#' @param labels Character vector of place names, same length as `x`.
+#' @param weight Optional numeric sizing vector (e.g. renter households).
+#'   Areas, not radii, scale with it. Defaults to equal sizes.
+#' @param label_which Character vector of `labels` to print on the plate.
+#'   Defaults to none.
+#' @param accent Character vector of `labels` to draw in the focal colour.
+#' @param x_lab,y_lab Axis titles.
+#' @param x_step,y_step Gridline intervals in data units.
+#' @param x_max,y_max Axis ceilings; default to the data rounded out to a step.
+#' @param svg_id Element id, kept unique per page.
+#' @return Character scalar: the complete `<svg>...</svg>` block.
+#' @family state profile
+#' @export
+nt_profile_scatter_svg <- function(x, y, labels,
+                                   weight = NULL,
+                                   label_which = character(0),
+                                   accent = character(0),
+                                   x_lab = "", y_lab = "",
+                                   x_step = 10, y_step = 20,
+                                   x_max = NULL, y_max = NULL,
+                                   svg_id = "chart-scatter-svg") {
+  stopifnot(length(x) == length(y), length(x) == length(labels))
+  ok <- is.finite(x) & is.finite(y)
+  x <- x[ok]; y <- y[ok]; labels <- labels[ok]
+  weight <- if (is.null(weight)) rep(1, length(x)) else weight[ok]
+
+  x_max <- if (is.null(x_max)) ceiling(max(x, na.rm = TRUE) / x_step) * x_step else x_max
+  y_max <- if (is.null(y_max)) ceiling(max(y, na.rm = TRUE) / y_step) * y_step else y_max
+
+  # plot frame inside the 1000 x 360 viewBox
+  px0 <- 78; px1 <- 962; py0 <- 30; py1 <- 296
+  x_of <- function(v) px0 + (v / x_max) * (px1 - px0)
+  y_of <- function(v) py1 - (v / y_max) * (py1 - py0)
+
+  grid_y <- .nt_grid_lines_svg(seq(y_step, y_max, by = y_step), px0, px1, px0 - 10,
+                               y_of, function(v) format(v, trim = TRUE))
+  xt <- seq(0, x_max, by = x_step)
+  grid_x <- paste(sprintf(
+    paste0('          <line class="grid-line" x1="%.1f" y1="%d" x2="%.1f" y2="%d"/>\n',
+           '          <text class="grid-label" x="%.1f" y="%d" text-anchor="middle">%s</text>'),
+    x_of(xt), py0, x_of(xt), py1, x_of(xt), py1 + 20, format(xt, trim = TRUE)),
+    collapse = "\n")
+
+  # area, not radius, tracks the weight
+  w <- weight / max(weight, na.rm = TRUE)
+  r <- 4 + 13 * sqrt(w)
+
+  is_acc <- labels %in% accent
+  ord <- order(r, decreasing = TRUE)          # big points first, small on top
+  pts <- paste(sprintf(
+    '          <circle class="%s" cx="%.1f" cy="%.1f" r="%.1f"/>',
+    ifelse(is_acc[ord], "sc-dot sc-dot-accent", "sc-dot"),
+    x_of(x[ord]), y_of(y[ord]), r[ord]), collapse = "\n")
+
+  lab_i <- which(labels %in% label_which)
+  labs <- if (length(lab_i)) paste(sprintf(
+    '          <text class="sc-label%s" x="%.1f" y="%.1f" text-anchor="middle">%s</text>',
+    ifelse(is_acc[lab_i], " sc-label-accent", ""),
+    x_of(x[lab_i]), y_of(y[lab_i]) - r[lab_i] - 6, labels[lab_i]), collapse = "\n") else ""
+
+  paste0(
+    '      <svg id="', svg_id, '" viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg">\n',
+    '        <g class="grid">\n', grid_x, '\n', grid_y, '\n        </g>\n',
+    '        <g class="points">\n', pts, '\n        </g>\n',
+    if (nzchar(labs)) paste0('        <g class="labels">\n', labs, '\n        </g>\n') else "",
+    sprintf('        <text class="sc-axis-title" x="%.1f" y="%d" text-anchor="middle">%s</text>\n',
+            (px0 + px1) / 2, py1 + 48, x_lab),
+    sprintf('        <text class="sc-axis-title" transform="rotate(-90 %d %.1f)" x="%d" y="%.1f" text-anchor="middle">%s</text>\n',
+            22, (py0 + py1) / 2, 22, (py0 + py1) / 2, y_lab),
+    '      </svg>'
+  )
+}

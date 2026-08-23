@@ -1,5 +1,52 @@
 # neighborhood 1.1.0 (development version)
 
+## Maps
+
+* New `nt_add_bivariate()`: a two-way choropleth that crosses two numeric
+  columns into an `n x n` color grid, for the questions that are about overlap
+  rather than either measure alone. Each variable is cut into `n` classes
+  (quantiles by default, or supply `x_breaks`/`y_breaks` to cut on substantive
+  thresholds), and the pair picks a color from the grid. It builds through
+  `nt_add_choropleth()`, so popups, tooltips, PMTiles handling and the
+  `visible = FALSE` multi-layer convention all behave as they do elsewhere,
+  and its two-dimensional legend carries the usual `data-layer-id` binding so
+  it shows and hides with the layer under `nt_layers_control()` and
+  `nt_sync_maps()`.
+
+* New `nt_bivariate_pal()`: the `n x n` grid itself, keyed `"<x>-<y>"`. Three
+  palettes — `"bluered"` (the Stevens grid, default), `"purplegreen"`, and
+  `"ern"` from the house tint, red and blue-navy. At `n = 3` the published
+  grids are returned verbatim, since those middle tones were hand-chosen; at
+  any other `n` the grid is interpolated bilinearly so the four corners stay
+  exact and the interior spaces evenly.
+
+## State profile builders
+
+* New `nt_profile_rent_trend_svg()`: the profile-family rent line chart, the
+  inline-SVG counterpart of the `nt_chart()` rent lines in the San Mateo
+  reports, first drawn on the Washington profile from
+  `nt_apartmentlist_rents()` data. Focal series in the profile ink; the
+  comparison series take the house red-free qualitative palette (plus the
+  legacy burnt orange for a ninth), assigned in descending end-value order so
+  near neighbors contrast. End labels are ink text with a dot in the line's
+  color (gold and steel fail contrast as small text), collision-nudged. An
+  optional dated reference line; per-series NA runs drawn as separate
+  segments. Hover is the template's `attachMultiLineChart` in the new
+  `nearest` mode: one dot and a one-row tooltip on the line closest to the
+  pointer (ten stacked rows blocked the upper lines; the race pair keeps its
+  all-series column via the default `column` mode). The builder also emits an
+  isolation chooser (the Figure 3 `.ct-select` pattern, options in end-value
+  order): choosing a place dims every other line, label, and dot to a ghost
+  field and restricts the hover to the chosen line; the binder wires it by
+  `<chart_id>-select` and skips charts that emit none. The template binder gained three backward-compatible extensions for
+  it: payload-declared viewBox (`vbW`/`vbH`, defaulting to the race pair's
+  480×240), null-value guards for series that start late, and a `prefix` +
+  thousands-grouped number format.
+
+* New `nt_profile_rent_dumbbell_svg()`: a static two-date rent comparison,
+  one row per place, percent change at the right edge. Exported and
+  documented; no page currently draws it (Washington chose the line chart).
+
 ## HPRM responsible use
 
 * The Do No Harm pledge that accompanies every release of Housing Precarity
