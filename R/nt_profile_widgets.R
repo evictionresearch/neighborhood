@@ -241,6 +241,8 @@ nt_profile_county_table <- function(counties,
     sprintf('<span class="th-sub">%s</span>', sub_labels[[key]])
   }
 
+  # which.max ignores NA, so a table carrying no-data rows still highlights the
+  # real leader rather than nothing.
   hi_row <- which.max(counties$rate)
   # `chg` is the percent change in the annualized rate between the two ends of
   # the window, comparing blocks of up to 12 months at each end rather than
@@ -250,17 +252,24 @@ nt_profile_county_table <- function(counties,
   # from the monthly series whenever the slider moves, by the same rule.
   chg_js <- ifelse(is.na(counties$chg), ", chg: null",
                    sprintf(", chg: %.1f", counties$chg))
+  # A row may carry no data at all: a county the source does not cover still
+  # belongs in the table, so the reader can see it is absent rather than assume
+  # it was overlooked. R's sprintf would render those NAs as the literal `NA`,
+  # which is not valid JavaScript and would take the whole table down, so every
+  # numeric field is emitted as `null` instead. The page already renders a null
+  # rate as "not reported" (template.html, hasRate).
+  jnum <- function(x, fmt) ifelse(is.na(x), "null", sprintf(fmt, x))
   rows_js <- paste0(
     "[\n",
     paste0(
       "      ",
-      sprintf('{ county: %s, renters: %d, filings: %d, rate: %.1f%s%s }',
+      sprintf('{ county: %s, renters: %s, filings: %s, rate: %s%s%s }',
               vapply(counties$county,
                      function(s) as.character(jsonlite::toJSON(s, auto_unbox = TRUE)),
                      character(1)),
-              as.integer(round(counties$renters)),
-              as.integer(counties$filings),
-              counties$rate,
+              jnum(round(counties$renters), "%d"),
+              jnum(round(counties$filings), "%d"),
+              jnum(counties$rate, "%.1f"),
               chg_js,
               ifelse(seq_len(nrow(counties)) == hi_row, ", hi: true", "")),
       collapse = ",\n"
