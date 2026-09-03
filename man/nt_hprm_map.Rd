@@ -164,8 +164,10 @@ htmlwidgets::saveWidget(m, "hprm_redwood_city.html", selfcontained = TRUE)
 
 Other ern_maps:
 \code{\link[=afford_map]{afford_map()}},
+\code{\link[=nt_add_bivariate]{nt_add_bivariate()}},
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_bivariate_pal]{nt_bivariate_pal()}},
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_hprm_pal]{nt_hprm_pal()}},
 \code{\link[=nt_layers_control]{nt_layers_control()}},

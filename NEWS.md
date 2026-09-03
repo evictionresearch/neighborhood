@@ -2,6 +2,16 @@
 
 ## Maps
 
+* Legends from `nt_add_choropleth()` (and everything built on it, including
+  `nt_map()`, `nt_hprm_map()`, and `afford_map()`) now draw on a fully opaque
+  white panel. mapgl's default is white at 50% alpha, which let the basemap
+  read through the swatches and labels on screen and rendered badly in print
+  (#20). Two new passthroughs, `legend_style` (a `mapgl::legend_style()`
+  object) and `legend_position` (map corner), make the panel styleable and
+  movable without injected CSS; a caller style that sets no background of its
+  own still inherits the opaque background, so partial styling can't quietly
+  bring the translucency back.
+
 * New `nt_add_bivariate()`: a two-way choropleth that crosses two numeric
   columns into an `n x n` color grid, for the questions that are about overlap
   rather than either measure alone. Each variable is cut into `n` classes

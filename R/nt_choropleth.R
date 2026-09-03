@@ -47,6 +47,16 @@
 #' @param legend `TRUE` (default), `FALSE`, or `"interactive"` for a clickable
 #'   legend that filters the map.
 #' @param legend_title Legend title (defaults to `column`).
+#' @param legend_position Map corner for the legend: `"top-left"` (default),
+#'   `"top-right"`, `"bottom-left"`, or `"bottom-right"`.
+#' @param legend_style A [mapgl::legend_style()] object styling the legend
+#'   panel (background, border, text, shadow, padding). The default `NULL`
+#'   draws a fully opaque white panel; mapgl's own default is white at 50%
+#'   alpha, which lets the basemap bleed through the swatches on screen and
+#'   prints poorly. A style of your own is used as-is when it sets
+#'   `background_color` or `background_opacity`, and inherits the opaque
+#'   white background otherwise, so partial styles (say, a text size) don't
+#'   quietly bring the translucency back.
 #' @param popup Click popup. `TRUE` (default) builds a sensible popup from the
 #'   data; `FALSE`/`NULL` for none; a column name to use an existing HTML column
 #'   (e.g. one from [nt_popup()]); or a character vector of length `nrow(data)`.
@@ -98,6 +108,9 @@ nt_add_choropleth <- function(map, data, column,
                               breaks = NULL, colors = NULL, labels = NULL,
                               fill_color = NULL,
                               id = NULL, legend = TRUE, legend_title = NULL,
+                              legend_position = c("top-left", "top-right",
+                                                  "bottom-left", "bottom-right"),
+                              legend_style = NULL,
                               popup = TRUE, tooltip = TRUE,
                               opacity = 0.7, outline_color = "#ffffff",
                               na_color = NULL, visible = TRUE,
@@ -105,6 +118,7 @@ nt_add_choropleth <- function(map, data, column,
                               max_inline = 25000, ...) {
   type  <- match.arg(type)
   tiles <- match.arg(tiles)
+  legend_position <- match.arg(legend_position)
   data <- .nt_ensure_wgs84(.nt_as_sf(data))
   # Strip any name attribute: a named column (e.g. from `demos[i]` in a loop)
   # would otherwise serialize into the MapLibre ["get", column] expression as an
@@ -177,10 +191,12 @@ nt_add_choropleth <- function(map, data, column,
       if (!is.null(colors) && !is.null(labels)) {
         spec_leg <- list(legend_type = "categorical",
                          legend_values = labels, legend_colors = colors)
-        map <- .nt_add_legend(map, spec_leg, column, legend, legend_title, id)
+        map <- .nt_add_legend(map, spec_leg, column, legend, legend_title, id,
+                              position = legend_position, style = legend_style)
       }
     } else {
-      map <- .nt_add_legend(map, spec, column, legend, legend_title, id)
+      map <- .nt_add_legend(map, spec, column, legend, legend_title, id,
+                            position = legend_position, style = legend_style)
     }
   }
   map
@@ -232,9 +248,22 @@ nt_add_choropleth <- function(map, data, column,
 }
 
 # Add the legend that matches a fill spec.
-.nt_add_legend <- function(map, spec, column, legend, legend_title, id = NULL) {
+.nt_add_legend <- function(map, spec, column, legend, legend_title, id = NULL,
+                           position = "top-left", style = NULL) {
   lt <- legend_title %nt||% column
   interactive <- identical(legend, "interactive")
+
+  # Opaque panel by default: mapgl's own default background is white at 50%
+  # alpha (#ffffff80), which lets the basemap read through the swatches and
+  # labels on screen and renders badly in print (issue #20). A caller style
+  # that sets its own background is honored as-is; one that styles other
+  # pieces still inherits the opaque background.
+  if (is.null(style)) {
+    style <- mapgl::legend_style(background_opacity = 1)
+  } else if (is.null(style$background_color) &&
+             is.null(style$background_opacity)) {
+    style$background_opacity <- 1
+  }
 
   # If the map already carries a legend (i.e. this is a 2nd+ choropleth layer),
   # APPEND rather than replace, and tie each legend to its layer via layer_id so
@@ -247,7 +276,8 @@ nt_add_choropleth <- function(map, data, column,
       map, legend_title = lt,
       values = .nt_fmt(spec$legend_values),
       colors = spec$legend_colors,
-      add = has_legend, layer_id = id
+      add = has_legend, layer_id = id,
+      position = position, style = style
     ))
   }
 
@@ -255,7 +285,8 @@ nt_add_choropleth <- function(map, data, column,
   args <- list(
     map, legend_title = lt,
     values = spec$legend_values, colors = spec$legend_colors,
-    interactive = interactive, add = has_legend, layer_id = id
+    interactive = interactive, add = has_legend, layer_id = id,
+    position = position, style = style
   )
   if (interactive) {
     args$filter_column <- column

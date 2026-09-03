@@ -174,8 +174,10 @@ htmltools::browsable(htmltools::tagList(
 \code{\link[=nt_map_sync]{nt_map_sync()}}, \code{\link[=nt_hprm_terms]{nt_hprm_terms()}}
 
 Other ern_maps:
+\code{\link[=nt_add_bivariate]{nt_add_bivariate()}},
 \code{\link[=nt_add_choropleth]{nt_add_choropleth()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_bivariate_pal]{nt_bivariate_pal()}},
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_hprm_map]{nt_hprm_map()}},
 \code{\link[=nt_hprm_pal]{nt_hprm_pal()}},

@@ -138,3 +138,46 @@ test_that("map functions reject non-spatial data with guidance", {
   expect_error(nt_map(d), "not spatial|could not be converted")
   expect_error(nt_maplibre(d), "not spatial|could not be converted")
 })
+
+test_that("legends are opaque by default (issue #20)", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+
+  # categorical: opaque override lands after mapgl's #ffffff80 default
+  m <- nt_maplibre(d) |> nt_add_choropleth(d, "nt_conc")
+  css <- paste(unlist(m$x$legend_css), collapse = "")
+  expect_match(css, "rgba(255, 255, 255, 1.00) !important", fixed = TRUE)
+
+  # continuous branch takes the style too
+  m2 <- nt_maplibre(d) |> nt_add_choropleth(d, "pBlack", type = "continuous")
+  css2 <- paste(unlist(m2$x$legend_css), collapse = "")
+  expect_match(css2, "rgba(255, 255, 255, 1.00) !important", fixed = TRUE)
+
+  # a caller style that doesn't touch the background inherits the opacity
+  m3 <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc",
+                      legend_style = mapgl::legend_style(text_size = 12))
+  css3 <- paste(unlist(m3$x$legend_css), collapse = "")
+  expect_match(css3, "rgba(255, 255, 255, 1.00) !important", fixed = TRUE)
+  expect_match(css3, "font-size: 12px", fixed = TRUE)
+
+  # a caller background is honored as-is
+  m4 <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc",
+                      legend_style = mapgl::legend_style(background_color = "#19222C"))
+  css4 <- paste(unlist(m4$x$legend_css), collapse = "")
+  expect_match(css4, "#19222C", fixed = TRUE)
+  expect_no_match(css4, "rgba(255, 255, 255, 1.00)", fixed = TRUE)
+})
+
+test_that("legend_position reaches the legend container", {
+  skip_if_not_installed("mapgl")
+  d <- nt_test_sf()
+  m <- nt_maplibre(d) |>
+    nt_add_choropleth(d, "nt_conc", legend_position = "bottom-right")
+  html <- paste(unlist(m$x$legend_html), collapse = "")
+  expect_match(html, "bottom-right", fixed = TRUE)
+  expect_error(
+    nt_add_choropleth(nt_maplibre(d), d, "nt_conc", legend_position = "middle"),
+    "should be one of")
+})

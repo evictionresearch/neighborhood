@@ -16,6 +16,8 @@ nt_add_choropleth(
   id = NULL,
   legend = TRUE,
   legend_title = NULL,
+  legend_position = c("top-left", "top-right", "bottom-left", "bottom-right"),
+  legend_style = NULL,
   popup = TRUE,
   tooltip = TRUE,
   opacity = 0.7,
@@ -66,6 +68,18 @@ expression); the column is still used for the popup, tooltip, and \code{id}.}
 legend that filters the map.}
 
 \item{legend_title}{Legend title (defaults to \code{column}).}
+
+\item{legend_position}{Map corner for the legend: \code{"top-left"} (default),
+\code{"top-right"}, \code{"bottom-left"}, or \code{"bottom-right"}.}
+
+\item{legend_style}{A \code{\link[mapgl:legend_style]{mapgl::legend_style()}} object styling the legend
+panel (background, border, text, shadow, padding). The default \code{NULL}
+draws a fully opaque white panel; mapgl's own default is white at 50\%
+alpha, which lets the basemap bleed through the swatches on screen and
+prints poorly. A style of your own is used as-is when it sets
+\code{background_color} or \code{background_opacity}, and inherits the opaque
+white background otherwise, so partial styles (say, a text size) don't
+quietly bring the translucency back.}
 
 \item{popup}{Click popup. \code{TRUE} (default) builds a sensible popup from the
 data; \code{FALSE}/\code{NULL} for none; a column name to use an existing HTML column
@@ -149,7 +163,9 @@ m |> mapgl::add_layers_control(layers = c("Typology", names(demos)))
 
 Other ern_maps:
 \code{\link[=afford_map]{afford_map()}},
+\code{\link[=nt_add_bivariate]{nt_add_bivariate()}},
 \code{\link[=nt_add_labels]{nt_add_labels()}},
+\code{\link[=nt_bivariate_pal]{nt_bivariate_pal()}},
 \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}},
 \code{\link[=nt_hprm_map]{nt_hprm_map()}},
 \code{\link[=nt_hprm_pal]{nt_hprm_pal()}},
