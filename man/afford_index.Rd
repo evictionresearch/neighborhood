@@ -21,6 +21,7 @@ afford_index(
   tax_ins_rate = 0.0125,
   buyin_stock = c("owned_value", "for_sale"),
   availability = TRUE,
+  availability_shrink = TRUE,
   geometry = FALSE
 )
 }
@@ -84,6 +85,15 @@ Gate-2 vacancy/turnover measures.}
 and \code{available_turnover} (= \code{accessible} x each rate -- affordable units
 that are actually open / turning over). Set \code{FALSE} for price-only Gate 1.}
 
+\item{availability_shrink}{If \code{TRUE} (default), the Gate-2 rates are
+empirical-Bayes shrunk toward their county pool before the \verb{available_*}
+multiplications: tract vacancy counts especially are a rare ACS category
+whose raw rates are noise-dominated. Precise tracts keep their own rate;
+noisy ones borrow the county's (weights from the ACS margins of error).
+The unshrunk rates ride along as \code{vacancy_rate_raw} / \code{turnover_rate_raw}
+so the adjustment is inspectable. \code{FALSE} reproduces the raw-rate
+behavior of earlier versions.}
+
 \item{geometry}{If \code{TRUE}, attach tract polygons (an \code{sf} tibble). With the
 long output this duplicates polygons across tenure/tier; filter to one
 tenure and tier before mapping.}
@@ -92,9 +102,25 @@ tenure and tier before mapping.}
 A long tibble, one row per tract x tenure x tier, with \code{accessible},
 \code{total}, \code{supply} (and, when \code{stretch} is set, \code{accessible_stretch} /
 \code{supply_stretch}), \code{reg_hh_tier}, \code{reg_hh_total}, \code{class_prop}, \code{ratio},
-\code{rate}, the county \code{ami}, and the tier \code{income_cutoff}. When
-\code{availability = TRUE}, also \code{vacancy_rate}, \code{turnover_rate},
-\code{available_vacancy}, and \code{available_turnover} (Gate 2).
+\code{rate}, the county \code{ami}, and the tier \code{income_cutoff}. Every
+accessible/supply count carries a 90\% margin of error alongside it
+(\code{accessible_moe}, \code{supply_moe}, and the \verb{_stretch_} pair): root sum of
+squares over the included brackets, the partial bracket scaled by its
+included fraction, the share MOE first-order in the numerator. These feed
+\code{\link[=afford_verdict]{afford_verdict()}}'s fragility flag. When \code{availability = TRUE}, also
+\code{vacancy_rate}, \code{turnover_rate}, \code{available_vacancy}, and
+\code{available_turnover} (Gate 2), plus the unshrunk \verb{*_rate_raw} pair when
+\code{availability_shrink} is on.
+
+One honesty note that applies to every number downstream: the ACS rent and
+cost distributions include subsidized units (public housing, LIHTC,
+voucher-assisted), whose reported costs sit below market. Some of what
+counts as affordable stock is assisted housing not open to an arbitrary
+mover, so affordable shares run high in subsidy-rich tracts on every price
+basis, the entry basis included (the premium rescales those units too).
+Netting out HUD-assisted unit counts (Picture of Subsidized Households) is
+the planned refinement; until then, state the caveat wherever these
+numbers are published.
 }
 \description{
 For each census tract, counts the housing units affordable to households at

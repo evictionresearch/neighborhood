@@ -1,5 +1,55 @@
 # neighborhood 1.1.0 (development version)
 
+## Affordability
+
+* The afford family now carries its uncertainty. `afford_index()` returns a
+  90% margin of error beside every accessible count and supply share
+  (`accessible_moe`, `supply_moe`, and the stretch pair; root sum of squares
+  over the included brackets, the partial bracket scaled by its fraction),
+  `afford_entry()` does the same for its entry-priced counts, and
+  `afford_bands()` differences MOEs by the disjoint-bracket identity.
+  `afford_verdict()` and the entry verdict gain a fragility flag
+  (`verdict_fragile` / `entry_verdict_fragile`): `TRUE` where a burden line
+  sits within one MOE of the majority rule, so a tract one point from the
+  cut renders hatched instead of silently colored.
+
+* Gate-2 vacancy and turnover rates are empirical-Bayes shrunk toward their
+  county pools by default (`availability_shrink = TRUE`; unshrunk rates ride
+  along as `*_rate_raw`, and `FALSE` reproduces the previous behavior).
+  Tract vacancy counts are a rare ACS category; raw tract rates were mostly
+  noise. Downstream `available_*` counts move accordingly -- consumers that
+  pinned numbers should re-verify or pass `availability_shrink = FALSE`.
+
+* New `afford_households()`: tract-level households by AMI tier from
+  `B25118`, cut at the same [ami_cutoffs()] dollars the supply side uses,
+  with MOEs and the open-top discipline consumers had been hand-rolling: a
+  cutoff landing inside the open $150,000+ bracket snaps to the bracket
+  floor and says so, rather than interpolating against an invented ceiling.
+  Supersedes per-repo reimplementations (hprm_sanmateo `f_ami_tiers.R`).
+
+* New `afford_typology()` and `afford_mismatch()`: the where-they-are versus
+  where-they-could-go readout. A four-cell tract classification (stable /
+  lockin / latent / exclusion, split at tier medians of households and
+  openings), a dissimilarity index between the household and openings
+  distributions, and exposure statistics with a market counterfactual --
+  the tract conditions a tier lives with now, versus what openings alone
+  would hand a mover, versus the all-renter benchmark. Counterfactual
+  exposure running worse than observed is a displacement reading: the
+  protections holding people in place are doing work the market would not.
+
+* New `afford_safmr_check()`: an independent cross-check of the ZORI-based
+  entry premium against HUD Small Area FMRs, flagging tracts whose implied
+  asking 40th percentile strays from the regional offset (an all-bedroom
+  percentile sits below a 2BR benchmark by construction, so the band centers
+  on the regional median ratio, not on 1). Needs `hudr` + `HUD_API_KEY`;
+  degrades to `NA` columns with a message.
+
+* Documented across the family: ACS rent distributions include subsidized
+  units, so affordable shares run high in subsidy-rich tracts on every price
+  basis. Netting out Picture of Subsidized Households counts is the planned
+  refinement. Folded in from the standalone afford prototype comparison,
+  2026-09-04.
+
 ## Maps
 
 * Legends from `nt_add_choropleth()` (and everything built on it, including

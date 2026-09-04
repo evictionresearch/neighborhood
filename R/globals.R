@@ -18,6 +18,10 @@ utils::globalVariables(c(
   # afford_entry() / nt_zcta_weights() NSE columns
   "zcta", "premium", "coverage", "premium_fallback", "accessible_entry",
   "available_entry_turnover", "stable_dest", "stability",
+  # afford MOE / households / mismatch NSE columns (2026-09)
+  "m", "accessible_moe", "accessible_stretch_moe",
+  "hh", "hh_moe", "hh_total", "income_cutoff_eff", "cutoff_snapped",
+  "openings", ".ctx", "safmr_2br", "safmr_p40_ratio",
   # nt_areal_weight() NSE columns
   "NAME", "GEOID20", "POP20", "HOUSING20", "ALAND20", "block", "tract_geoid",
   "pop", "hu", "area", "place_name", "place_geoid", "pop_in", "hu_in",

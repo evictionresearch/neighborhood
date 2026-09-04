@@ -48,7 +48,13 @@
 #'   the verdict (default `0.5` -- the majority / median-unit rule).
 #' @return `x` with a `verdict` factor
 #'   (`affordable` / `roughly affordable` / `not affordable`; `NA` where the
-#'   tract has no priced stock). For maps, pair the levels with unambiguous
+#'   tract has no priced stock). When the input carries `supply_moe` /
+#'   `supply_stretch_moe` (afford_index() with MOE columns), also `verdict_fragile`:
+#'   `TRUE` where either burden line sits within one margin of error of
+#'   `share_cut`, so the class could flip inside sampling noise. Render
+#'   fragile tracts hatched or muted, never silently solid -- a tract one
+#'   point under the majority rule is a different sentence than one twenty
+#'   points under. For maps, pair the levels with unambiguous
 #'   traffic-light colors, e.g. `#1a9850` / `#fdae61` / `#d73027`.
 #' @seealso [afford_index()], [afford_capacity()], [afford_stability()]
 #' @examples \dontrun{
@@ -71,6 +77,15 @@ afford_verdict <- function(x, share_cut = 0.5) {
     ifelse(x$supply_stretch >= share_cut, "roughly affordable",
            "not affordable"))),
     levels = c("affordable", "roughly affordable", "not affordable"))
+  # A verdict earned by less than one margin of error is a coin flip, not a
+  # finding: flag rows where either burden line sits within its MOE of the
+  # cut, so maps can hatch them instead of silently coloring. NA where the
+  # MOEs are NA (nothing to assess).
+  if (all(c("supply_moe", "supply_stretch_moe") %in% names(x))) {
+    x$verdict_fragile <- ifelse(is.na(x$verdict), NA,
+      abs(x$supply - share_cut) < x$supply_moe |
+      abs(x$supply_stretch - share_cut) < x$supply_stretch_moe)
+  }
   x
 }
 

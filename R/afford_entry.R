@@ -138,9 +138,13 @@ afford_zori <- function(month = NULL, path = NULL, refresh = FALSE,
 #'   the fallback premium is used (default `0.25`).
 #' @return `x` plus: `entry_premium`, `premium_coverage`, `premium_fallback`,
 #'   `accessible_entry`, `accessible_entry_stretch`, `supply_entry`,
-#'   `supply_entry_stretch`, `entry_verdict` (same three classes as
-#'   [afford_verdict()]), and `available_entry_turnover` /
-#'   `available_entry_vacancy` when availability columns are present.
+#'   `supply_entry_stretch` (each count/share with its `_moe` companion, same
+#'   root-sum-of-squares construction as [afford_index()]), `entry_verdict`
+#'   (same three classes as [afford_verdict()]), `entry_verdict_fragile`
+#'   (`TRUE` where a burden line sits within one MOE of the 0.5 majority rule,
+#'   so the color could flip inside sampling noise), and
+#'   `available_entry_turnover` / `available_entry_vacancy` when availability
+#'   columns are present.
 #' @seealso [afford_zori()], [nt_zcta_weights()], [afford_capacity()] (gains
 #'   per-100-at-entry columns), [afford_map()] (`verdict_col =
 #'   "entry_verdict"`)
@@ -206,29 +210,42 @@ afford_entry <- function(x, zori, weights = NULL,
     premium_fallback = dplyr::first(premium_fallback),
     accessible_entry = .afi_interp_le(
       lo, hi, n, dplyr::first(income_cutoff) * burden / 12 / dplyr::first(premium)),
+    accessible_entry_moe = .afi_interp_le_moe(
+      lo, hi, m, dplyr::first(income_cutoff) * burden / 12 / dplyr::first(premium)),
     accessible_entry_stretch = .afi_interp_le(
       lo, hi, n, dplyr::first(income_cutoff) * stretch / 12 / dplyr::first(premium)),
+    accessible_entry_stretch_moe = .afi_interp_le_moe(
+      lo, hi, m, dplyr::first(income_cutoff) * stretch / 12 / dplyr::first(premium)),
     .groups = "drop")
 
   out <- dplyr::left_join(x, ent, by = c("GEOID", "ami_tier"))
   not_rent <- out$tenure != "rent"
   if (any(not_rent)) {
     for (cl in c("entry_premium", "premium_coverage", "premium_fallback",
-                 "accessible_entry", "accessible_entry_stretch"))
+                 "accessible_entry", "accessible_entry_moe",
+                 "accessible_entry_stretch", "accessible_entry_stretch_moe"))
       out[[cl]][not_rent] <- NA
     message("afford_entry(): entry pricing is a rental concept -- ",
             "non-rent rows get NA entry columns.")
   }
   out$supply_entry <- ifelse(out$total > 0, out$accessible_entry / out$total,
                              NA_real_)
+  out$supply_entry_moe <- ifelse(out$total > 0,
+    out$accessible_entry_moe / out$total, NA_real_)
   out$supply_entry_stretch <- ifelse(out$total > 0,
     out$accessible_entry_stretch / out$total, NA_real_)
+  out$supply_entry_stretch_moe <- ifelse(out$total > 0,
+    out$accessible_entry_stretch_moe / out$total, NA_real_)
   out$entry_verdict <- factor(
     ifelse(is.na(out$supply_entry) | is.na(out$supply_entry_stretch), NA_character_,
     ifelse(out$supply_entry >= 0.5, "affordable",
     ifelse(out$supply_entry_stretch >= 0.5, "roughly affordable",
            "not affordable"))),
     levels = c("affordable", "roughly affordable", "not affordable"))
+  # same fragility grammar as afford_verdict(), at the fixed 0.5 majority rule
+  out$entry_verdict_fragile <- ifelse(is.na(out$entry_verdict), NA,
+    abs(out$supply_entry - 0.5) < out$supply_entry_moe |
+    abs(out$supply_entry_stretch - 0.5) < out$supply_entry_stretch_moe)
   if ("turnover_rate" %in% names(out))
     out$available_entry_turnover <- out$accessible_entry * out$turnover_rate
   if ("vacancy_rate" %in% names(out))

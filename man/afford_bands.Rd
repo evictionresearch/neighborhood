@@ -20,9 +20,12 @@ at/below 50\%, ...). \code{afford_bands()} differences them into \strong{non-ove
 bands} (the 30-50\% slice, the 50-80\% slice, ...) within each tract x tenure,
 so the tiers partition the stock instead of nesting. The lowest tier is
 unchanged; \code{supply}/\code{class_prop}/\code{ratio}/\code{rate} (and any availability or
-stretch columns) are recomputed on the banded counts. Tier \emph{labels} keep their names (the \code{VLI}
-row now holds the 30-50\% slice). Assumes tiers are ascending in AMI fraction
-(the default ELI/VLI/LI/MI order).
+stretch columns) are recomputed on the banded counts. MOE columns difference
+too: a band's brackets are disjoint from the tier below's, so
+\code{sqrt(moe_hi^2 - moe_lo^2)} recovers the band MOE under the same
+independence assumption the cumulative MOEs were built on. Tier \emph{labels}
+keep their names (the \code{VLI} row now holds the 30-50\% slice). Assumes tiers
+are ascending in AMI fraction (the default ELI/VLI/LI/MI order).
 }
 \examples{
 \dontrun{

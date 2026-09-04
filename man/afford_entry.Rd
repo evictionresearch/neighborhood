@@ -33,9 +33,13 @@ the fallback premium is used (default \code{0.25}).}
 \value{
 \code{x} plus: \code{entry_premium}, \code{premium_coverage}, \code{premium_fallback},
 \code{accessible_entry}, \code{accessible_entry_stretch}, \code{supply_entry},
-\code{supply_entry_stretch}, \code{entry_verdict} (same three classes as
-\code{\link[=afford_verdict]{afford_verdict()}}), and \code{available_entry_turnover} /
-\code{available_entry_vacancy} when availability columns are present.
+\code{supply_entry_stretch} (each count/share with its \verb{_moe} companion, same
+root-sum-of-squares construction as \code{\link[=afford_index]{afford_index()}}), \code{entry_verdict}
+(same three classes as \code{\link[=afford_verdict]{afford_verdict()}}), \code{entry_verdict_fragile}
+(\code{TRUE} where a burden line sits within one MOE of the 0.5 majority rule,
+so the color could flip inside sampling noise), and
+\code{available_entry_turnover} / \code{available_entry_vacancy} when availability
+columns are present.
 }
 \description{
 Pane 1 (\code{\link[=afford_index]{afford_index()}} + \code{\link[=afford_verdict]{afford_verdict()}}) prices each tract at what
