@@ -16,7 +16,13 @@ the verdict (default \code{0.5} -- the majority / median-unit rule).}
 \value{
 \code{x} with a \code{verdict} factor
 (\code{affordable} / \verb{roughly affordable} / \verb{not affordable}; \code{NA} where the
-tract has no priced stock). For maps, pair the levels with unambiguous
+tract has no priced stock). When the input carries \code{supply_moe} /
+\code{supply_stretch_moe} (afford_index() with MOE columns), also \code{verdict_fragile}:
+\code{TRUE} where either burden line sits within one margin of error of
+\code{share_cut}, so the class could flip inside sampling noise. Render
+fragile tracts hatched or muted, never silently solid -- a tract one
+point under the majority rule is a different sentence than one twenty
+points under. For maps, pair the levels with unambiguous
 traffic-light colors, e.g. \verb{#1a9850} / \verb{#fdae61} / \verb{#d73027}.
 }
 \description{

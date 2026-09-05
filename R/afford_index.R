@@ -9,6 +9,9 @@
 #   * standardized ELI/VLI/LI/MI tiers, all household sizes (default 4)
 #   * two burden lines: the 30% standard plus a 50% "stretch" (severe-burden)
 #     line, so "roughly affordable" is measurable (see afford_verdict())
+#   * margins of error carried through every bracket sum (accessible_moe /
+#     supply_moe), and Gate-2 rates empirical-Bayes shrunk toward county pools
+#     (folded in from the standalone afford prototype, 2026-09-04)
 #
 # See dev/affordability-index-design.md and dev/hud-income-limits-architecture.md.
 # This is Gate 1 of the three-gate "choice" funnel; availability and barrier
@@ -64,6 +67,42 @@
   sum(n * frac, na.rm = TRUE)
 }
 
+# ---- internal: MOE of that interpolated count --------------------------------
+# Root sum of squares over the included brackets (the Census-approved
+# approximation for a sum), the partial bracket's MOE scaled by its included
+# fraction (first order). Same open-top rule as .afi_interp_le: a finite cutoff
+# inside the open-top bracket adds nothing. NA MOEs (tidycensus returns NA for
+# controlled estimates) carry no sampling error and count as zero.
+.afi_interp_le_moe <- function(lo, hi, m, cutoff) {
+  frac <- ifelse(hi <= cutoff, 1,
+          ifelse(lo >= cutoff, 0,
+          ifelse(is.finite(hi), (cutoff - lo) / (hi - lo), 0)))
+  m <- ifelse(is.na(m) | m < 0, 0, m)
+  sqrt(sum((m * frac)^2, na.rm = TRUE))
+}
+
+# ---- internal: empirical Bayes shrinkage of tract rates toward a group pool --
+# Tract vacancy and turnover rates ride on small counts; raw rates overdisperse.
+# Per group (county), the pool is the precision-weighted mean, tau2 is the
+# method-of-moments between-tract variance (observed variance minus mean
+# sampling variance, floored), and each tract gets w = tau2 / (tau2 + se^2) --
+# precise tracts keep their rate, noisy ones borrow the county's. Groups with
+# fewer than min_n usable tracts are left untouched (nothing to pool against).
+.afi_eb_shrink <- function(rate, se, group, min_n = 5) {
+  out <- rate
+  for (gp in unique(group)) {
+    i <- which(group == gp & is.finite(rate) & is.finite(se) & se > 0)
+    if (length(i) < min_n) next
+    w0 <- 1 / se[i]^2
+    pool <- sum(rate[i] * w0) / sum(w0)
+    tau2 <- max(stats::var(rate[i]) * (length(i) - 1) / length(i) -
+                mean(se[i]^2), 1e-6)
+    w <- tau2 / (tau2 + se[i]^2)
+    out[i] <- w * rate[i] + (1 - w) * pool
+  }
+  out
+}
+
 # ---- internal: parse one ACS bracket label into [lo, hi) dollar bounds -------
 # Returns c(lo, hi); c(NA, NA) for totals / subtotals / non-dollar leaves
 # (e.g. "Total:", "With cash rent:", "No cash rent").
@@ -89,8 +128,9 @@
   bounds <- t(vapply(raw$label, .afi_parse_label, numeric(2)))
   raw$lo <- bounds[, 1]
   raw$hi <- bounds[, 2]
-  raw <- raw[!is.na(raw$lo), c("GEOID", "NAME", "lo", "hi", "estimate")]
+  raw <- raw[!is.na(raw$lo), c("GEOID", "NAME", "lo", "hi", "estimate", "moe")]
   names(raw)[names(raw) == "estimate"] <- "n"
+  names(raw)[names(raw) == "moe"] <- "m"
   raw
 }
 
@@ -135,8 +175,9 @@
   bounds <- t(vapply(raw$label, .afi_parse_label, numeric(2)))
   raw$lo <- bounds[, 1]; raw$hi <- bounds[, 2]
   raw <- raw[!is.na(raw$lo) & !is.na(raw$tenure_grp),
-             c("GEOID", "tenure_grp", "lo", "hi", "estimate")]
+             c("GEOID", "tenure_grp", "lo", "hi", "estimate", "moe")]
   names(raw)[names(raw) == "estimate"] <- "n"
+  names(raw)[names(raw) == "moe"] <- "m"
   raw
 }
 
@@ -159,7 +200,14 @@
 # Per tract, the share of stock that is OPEN now (point-in-time vacancy, B25004)
 # and the share that TURNS OVER per year (B07013 past-year movers), separately
 # for rental and owner stock. NA where the denominator is zero.
-.afi_availability <- function(state, counties, year) {
+#
+# With shrink = TRUE (the default upstream) each rate is empirical-Bayes shrunk
+# toward its county pool (.afi_eb_shrink): tract vacancy counts especially are
+# a rare category whose raw rates carry more noise than signal. Standard errors
+# come from the ACS 90% MOEs (moe / 1.645), first order in the numerator only
+# (the denominator's error is second-order for these small ratios). Raw rates
+# are kept alongside as *_raw so the shrinkage is inspectable, never silent.
+.afi_availability <- function(state, counties, year, shrink = TRUE) {
   vars <- c(own_occ = "B25003_002", rent_occ = "B25003_003",
             for_rent = "B25004_002", for_sale = "B25004_004",
             mov_own_tot = "B07013_002", mov_rent_tot = "B07013_003",
@@ -168,14 +216,34 @@
                            county = counties, year = year, survey = "acs5",
                            output = "wide")
   g <- function(nm) as.numeric(d[[paste0(nm, "E")]])
+  gm <- function(nm) { v <- as.numeric(d[[paste0(nm, "M")]])
+                       ifelse(is.na(v) | v < 0, 0, v) }
   rate <- function(num, den) ifelse(den > 0, num / den, NA_real_)
-  data.frame(
+  se_r <- function(m_num, den) ifelse(den > 0, m_num / 1.645 / den, NA_real_)
+  av <- data.frame(
     GEOID          = d$GEOID,
+    county         = substr(d$GEOID, 1, 5),
     vac_rate_rent  = rate(g("for_rent"), g("rent_occ") + g("for_rent")),
     vac_rate_own   = rate(g("for_sale"), g("own_occ")  + g("for_sale")),
     turn_rate_rent = rate(g("mov_rent_tot") - g("mov_rent_same"), g("mov_rent_tot")),
     turn_rate_own  = rate(g("mov_own_tot")  - g("mov_own_same"),  g("mov_own_tot")),
+    vac_se_rent    = se_r(gm("for_rent"), g("rent_occ") + g("for_rent")),
+    vac_se_own     = se_r(gm("for_sale"), g("own_occ") + g("for_sale")),
+    turn_se_rent   = se_r(sqrt(gm("mov_rent_tot")^2 + gm("mov_rent_same")^2),
+                          g("mov_rent_tot")),
+    turn_se_own    = se_r(sqrt(gm("mov_own_tot")^2 + gm("mov_own_same")^2),
+                          g("mov_own_tot")),
     stringsAsFactors = FALSE)
+  if (isTRUE(shrink)) {
+    for (nm in c("vac_rate_rent", "vac_rate_own",
+                 "turn_rate_rent", "turn_rate_own")) {
+      se_nm <- sub("_rate_", "_se_", nm)
+      av[[paste0(nm, "_raw")]] <- av[[nm]]
+      av[[nm]] <- .afi_eb_shrink(av[[nm]], av[[se_nm]], av$county)
+    }
+  }
+  av[, setdiff(names(av), c("county", "vac_se_rent", "vac_se_own",
+                            "turn_se_rent", "turn_se_own"))]
 }
 
 
@@ -259,15 +327,39 @@
 #'   (past-year move-outs, `B07013`), tenure-matched, plus `available_vacancy`
 #'   and `available_turnover` (= `accessible` x each rate -- affordable units
 #'   that are actually open / turning over). Set `FALSE` for price-only Gate 1.
+#' @param availability_shrink If `TRUE` (default), the Gate-2 rates are
+#'   empirical-Bayes shrunk toward their county pool before the `available_*`
+#'   multiplications: tract vacancy counts especially are a rare ACS category
+#'   whose raw rates are noise-dominated. Precise tracts keep their own rate;
+#'   noisy ones borrow the county's (weights from the ACS margins of error).
+#'   The unshrunk rates ride along as `vacancy_rate_raw` / `turnover_rate_raw`
+#'   so the adjustment is inspectable. `FALSE` reproduces the raw-rate
+#'   behavior of earlier versions.
 #' @param geometry If `TRUE`, attach tract polygons (an `sf` tibble). With the
 #'   long output this duplicates polygons across tenure/tier; filter to one
 #'   tenure and tier before mapping.
 #' @return A long tibble, one row per tract x tenure x tier, with `accessible`,
 #'   `total`, `supply` (and, when `stretch` is set, `accessible_stretch` /
 #'   `supply_stretch`), `reg_hh_tier`, `reg_hh_total`, `class_prop`, `ratio`,
-#'   `rate`, the county `ami`, and the tier `income_cutoff`. When
-#'   `availability = TRUE`, also `vacancy_rate`, `turnover_rate`,
-#'   `available_vacancy`, and `available_turnover` (Gate 2).
+#'   `rate`, the county `ami`, and the tier `income_cutoff`. Every
+#'   accessible/supply count carries a 90% margin of error alongside it
+#'   (`accessible_moe`, `supply_moe`, and the `_stretch_` pair): root sum of
+#'   squares over the included brackets, the partial bracket scaled by its
+#'   included fraction, the share MOE first-order in the numerator. These feed
+#'   [afford_verdict()]'s fragility flag. When `availability = TRUE`, also
+#'   `vacancy_rate`, `turnover_rate`, `available_vacancy`, and
+#'   `available_turnover` (Gate 2), plus the unshrunk `*_rate_raw` pair when
+#'   `availability_shrink` is on.
+#'
+#'   One honesty note that applies to every number downstream: the ACS rent and
+#'   cost distributions include subsidized units (public housing, LIHTC,
+#'   voucher-assisted), whose reported costs sit below market. Some of what
+#'   counts as affordable stock is assisted housing not open to an arbitrary
+#'   mover, so affordable shares run high in subsidy-rich tracts on every price
+#'   basis, the entry basis included (the premium rescales those units too).
+#'   Netting out HUD-assisted unit counts (Picture of Subsidized Households) is
+#'   the planned refinement; until then, state the caveat wherever these
+#'   numbers are published.
 #' @seealso [ami_cutoffs()], [afford_bands()], [afford_verdict()],
 #'   [afford_capacity()], [afford()] (legacy)
 #' @examples \dontrun{
@@ -300,6 +392,7 @@ afford_index <- function(state, counties, year = 2024,
                          down_pct = 0.10, tax_ins_rate = 0.0125,
                          buyin_stock = c("owned_value", "for_sale"),
                          availability = TRUE,
+                         availability_shrink = TRUE,
                          geometry = FALSE) {
   ami_source <- match.arg(ami_source)
   tenure <- match.arg(tenure, several.ok = TRUE)
@@ -386,8 +479,11 @@ afford_index <- function(state, counties, year = 2024,
                               else d$inc_cut * stretch / 12
       g <- dplyr::summarize(dplyr::group_by(d, GEOID, county),
         accessible   = .afi_interp_le(lo, hi, n, dplyr::first(cost_cut)),
+        accessible_moe = .afi_interp_le_moe(lo, hi, m, dplyr::first(cost_cut)),
         accessible_stretch = if (is.null(stretch)) NA_real_ else
           .afi_interp_le(lo, hi, n, dplyr::first(cost_cut_stretch)),
+        accessible_stretch_moe = if (is.null(stretch)) NA_real_ else
+          .afi_interp_le_moe(lo, hi, m, dplyr::first(cost_cut_stretch)),
         income_cutoff = dplyr::first(inc_cut), .groups = "drop")
       g$ami_tier <- ti
       g
@@ -407,15 +503,21 @@ afford_index <- function(state, counties, year = 2024,
   supply <- dplyr::mutate(supply,
     class_prop = reg_hh_tier / reg_hh_total,
     supply     = ifelse(total > 0, accessible / total, NA_real_),
+    # share MOE is first order in the numerator; the denominator (total stock)
+    # is the same bracket sum and its error is second-order for the share
+    supply_moe = ifelse(total > 0, accessible_moe / total, NA_real_),
     supply_stretch = ifelse(total > 0, accessible_stretch / total, NA_real_),
+    supply_stretch_moe = ifelse(total > 0, accessible_stretch_moe / total, NA_real_),
     ratio      = ifelse(class_prop > 0, supply / class_prop, NA_real_),
     rate       = ifelse(reg_hh_tier > 0, accessible / reg_hh_tier * 1e5, NA_real_),
     ami_tier   = factor(ami_tier, levels = tier_names),
     year       = year, ami_source = ami_source)
 
   out_cols <- c("GEOID", "county", "year", "ami_source", "tenure", "ami_tier",
-    "ami", "income_cutoff", "accessible", "total", "supply",
-    if (!is.null(stretch)) c("accessible_stretch", "supply_stretch"),
+    "ami", "income_cutoff", "accessible", "accessible_moe", "total",
+    "supply", "supply_moe",
+    if (!is.null(stretch)) c("accessible_stretch", "accessible_stretch_moe",
+                             "supply_stretch", "supply_stretch_moe"),
     "reg_hh_tier", "reg_hh_total", "class_prop", "ratio", "rate")
 
   # -- Gate 2: availability -- affordable AND open / turning over --------------
@@ -423,7 +525,7 @@ afford_index <- function(state, counties, year = 2024,
   # (B07013). available_* = accessible * rate, assuming open/turnover units share
   # the occupied affordability mix (report alongside the price-only `accessible`).
   if (isTRUE(availability)) {
-    av <- .afi_availability(state, counties, year)
+    av <- .afi_availability(state, counties, year, shrink = availability_shrink)
     supply <- dplyr::left_join(supply, av, by = "GEOID")
     is_rent <- supply$tenure == "rent"
     supply$vacancy_rate       <- ifelse(is_rent, supply$vac_rate_rent,  supply$vac_rate_own)
@@ -432,6 +534,13 @@ afford_index <- function(state, counties, year = 2024,
     supply$available_turnover <- supply$accessible * supply$turnover_rate
     out_cols <- c(out_cols, "vacancy_rate", "turnover_rate",
                   "available_vacancy", "available_turnover")
+    if (isTRUE(availability_shrink)) {
+      supply$vacancy_rate_raw  <- ifelse(is_rent, supply$vac_rate_rent_raw,
+                                                  supply$vac_rate_own_raw)
+      supply$turnover_rate_raw <- ifelse(is_rent, supply$turn_rate_rent_raw,
+                                                  supply$turn_rate_own_raw)
+      out_cols <- c(out_cols, "vacancy_rate_raw", "turnover_rate_raw")
+    }
   }
 
   supply <- dplyr::as_tibble(
@@ -452,9 +561,12 @@ afford_index <- function(state, counties, year = 2024,
 #' bands** (the 30-50% slice, the 50-80% slice, ...) within each tract x tenure,
 #' so the tiers partition the stock instead of nesting. The lowest tier is
 #' unchanged; `supply`/`class_prop`/`ratio`/`rate` (and any availability or
-#' stretch columns) are recomputed on the banded counts. Tier *labels* keep their names (the `VLI`
-#' row now holds the 30-50% slice). Assumes tiers are ascending in AMI fraction
-#' (the default ELI/VLI/LI/MI order).
+#' stretch columns) are recomputed on the banded counts. MOE columns difference
+#' too: a band's brackets are disjoint from the tier below's, so
+#' `sqrt(moe_hi^2 - moe_lo^2)` recovers the band MOE under the same
+#' independence assumption the cumulative MOEs were built on. Tier *labels*
+#' keep their names (the `VLI` row now holds the 30-50% slice). Assumes tiers
+#' are ascending in AMI fraction (the default ELI/VLI/LI/MI order).
 #' @param x A tibble returned by [afford_index()].
 #' @return `x` with `accessible`, `reg_hh_tier`, and any `available_*` /
 #'   `accessible_stretch` columns differenced to bands, and
@@ -472,7 +584,20 @@ afford_bands <- function(x) {
     stop("`x` must be an afford_index() result (missing columns).", call. = FALSE)
   has_av <- all(c("vacancy_rate", "turnover_rate") %in% names(x))
   has_st <- "accessible_stretch" %in% names(x)
+  has_moe <- "accessible_moe" %in% names(x)
+  has_stm <- "accessible_stretch_moe" %in% names(x)
   x <- dplyr::arrange(dplyr::group_by(x, GEOID, tenure), ami_tier)
+  # MOEs difference before the counts do, off the still-cumulative columns:
+  # cumulative_i = cumulative_{i-1} + band_i over disjoint brackets, so under
+  # bracket independence moe_band = sqrt(moe_i^2 - moe_{i-1}^2) exactly
+  # (floored at zero for the partial-bracket first-order wrinkle).
+  if (has_moe) x <- dplyr::mutate(x,
+    accessible_moe = sqrt(pmax(
+      accessible_moe^2 - dplyr::lag(accessible_moe, default = 0)^2, 0)))
+  if (has_stm) x <- dplyr::mutate(x,
+    accessible_stretch_moe = sqrt(pmax(
+      accessible_stretch_moe^2 -
+        dplyr::lag(accessible_stretch_moe, default = 0)^2, 0)))
   x <- dplyr::mutate(x,
     accessible  = accessible  - dplyr::lag(accessible,  default = 0),
     reg_hh_tier = reg_hh_tier - dplyr::lag(reg_hh_tier, default = 0))
@@ -484,8 +609,12 @@ afford_bands <- function(x) {
     class_prop = ifelse(reg_hh_total > 0, reg_hh_tier / reg_hh_total, NA_real_),
     ratio      = ifelse(class_prop > 0, supply / class_prop, NA_real_),
     rate       = ifelse(reg_hh_tier > 0, accessible / reg_hh_tier * 1e5, NA_real_))
+  if (has_moe) x <- dplyr::mutate(x,
+    supply_moe = ifelse(total > 0, accessible_moe / total, NA_real_))
   if (has_st) x <- dplyr::mutate(x,
     supply_stretch = ifelse(total > 0, accessible_stretch / total, NA_real_))
+  if (has_stm) x <- dplyr::mutate(x,
+    supply_stretch_moe = ifelse(total > 0, accessible_stretch_moe / total, NA_real_))
   if (has_av) x <- dplyr::mutate(x,
     available_vacancy  = accessible * vacancy_rate,
     available_turnover = accessible * turnover_rate)

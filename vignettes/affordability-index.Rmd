@@ -37,6 +37,20 @@ three-gate "choice" funnel — *Afford → Available → Allowed*. This vignette
 supply engine) plus the first availability measures of **Gate 2** (`availability = TRUE`); the
 *Allowed* gate (discrimination, voucher rejection, eviction-record screening) is future work.
 
+Two honesty notes ride with every number the engine emits. First, the ACS rent and owner-cost
+distributions include subsidized units (public housing, LIHTC, voucher-assisted), whose reported
+costs sit below market: affordable shares therefore run high in subsidy-rich tracts on every
+price basis, the entry basis included, since the premium rescales those units too. Netting out
+HUD's Picture of Subsidized Households counts is the planned refinement; until then, publish the
+caveat next to the numbers. Second, tract bracket counts are survey estimates, and every
+`accessible`/`supply` figure now carries a margin of error beside it; `afford_verdict()` and
+`afford_entry()` flag classifications that could flip inside that error (`verdict_fragile`,
+`entry_verdict_fragile`), and a map should render those hatched, never confidently solid. The
+demand-side and mismatch readout built on the funnel (`afford_households()`,
+`afford_typology()`, `afford_mismatch()`, `afford_safmr_check()`) is documented in the help
+pages; the short version is that it asks whether a tier's households live where its openings
+are, and what kind of tract the market alone would hand a mover.
+
 One theoretical commitment shapes everything downstream of the engine and is worth naming here:
 the product built on this index measures destinations by **housing stability, not by an
 "opportunity" score** — the third pane is HPRM displacement/eviction risk, not the Opportunity
