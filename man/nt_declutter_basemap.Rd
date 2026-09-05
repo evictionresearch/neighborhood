@@ -15,9 +15,10 @@ nt_declutter_basemap(
 \code{mapgl::maplibre()}).}
 
 \item{pattern}{Regular expression of basemap layer ids to hide. The default
-covers the usual suspects on Positron-style basemaps: park, landcover,
-landuse, hillshade, wood, grass, scrub, cemetery, golf, pitch, sand,
-glacier.}
+covers both the default terrain basemap (\code{\link[=nt_terrain_style]{nt_terrain_style()}} — where it
+hides the hillshade, landcover, park, and landuse tints) and the usual
+suspects on Positron-style basemaps: park, landcover, landuse, hillshade,
+wood, grass, scrub, cemetery, golf, pitch, sand, glacier.}
 }
 \value{
 The map, with a render hook that hides the matching layers.
@@ -51,6 +52,7 @@ Other ern_maps:
 \code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}},
+\code{\link[=nt_terrain_style]{nt_terrain_style()}},
 \code{\link[=nt_tract_interpolate]{nt_tract_interpolate()}}
 }
 \concept{ern_maps}

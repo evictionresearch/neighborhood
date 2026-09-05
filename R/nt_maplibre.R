@@ -2,10 +2,11 @@
 #'
 #' @description
 #' Initializes an interactive [MapLibre GL JS](https://maplibre.org/) map with
-#' the Eviction Research Network house style: an OpenFreeMap basemap, a flat
-#' (web-mercator) projection, the standard control set (zoom/compass,
-#' fullscreen, geolocate, and an address search box), and — if you hand it
-#' spatial data — an automatic fit to that data's bounds.
+#' the Eviction Research Network house style: the ERN terrain basemap
+#' ([nt_terrain_style()] — hillshade relief under a minimalist navy vector
+#' map), a flat (web-mercator) projection, the standard control set
+#' (zoom/compass, fullscreen, geolocate, and an address search box), and — if
+#' you hand it spatial data — an automatic fit to that data's bounds.
 #'
 #' This is the foundation the other `nt_*` map functions build on. It returns an
 #' ordinary `mapgl` map object, so you can keep building with [nt_add_choropleth()]
@@ -23,10 +24,12 @@
 #'   object (all normalized to `sf` and re-projected to WGS84 as needed). If
 #'   supplied and `fit = TRUE`, the map opens framed to its bounds. (Data is not
 #'   drawn here — add it with [nt_add_choropleth()].)
-#' @param style Basemap. One of the OpenFreeMap style names `"positron"`
-#'   (default), `"bright"`, `"liberty"`, `"dark"`, or `"fiord"`, **or** any value
-#'   `mapgl` accepts (a style URL, or the result of [mapgl::carto_style()],
-#'   [mapgl::maptiler_style()], etc.).
+#' @param style Basemap. `"terrain-light"` (default) or `"terrain-dark"` for
+#'   the house terrain style ([nt_terrain_style()]); one of the OpenFreeMap
+#'   style names `"positron"`, `"bright"`, `"liberty"`, `"dark"`, or
+#'   `"fiord"`; **or** any value `mapgl` accepts (a style URL, a style list
+#'   such as `nt_terrain_style(hillshade = FALSE)`, or the result of
+#'   [mapgl::carto_style()], [mapgl::maptiler_style()], etc.).
 #' @param controls Logical; add the standard control set (default `TRUE`).
 #' @param search Logical; include an OpenStreetMap/Nominatim address search box
 #'   (default `TRUE`, no API key required). Ignored when `controls = FALSE`.
@@ -47,7 +50,7 @@
 #' nt_maplibre(md) |>
 #'   nt_add_choropleth(md, "nt_conc")
 #' @export
-nt_maplibre <- function(data = NULL, style = "positron", controls = TRUE,
+nt_maplibre <- function(data = NULL, style = "terrain-light", controls = TRUE,
                         search = TRUE, fit = TRUE, center = NULL, zoom = NULL,
                         projection = "mercator", ...) {
   style_obj <- .nt_resolve_style(style)
@@ -70,13 +73,16 @@ nt_maplibre <- function(data = NULL, style = "positron", controls = TRUE,
   nt_legend_collapse(map)
 }
 
-# Resolve a basemap argument to something mapgl::maplibre() accepts. Known
+# Resolve a basemap argument to something mapgl::maplibre() accepts. The two
+# house terrain names build the style list via nt_terrain_style(); known
 # OpenFreeMap style names route through openfreemap_style(); anything else
-# (URL, carto_style() object, ...) passes through untouched.
+# (URL, carto_style() object, style list, ...) passes through untouched.
 .nt_resolve_style <- function(style) {
-  ofm <- c("positron", "bright", "liberty", "dark", "fiord")
-  if (is.character(style) && length(style) == 1L && style %in% ofm) {
-    return(mapgl::openfreemap_style(style))
+  if (is.character(style) && length(style) == 1L) {
+    ofm <- c("positron", "bright", "liberty", "dark", "fiord")
+    if (style %in% ofm) return(mapgl::openfreemap_style(style))
+    if (style %in% c("terrain-light", "terrain-dark"))
+      return(nt_terrain_style(mode = sub("^terrain-", "", style)))
   }
   style
 }

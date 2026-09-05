@@ -1,6 +1,7 @@
 # Hide the basemap's decorative land tints (parks, landcover, hillshade, ...)
-# that wash out semi-transparent choropleth fills -- the "light white stuff"
-# visible over tract colors on the Positron basemap.
+# that wash out semi-transparent choropleth fills -- the hillshade relief and
+# land tints on the default terrain basemap, or the "light white stuff"
+# visible over tract colors on Positron.
 
 #' Hide decorative basemap layers under a choropleth
 #'
@@ -14,9 +15,10 @@
 #' @param map A MapLibre map (`nt_map()`, [nt_maplibre()], or
 #'   `mapgl::maplibre()`).
 #' @param pattern Regular expression of basemap layer ids to hide. The default
-#'   covers the usual suspects on Positron-style basemaps: park, landcover,
-#'   landuse, hillshade, wood, grass, scrub, cemetery, golf, pitch, sand,
-#'   glacier.
+#'   covers both the default terrain basemap ([nt_terrain_style()] — where it
+#'   hides the hillshade, landcover, park, and landuse tints) and the usual
+#'   suspects on Positron-style basemaps: park, landcover, landuse, hillshade,
+#'   wood, grass, scrub, cemetery, golf, pitch, sand, glacier.
 #' @return The map, with a render hook that hides the matching layers.
 #' @family ern_maps
 #' @examplesIf interactive() && requireNamespace("mapgl", quietly = TRUE)

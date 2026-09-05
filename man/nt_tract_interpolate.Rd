@@ -80,6 +80,7 @@ Other ern_maps:
 \code{\link[=nt_map]{nt_map()}},
 \code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_maplibre]{nt_maplibre()}},
-\code{\link[=nt_pmtiles]{nt_pmtiles()}}
+\code{\link[=nt_pmtiles]{nt_pmtiles()}},
+\code{\link[=nt_terrain_style]{nt_terrain_style()}}
 }
 \concept{ern_maps}

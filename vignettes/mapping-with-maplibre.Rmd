@@ -59,8 +59,8 @@ nt_map(balt)
 fig("map-typologies.png")
 ```
 
-That single call gives you a finished map: an OpenFreeMap *Positron* basemap, the
-view framed to Baltimore, every tract colored by its typology (`nt_conc`) using
+That single call gives you a finished map: the ERN terrain basemap (hillshade
+relief under a minimalist navy-on-paper vector map), the view framed to Baltimore, every tract colored by its typology (`nt_conc`) using
 the canonical palette, a legend, a hover tooltip, a click popup, and the standard
 controls (zoom, fullscreen, locate-me, and an address search box).
 
@@ -117,7 +117,7 @@ nt_maplibre(balt)    # framed to Baltimore
 | Argument | Default | What it does |
 |---|---|---|
 | `data` | `NULL` | Optional spatial data used only to frame the view (not drawn). `sf`, a shapefile/GeoJSON/GeoPackage path, `sfc`, or `sp`/`terra`; normalized to `sf` and re-projected to WGS84. |
-| `style` | `"positron"` | Basemap (see below). |
+| `style` | `"terrain-light"` | Basemap (see below). |
 | `controls` | `TRUE` | Add the standard control set (zoom/compass, fullscreen, geolocate). |
 | `search` | `TRUE` | Add an OpenStreetMap/Nominatim address search box (no API key). Ignored when `controls = FALSE`. |
 | `fit` | `TRUE` | If `data` is supplied, fit the opening view to its bounds. Ignored when `center` is given. |
@@ -128,18 +128,31 @@ nt_maplibre(balt)    # framed to Baltimore
 
 ### Basemaps (`style`)
 
-There are five built-in OpenFreeMap basemaps. Any other value (a style URL, or
-the result of `mapgl::carto_style()` / `mapgl::maptiler_style()`) passes straight
-through to `mapgl`.
+The default is the house terrain style, `"terrain-light"`: hillshade relief
+under a minimalist vector map, navy ink on a paper-light ground, with
+haloed-text route shields and peaks labeled in feet. `"terrain-dark"` is the
+same design on a navy night ground. Both are built by `nt_terrain_style()`,
+which you can also call directly — for example
+`nt_terrain_style("light", hillshade = FALSE)` skips the terrain-relief tiles
+entirely, which you might want under a fully opaque layer. All of its map
+resources are keyless and free (OpenFreeMap vector tiles and glyphs, Mapzen
+terrain tiles on AWS).
+
+Five OpenFreeMap basemaps are also built in, and any other value (a style URL,
+a style list, or the result of `mapgl::carto_style()` /
+`mapgl::maptiler_style()`) passes straight through to `mapgl`.
 
 ```{r}
-nt_maplibre(balt, style = "positron")  # light grey (default)
+nt_maplibre(balt, style = "terrain-light")  # house terrain style (default)
+nt_maplibre(balt, style = "terrain-dark")   # its dark mode
+nt_maplibre(balt, style = "positron")  # light grey
 nt_maplibre(balt, style = "bright")    # full-color OSM
 nt_maplibre(balt, style = "liberty")   # OSM "Liberty" theme
-nt_maplibre(balt, style = "dark")      # dark mode
+nt_maplibre(balt, style = "dark")      # OpenFreeMap dark mode
 nt_maplibre(balt, style = "fiord")     # muted blue-grey
 
 # Anything mapgl accepts also works:
+nt_maplibre(balt, style = nt_terrain_style("light", hillshade = FALSE))
 nt_maplibre(balt, style = mapgl::carto_style("positron"))
 ```
 

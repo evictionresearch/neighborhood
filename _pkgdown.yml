@@ -46,6 +46,7 @@ reference:
       - nt_hprm_map
       - nt_hprm_pal
       - nt_maplibre
+      - nt_terrain_style
       - nt_add_choropleth
       - nt_add_bivariate
       - nt_bivariate_pal

@@ -2,6 +2,23 @@
 
 ## Maps
 
+* New `nt_terrain_style()`: the house terrain basemap, in light and dark.
+  Hillshade relief under a minimalist navy vector map, cool-blue road
+  hairlines, haloed-text route shields ("I-5", "US 97"), and peaks labeled in
+  feet. Designed for the Boondock map and now shared here as the ERN house
+  basemap; every resource it touches is keyless and free (OpenFreeMap vector
+  tiles and glyphs, Mapzen terrain tiles on AWS), and it needs no sprite
+  sheet. Reach it by name — `nt_maplibre(style = "terrain-light")` or
+  `"terrain-dark"` — or call it directly for the knobs (`hillshade = FALSE`
+  drops the relief and its tile requests entirely).
+
+* The default basemap for `nt_maplibre()` — and so for `nt_map()`,
+  `nt_hprm_map()`, `afford_map()`, and synced maps — is now `"terrain-light"`
+  (was OpenFreeMap `"positron"`; pass `style = "positron"` to restore the old
+  look). Choropleths behave as before: `nt_declutter_basemap()` hides the
+  terrain's hillshade and land tints under the fills, and the style keeps a
+  `water` layer in the position the `before_id = "water"` convention expects.
+
 * Legends from `nt_add_choropleth()` (and everything built on it, including
   `nt_map()`, `nt_hprm_map()`, and `afford_map()`) now draw on a fully opaque
   white panel. mapgl's default is white at 50% alpha, which let the basemap

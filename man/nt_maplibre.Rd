@@ -6,7 +6,7 @@
 \usage{
 nt_maplibre(
   data = NULL,
-  style = "positron",
+  style = "terrain-light",
   controls = TRUE,
   search = TRUE,
   fit = TRUE,
@@ -23,10 +23,12 @@ object (all normalized to \code{sf} and re-projected to WGS84 as needed). If
 supplied and \code{fit = TRUE}, the map opens framed to its bounds. (Data is not
 drawn here — add it with \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}.)}
 
-\item{style}{Basemap. One of the OpenFreeMap style names \code{"positron"}
-(default), \code{"bright"}, \code{"liberty"}, \code{"dark"}, or \code{"fiord"}, \strong{or} any value
-\code{mapgl} accepts (a style URL, or the result of \code{\link[mapgl:carto_style]{mapgl::carto_style()}},
-\code{\link[mapgl:maptiler_style]{mapgl::maptiler_style()}}, etc.).}
+\item{style}{Basemap. \code{"terrain-light"} (default) or \code{"terrain-dark"} for
+the house terrain style (\code{\link[=nt_terrain_style]{nt_terrain_style()}}); one of the OpenFreeMap
+style names \code{"positron"}, \code{"bright"}, \code{"liberty"}, \code{"dark"}, or
+\code{"fiord"}; \strong{or} any value \code{mapgl} accepts (a style URL, a style list
+such as \code{nt_terrain_style(hillshade = FALSE)}, or the result of
+\code{\link[mapgl:carto_style]{mapgl::carto_style()}}, \code{\link[mapgl:maptiler_style]{mapgl::maptiler_style()}}, etc.).}
 
 \item{controls}{Logical; add the standard control set (default \code{TRUE}).}
 
@@ -50,10 +52,11 @@ A \code{mapgl}/\code{maplibregl} \code{htmlwidget}.
 }
 \description{
 Initializes an interactive \href{https://maplibre.org/}{MapLibre GL JS} map with
-the Eviction Research Network house style: an OpenFreeMap basemap, a flat
-(web-mercator) projection, the standard control set (zoom/compass,
-fullscreen, geolocate, and an address search box), and — if you hand it
-spatial data — an automatic fit to that data's bounds.
+the Eviction Research Network house style: the ERN terrain basemap
+(\code{\link[=nt_terrain_style]{nt_terrain_style()}} — hillshade relief under a minimalist navy vector
+map), a flat (web-mercator) projection, the standard control set
+(zoom/compass, fullscreen, geolocate, and an address search box), and — if
+you hand it spatial data — an automatic fit to that data's bounds.
 
 This is the foundation the other \verb{nt_*} map functions build on. It returns an
 ordinary \code{mapgl} map object, so you can keep building with \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}
@@ -92,6 +95,7 @@ Other ern_maps:
 \code{\link[=nt_map]{nt_map()}},
 \code{\link[=nt_map_sync]{nt_map_sync()}},
 \code{\link[=nt_pmtiles]{nt_pmtiles()}},
+\code{\link[=nt_terrain_style]{nt_terrain_style()}},
 \code{\link[=nt_tract_interpolate]{nt_tract_interpolate()}}
 }
 \concept{ern_maps}
