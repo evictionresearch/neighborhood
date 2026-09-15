@@ -156,7 +156,8 @@ nt_hprm_pal <- function(model = c("edr", "eer", "divergence", "hprm")) {
 nt_hprm_map <- function(hprm, state = NULL, county = NULL, place = NULL,
                         layers = c("edr", "eer", "hprm", "divergence"),
                         year = 2020, erase_water = TRUE, declutter = TRUE,
-                        popup_note = NULL, opacity = 0.8, height = NULL, ...) {
+                        popup_note = NULL, opacity = 0.8, height = NULL,
+                        style = "terrain-light", ...) {
   layers <- match.arg(layers, several.ok = TRUE)
   layer_cols <- c(edr = "dis_risk2", eer = "ev_risk2",
                   hprm = "hprm_score", divergence = "divergence")
@@ -278,7 +279,7 @@ nt_hprm_map <- function(hprm, state = NULL, county = NULL, place = NULL,
          colors = unname(pal[present]))
   }
 
-  m <- nt_maplibre(if (!is.null(pl)) pl else x)
+  m <- nt_maplibre(if (!is.null(pl)) pl else x, style = style)
   ids <- c(edr = "EDR", eer = "EER", hprm = "HPRM", divergence = "Divergence")
   labs <- c(edr = "Displacement risk (EDR)", eer = "Eviction risk (EER)",
             hprm = "HPRM composite (0-8)", divergence = "Divergence (EDR + EER)")

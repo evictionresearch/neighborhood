@@ -25,9 +25,11 @@
 #'   supplied and `fit = TRUE`, the map opens framed to its bounds. (Data is not
 #'   drawn here — add it with [nt_add_choropleth()].)
 #' @param style Basemap. `"terrain-light"` (default) or `"terrain-dark"` for
-#'   the house terrain style ([nt_terrain_style()]); one of the OpenFreeMap
-#'   style names `"positron"`, `"bright"`, `"liberty"`, `"dark"`, or
-#'   `"fiord"`; **or** any value `mapgl` accepts (a style URL, a style list
+#'   the house terrain style ([nt_terrain_style()]), or `"terrain-light-soft"`
+#'   / `"terrain-dark-soft"` for its soft-streets variant (road inks pulled
+#'   toward the ground so the grid recedes under a choropleth); one of the
+#'   OpenFreeMap style names `"positron"`, `"bright"`, `"liberty"`, `"dark"`,
+#'   or `"fiord"`; **or** any value `mapgl` accepts (a style URL, a style list
 #'   such as `nt_terrain_style(hillshade = FALSE)`, or the result of
 #'   [mapgl::carto_style()], [mapgl::maptiler_style()], etc.).
 #' @param controls Logical; add the standard control set (default `TRUE`).
@@ -83,6 +85,9 @@ nt_maplibre <- function(data = NULL, style = "terrain-light", controls = TRUE,
     if (style %in% ofm) return(mapgl::openfreemap_style(style))
     if (style %in% c("terrain-light", "terrain-dark"))
       return(nt_terrain_style(mode = sub("^terrain-", "", style)))
+    if (style %in% c("terrain-light-soft", "terrain-dark-soft"))
+      return(nt_terrain_style(mode = sub("^terrain-(light|dark)-soft$", "\\1", style),
+                              streets = "soft"))
   }
   style
 }

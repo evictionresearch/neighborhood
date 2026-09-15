@@ -33,10 +33,32 @@ test_that("nt_chart enables the crosshair axisPointer on hover", {
   expect_match(ap$lineStyle$color, "F9322B", ignore.case = TRUE)
 })
 
-test_that("nt_chart can disable the crosshair", {
+test_that("the default hover is a per-type guide, not a crosshair", {
   skip_if_not_installed("echarts4r")
-  m <- nt_chart(trend_df(), "month", "filings", crosshair = FALSE)
-  expect_null(m$x$opts$tooltip$axisPointer)
+  line <- nt_chart(trend_df(), "month", "filings", type = "line")
+  expect_identical(line$x$opts$tooltip$axisPointer$type, "line")
+  bar <- nt_chart(trend_df(), "month", "filings", type = "bar")
+  expect_identical(bar$x$opts$tooltip$axisPointer$type, "shadow")
+  # neither guide draws boxed on-axis values — that readout is crosshair-only
+  expect_false(isTRUE(line$x$opts$tooltip$axisPointer$label$show))
+  expect_null(line$x$opts$yAxis[[1]]$axisPointer)
+  # tooltips stay inside the chart's own box (widgets ship as iframes)
+  expect_true(isTRUE(line$x$opts$tooltip$confine))
+})
+
+test_that("axis tooltip rows follow the chart's vertical order", {
+  skip_if_not_installed("echarts4r")
+  # unstacked: rows sort by value at the hovered point, largest first
+  line <- nt_chart(race_df(), "year", "rate", group = "race", type = "line")
+  js <- as.character(line$x$opts$tooltip$formatter)
+  expect_match(js, ".sort(function(a, b)", fixed = TRUE)
+  expect_false(grepl("params.slice().reverse()", js, fixed = TRUE))
+  # stacked: series order reversed, so the bar reads top segment first
+  bar <- nt_chart(race_df(), "year", "rate", group = "race", type = "bar",
+                  stack = "race")
+  js_bar <- as.character(bar$x$opts$tooltip$formatter)
+  expect_match(js_bar, "params.slice().reverse()", fixed = TRUE)
+  expect_false(grepl(".sort(function(a, b)", js_bar, fixed = TRUE))
 })
 
 test_that("grouped data yields one series per group", {

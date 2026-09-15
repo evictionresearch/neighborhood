@@ -50,6 +50,35 @@
   refinement. Folded in from the standalone afford prototype comparison,
   2026-09-04.
 
+## Charts
+
+* New `nt_pd_spark()`: the compact partial-dependence cell used by the HPRM
+  Variable Direction Atlas (2026) — posterior-mean line over the credible
+  ribbon with the predictor's frequency distribution as a bar strip along the
+  panel floor, in one axis-free panel sized for small multiples and table
+  rows (`axes = TRUE` for a standalone version). Takes the same tidy PD table
+  as `nt_pd_plot()`, so `nt_pd_bart(..., return_data = TRUE)` feeds it
+  directly; model-agnostic and Java-free.
+
+* `nt_chart()` no longer draws the full crosshair on hover by default.
+  Line and area charts get a quiet vertical guide, with the tooltip carrying
+  each series' value at the hovered point; bar charts shade the whole
+  hovered bar and the tooltip lists every value in it. The crosshair (both
+  axes, boxed on-axis values) is unchanged and opt-in via
+  `crosshair = TRUE`; charts already passing `crosshair = FALSE` gain the
+  per-type hover guide.
+
+* Axis tooltips list series in the chart's own vertical order at the
+  hovered point — largest value first on line/area charts, top segment
+  first on stacked bars. This also fixes a scoping slip in the style
+  engine (`stack` resolved to `base::stack`, never `NULL`), which had been
+  reversing every axis tooltip's rows as if stacked.
+
+* Tooltips are confined to the chart's own box (`nt_chart()`, `nt_rank()`,
+  `nt_waffle()`, `nt_scatter()`). These widgets ship inside iframes, and an
+  unconfined tooltip near a chart edge was clipped mid-word at the iframe
+  boundary; confined, ECharts repositions it to fit.
+
 ## Maps
 
 * New `nt_terrain_style()`: the house terrain basemap, in light and dark.

@@ -120,7 +120,7 @@ nt_waffle <- function(data, category = NULL, value = NULL,
   tip <- htmlwidgets::JS(sprintf(paste0(
     "function(p){ var m=%s; var s=m[p.seriesName]||'';",
     " return '<b>'+(p.seriesName||'')+'</b>'+(s?' \\u00b7 '+s:''); }"), share_map))
-  e <- echarts4r::e_tooltip(e, trigger = "item",
+  e <- echarts4r::e_tooltip(e, trigger = "item", confine = TRUE,
                             backgroundColor = .ern_brand$navy, borderWidth = 0,
                             textStyle = list(color = "#ffffff", fontSize = 12,
                                              fontFamily = .ern_font),

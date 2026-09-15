@@ -25,7 +25,7 @@ nt_chart(
   bar_labels = FALSE,
   flip = FALSE,
   smooth = NULL,
-  crosshair = TRUE,
+  crosshair = FALSE,
   yaxis = c("always", "hover", "none"),
   y_max = NULL,
   y_min = NULL,
@@ -93,7 +93,7 @@ parentheses (e.g. \code{" households"}, \code{" people"}). Default \code{""}.}
 \item{tooltip_trigger}{\code{"axis"} (default) shows one tooltip listing every
 series at the hovered x-position; \code{"item"} shows a tooltip only while
 hovering a line or bar itself — the right choice for line charts with
-many series (pair it with \code{crosshair = FALSE}).}
+many series.}
 
 \item{isolate}{Logical; when \code{TRUE}, double-clicking a series — its line
 or its end-of-line label — isolates it and dims the rest. Double-click
@@ -109,19 +109,22 @@ dark bars, inside pale bars, and outside on white. Bars only.}
 \item{flip}{Logical; draw bars horizontally (categories on the y-axis).
 Prefer this over piping \code{\link[echarts4r:e_flip_coords]{echarts4r::e_flip_coords()}} afterwards — the
 engine then knows the orientation, so \code{bar_labels} overflow placement
-and the crosshair land correctly.}
+and the hover highlight land correctly.}
 
 \item{smooth}{Logical; smooth lines/areas (default \code{TRUE} for line/area,
 \code{FALSE} for bars).}
 
-\item{crosshair}{Logical; the hover crosshair + on-axis value (default
-\code{TRUE}).}
+\item{crosshair}{Logical; add the full hover crosshair, drawn to both axes
+with boxed on-axis values (default \code{FALSE}). Left off, hovering still
+reads the data out: line/area charts get a quiet vertical guide plus the
+tooltip, and bar charts highlight the whole hovered bar with every value
+listed in the tooltip.}
 
 \item{yaxis}{When the y-axis scale is shown: \code{"always"} (default; labels
 always visible), \code{"hover"} (the "newspaper graphic" style used in the ERN
 state profiles — the y-axis labels and dashed gridlines are hidden until the
 reader hovers the chart, then appear), or \code{"none"} (never; rely on the
-hover crosshair value alone).}
+hover tooltip alone).}
 
 \item{y_max}{Optional fixed maximum for the value axis. Normalized (100\%)
 stacked percent bars are capped at 1 automatically — ECharts would
@@ -182,9 +185,11 @@ An \code{echarts4r}/\code{htmlwidget} object.
 \description{
 Builds an interactive line, area, or bar chart in the Eviction Research
 Network "newspaper graphic" style — the look of the Washington and Minnesota
-state-profile charts. Hovering reveals the scale: a crosshair tracks the
-cursor and \strong{the value is printed on the y-axis} where you point, alongside a
-tooltip. The axes are otherwise minimal (no chart-junk), so the data leads.
+state-profile charts. Hovering reads the data out: a line or area chart
+gets a quiet vertical guide and a tooltip with each series' value at that
+point, and a bar chart highlights the whole hovered bar and lists every
+value in it. The axes are otherwise minimal (no chart-junk), so the data
+leads.
 
 It is a thin, opinionated wrapper over the
 \href{https://echarts4r.john-coene.com/}{echarts4r} package (by John Coene), which
@@ -195,10 +200,11 @@ they display in RStudio, Quarto/R Markdown, and Shiny, and save to standalone
 HTML with \code{\link[htmlwidgets:saveWidget]{htmlwidgets::saveWidget()}}.
 }
 \details{
-The signature interaction — a crosshair that draws to the axes and shows the
-value on the y-axis on hover — is ECharts' \code{axisPointer} of \code{type = "cross"},
-enabled by \code{crosshair = TRUE} (the default). Editorial touches map to
-arguments:
+A full crosshair — drawn to both axes with the value printed on the y-axis
+where you point — remains available as ECharts' \code{axisPointer} of
+\code{type = "cross"} via \code{crosshair = TRUE}, but it is opt-in, not the default:
+ordinary hover uses the guide-and-tooltip behavior above. Editorial touches
+map to arguments:
 \itemize{
 \item \code{baseline} draws a dashed horizontal reference line (e.g. a pre-pandemic
 average, or a \code{1.0} parity line on a ratio chart), like the state-profile
@@ -242,6 +248,7 @@ Other ern_charts:
 \code{\link[=nt_lollipop]{nt_lollipop()}},
 \code{\link[=nt_pd_bart]{nt_pd_bart()}},
 \code{\link[=nt_pd_plot]{nt_pd_plot()}},
+\code{\link[=nt_pd_spark]{nt_pd_spark()}},
 \code{\link[=nt_range]{nt_range()}},
 \code{\link[=nt_scatter]{nt_scatter()}},
 \code{\link[=nt_slope]{nt_slope()}},

@@ -111,7 +111,7 @@ nt_scatter <- function(data, x, y, group = NULL,
     "   '<div style=\"display:flex;justify-content:space-between;gap:18px\"><span>x</span><span style=\"font-weight:600\">'+xs+'</span></div>'+",
     "   '<div style=\"display:flex;justify-content:space-between;gap:18px\"><span>y</span><span style=\"font-weight:600\">'+ys+'</span></div>'; }"),
     x_expr, .nt_js_number_expr(value_fmt, "a[1]")))
-  e <- echarts4r::e_tooltip(e, trigger = "item",
+  e <- echarts4r::e_tooltip(e, trigger = "item", confine = TRUE,
                             backgroundColor = .ern_brand$navy, borderWidth = 0,
                             textStyle = list(color = "#ffffff", fontSize = 12,
                                              fontFamily = .ern_font),

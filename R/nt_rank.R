@@ -165,7 +165,7 @@
 
   if (isTRUE(tooltip)) {
     e <- echarts4r::e_tooltip(
-      e, trigger = "item",
+      e, trigger = "item", confine = TRUE,
       backgroundColor = .ern_brand$navy, borderWidth = 0,
       textStyle = list(color = "#ffffff", fontSize = 12, fontFamily = .ern_font),
       formatter = tooltip_js %nt||% .nt_item_tooltip_js(value_fmt, orientation))

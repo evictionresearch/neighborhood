@@ -248,3 +248,96 @@ nt_pd_bart <- function(bart_machine, j,
              var_label = var_label %nt||% j_name, title = title,
              effect = if (is_class) "probit" else "response", ...)
 }
+
+#' Compact partial-dependence sparkline (Atlas cell style)
+#'
+#' @description
+#' Draws a partial-dependence curve in the compact single-panel form used by
+#' the HPRM Variable Direction Atlas (2026): posterior-mean line over a
+#' credible ribbon, with the predictor's observed frequency distribution drawn
+#' as a small bar strip along the bottom of the same panel. Where
+#' [nt_pd_plot()] is the full-size, two-panel presentation figure, this is the
+#' small-multiple cell: axis-free by default, sized to sit inside a table row
+#' or a grid of dozens of predictors, while still showing the two things a PD
+#' curve must never be read without, its uncertainty and where the data are.
+#'
+#' The function is model-agnostic and needs no Java: it takes the same tidy PD
+#' table as [nt_pd_plot()], so [nt_pd_bart()] (with `return_data = TRUE`) can
+#' feed it from a fitted `bartMachine` model.
+#'
+#' @param pd A data frame of the PD curve with columns `x`, `mean`, `lower`,
+#'   `upper` (as for [nt_pd_plot()]).
+#' @param observed Optional numeric vector of the predictor's observed values,
+#'   drawn as the frequency strip. If `NULL`, no strip is drawn.
+#' @param var_label Label used when `axes = TRUE` (x-axis title). Defaults to
+#'   `"x"`.
+#' @param axes If `FALSE` (default), a frameless sparkline for small-multiple
+#'   use. If `TRUE`, adds axes and labels via [theme_ern()] so the same cell
+#'   can stand alone.
+#' @param bins Number of bins for the frequency strip (default `20`).
+#' @param freq_height Height of the frequency strip as a fraction of the PD
+#'   panel's vertical range (default `0.18`).
+#' @param line_width Width of the mean line (default `0.7`).
+#' @param points Draw a marker at each PD evaluation quantile (default
+#'   `FALSE`; the full-size plot defaults to `TRUE`).
+#' @return A `ggplot2` object.
+#' @family ern_charts
+#' @seealso [nt_pd_plot()] for the full-size two-panel figure; [nt_pd_bart()]
+#'   to compute the PD table from a fitted model.
+#' @examplesIf requireNamespace("ggplot2", quietly = TRUE)
+#' set.seed(1)
+#' x  <- sort(c(rnorm(400, 2, 0.6), rnorm(120, 4.5, 0.4)))
+#' xg <- quantile(x, c(.05, seq(.1, .9, .1), .95))
+#' pd <- data.frame(x = xg, mean = 0.3 * xg,
+#'                  lower = 0.3 * xg - 0.15, upper = 0.3 * xg + 0.15)
+#' nt_pd_spark(pd, observed = x)                      # sparkline cell
+#' nt_pd_spark(pd, observed = x, axes = TRUE,
+#'             var_label = "Median gross rent")       # standalone version
+#' @export
+nt_pd_spark <- function(pd, observed = NULL, var_label = NULL, axes = FALSE,
+                        bins = 20, freq_height = 0.18, line_width = 0.7,
+                        points = FALSE) {
+  pd <- .nt_pd_check(pd)
+  var_label <- var_label %nt||% "x"
+
+  navy   <- .ern_brand$navy
+  steel  <- .ern_brand$steel
+  ribbon <- grDevices::adjustcolor(steel, alpha.f = 0.40)
+
+  p <- ggplot2::ggplot(pd, ggplot2::aes(x = .data$x)) +
+    ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower, ymax = .data$upper),
+                         fill = ribbon) +
+    ggplot2::geom_line(ggplot2::aes(y = .data$mean), colour = navy,
+                       linewidth = line_width)
+  if (isTRUE(points)) {
+    p <- p + ggplot2::geom_point(ggplot2::aes(y = .data$mean), colour = navy,
+                                 size = 1.1, shape = 21,
+                                 fill = .ern_brand$paper, stroke = 0.5)
+  }
+
+  # frequency strip: observed distribution as bars along the panel floor,
+  # kept below the ribbon so the curve is never overplotted
+  if (!is.null(observed)) {
+    obs <- as.numeric(stats::na.omit(observed))
+    h   <- graphics::hist(obs, breaks = bins, plot = FALSE)
+    yr  <- range(c(pd$lower, pd$upper))
+    gap <- 0.06 * diff(yr)
+    base <- yr[1] - gap
+    bars <- data.frame(
+      xmin = utils::head(h$breaks, -1), xmax = utils::tail(h$breaks, -1),
+      ymin = base - freq_height * diff(yr) * (h$counts / max(h$counts, 1)),
+      ymax = base)
+    p <- p + ggplot2::geom_rect(
+      data = bars, inherit.aes = FALSE,
+      ggplot2::aes(xmin = .data$xmin, xmax = .data$xmax,
+                   ymin = .data$ymin, ymax = .data$ymax),
+      fill = steel, colour = .ern_brand$paper, linewidth = 0.1)
+  }
+
+  if (isTRUE(axes)) {
+    p + theme_ern(grid = "y", legend = "none") +
+      ggplot2::labs(x = var_label, y = "Partial effect")
+  } else {
+    p + ggplot2::theme_void()
+  }
+}

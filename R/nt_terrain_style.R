@@ -92,6 +92,19 @@
   }
 }
 
+# 50/50 mix of two hex colors, for the soft-streets variant: road inks pulled
+# halfway toward the ground tone so the grid recedes under a choropleth.
+# Base grDevices only; returns an uppercase "#RRGGBB" scalar, which keeps the
+# serialization discipline above (colors stay atomic). Half-up rounding via
+# floor(x + 0.5), not round(): it matches JavaScript's Math.round, so this
+# port and the canonical generator (boondockStyle.js mixHex) emit identical
+# hexes even when a channel mix lands on .5.
+.nt_mix_hex <- function(hex, with, w = 0.5) {
+  a <- grDevices::col2rgb(hex)
+  b <- grDevices::col2rgb(with)
+  grDevices::rgb(t(floor(a * (1 - w) + b * w + 0.5)), maxColorValue = 255)
+}
+
 # Route numbers for the roads you navigate by. `ref` is a separate field from
 # `name` in the OpenMapTiles schema, so the road-name layer, which labels
 # `name`, never shows a route number. Bold haloed text rather than a shield
@@ -128,7 +141,9 @@
     ),
     layout = layout,
     paint = list(
-      "text-color" = C$textBright,
+      # shieldText is set by nt_terrain_style(): textBright normally, the
+      # faint label tone under streets = "soft"
+      "text-color" = C$shieldText,
       "text-halo-color" = C$halo,
       "text-halo-width" = 2.2
     )
@@ -163,6 +178,13 @@
 #'   useful under an opaque choropleth. (With the default choropleth pipeline
 #'   you rarely need this: [nt_declutter_basemap()] already hides the
 #'   hillshade and land tints under the fills.)
+#' @param streets `"ink"` (default) draws the roads in the full navy road
+#'   inks; `"soft"` pulls every road ink halfway toward the ground tone and
+#'   drops the route shields ("I-5", "US 101") to the faint label color, so
+#'   dense urban grids recede and a choropleth carries the pane. Born on the
+#'   San Mateo rental-vacancy figure (2026-09-15), where the full-ink grid
+#'   read as too heavy beside the data. Also available through
+#'   [nt_maplibre()] as `style = "terrain-light-soft"` / `"terrain-dark-soft"`.
 #' @return A MapLibre style specification as a plain R list, for the `style`
 #'   argument of [nt_maplibre()] or [mapgl::maplibre()].
 #' @family ern_maps
@@ -172,11 +194,25 @@
 #' # The two variants, and a flat (no-hillshade) light map
 #' nt_maplibre(style = "terrain-dark", center = c(-122.33, 47.6), zoom = 9)
 #' nt_maplibre(style = nt_terrain_style("light", hillshade = FALSE))
+#' # Soft streets: the road grid recedes under a choropleth
+#' nt_maplibre(style = "terrain-light-soft")
 #' @export
-nt_terrain_style <- function(mode = c("light", "dark"), hillshade = TRUE) {
+nt_terrain_style <- function(mode = c("light", "dark"), hillshade = TRUE,
+                             streets = c("ink", "soft")) {
   mode <- match.arg(mode)
+  streets <- match.arg(streets)
   stopifnot(is.logical(hillshade), length(hillshade) == 1L, !is.na(hillshade))
   C <- .nt_terrain_palette(mode)
+
+  # Soft streets: mix the road inks toward the ground so the grid recedes;
+  # the shields follow, dropping to the faint label tone. Applied at the
+  # palette level so every layer that borrows a road color (aeroway) follows.
+  C$shieldText <- C$textBright
+  if (streets == "soft") {
+    for (k in c("roadMajor", "roadMid", "roadMinor", "path"))
+      C[[k]] <- .nt_mix_hex(C[[k]], C$land)
+    C$shieldText <- C$textFaint
+  }
 
   sources <- list(
     omt = list(

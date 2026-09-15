@@ -3,9 +3,11 @@
 #' @description
 #' Builds an interactive line, area, or bar chart in the Eviction Research
 #' Network "newspaper graphic" style — the look of the Washington and Minnesota
-#' state-profile charts. Hovering reveals the scale: a crosshair tracks the
-#' cursor and **the value is printed on the y-axis** where you point, alongside a
-#' tooltip. The axes are otherwise minimal (no chart-junk), so the data leads.
+#' state-profile charts. Hovering reads the data out: a line or area chart
+#' gets a quiet vertical guide and a tooltip with each series' value at that
+#' point, and a bar chart highlights the whole hovered bar and lists every
+#' value in it. The axes are otherwise minimal (no chart-junk), so the data
+#' leads.
 #'
 #' It is a thin, opinionated wrapper over the
 #' [echarts4r](https://echarts4r.john-coene.com/) package (by John Coene), which
@@ -16,10 +18,11 @@
 #' HTML with [htmlwidgets::saveWidget()].
 #'
 #' @details
-#' The signature interaction — a crosshair that draws to the axes and shows the
-#' value on the y-axis on hover — is ECharts' `axisPointer` of `type = "cross"`,
-#' enabled by `crosshair = TRUE` (the default). Editorial touches map to
-#' arguments:
+#' A full crosshair — drawn to both axes with the value printed on the y-axis
+#' where you point — remains available as ECharts' `axisPointer` of
+#' `type = "cross"` via `crosshair = TRUE`, but it is opt-in, not the default:
+#' ordinary hover uses the guide-and-tooltip behavior above. Editorial touches
+#' map to arguments:
 #'
 #' * `baseline` draws a dashed horizontal reference line (e.g. a pre-pandemic
 #'   average, or a `1.0` parity line on a ratio chart), like the state-profile
@@ -67,7 +70,7 @@
 #' @param tooltip_trigger `"axis"` (default) shows one tooltip listing every
 #'   series at the hovered x-position; `"item"` shows a tooltip only while
 #'   hovering a line or bar itself — the right choice for line charts with
-#'   many series (pair it with `crosshair = FALSE`).
+#'   many series.
 #' @param isolate Logical; when `TRUE`, double-clicking a series — its line
 #'   or its end-of-line label — isolates it and dims the rest. Double-click
 #'   it again (or empty space) to restore. Line charts with a `group`.
@@ -80,16 +83,19 @@
 #' @param flip Logical; draw bars horizontally (categories on the y-axis).
 #'   Prefer this over piping [echarts4r::e_flip_coords()] afterwards — the
 #'   engine then knows the orientation, so `bar_labels` overflow placement
-#'   and the crosshair land correctly.
+#'   and the hover highlight land correctly.
 #' @param smooth Logical; smooth lines/areas (default `TRUE` for line/area,
 #'   `FALSE` for bars).
-#' @param crosshair Logical; the hover crosshair + on-axis value (default
-#'   `TRUE`).
+#' @param crosshair Logical; add the full hover crosshair, drawn to both axes
+#'   with boxed on-axis values (default `FALSE`). Left off, hovering still
+#'   reads the data out: line/area charts get a quiet vertical guide plus the
+#'   tooltip, and bar charts highlight the whole hovered bar with every value
+#'   listed in the tooltip.
 #' @param yaxis When the y-axis scale is shown: `"always"` (default; labels
 #'   always visible), `"hover"` (the "newspaper graphic" style used in the ERN
 #'   state profiles — the y-axis labels and dashed gridlines are hidden until the
 #'   reader hovers the chart, then appear), or `"none"` (never; rely on the
-#'   hover crosshair value alone).
+#'   hover tooltip alone).
 #' @param y_max Optional fixed maximum for the value axis. Normalized (100%)
 #'   stacked percent bars are capped at 1 automatically — ECharts would
 #'   otherwise pick the next "nice" tick and render a phantom 120% ceiling — so
@@ -161,7 +167,7 @@ nt_chart <- function(data, x, y, group = NULL,
                      bar_labels = FALSE,
                      flip = FALSE,
                      smooth = NULL,
-                     crosshair = TRUE,
+                     crosshair = FALSE,
                      yaxis = c("always", "hover", "none"),
                      y_max = NULL,
                      y_min = NULL,
@@ -294,6 +300,7 @@ nt_chart <- function(data, x, y, group = NULL,
 
   e <- .nt_ern_chart_style(e, pal, value_fmt, crosshair, legend,
                            x_title, y_title, !is.null(baseline) || !is.null(band),
+                           chart_type = type, stacked = !is.null(stack),
                            yaxis = yaxis, y_max = y_max, y_min = y_min,
                            end_label = isTRUE(end_label),
                            legend_pos = legend_pos, legend_nudge = legend_nudge,
@@ -428,14 +435,16 @@ nt_spark <- function(values, type = c("line", "bar"),
 # colors, grid). Kept here so nt_chart() and future chart functions agree.
 # ---------------------------------------------------------------------------
 .nt_ern_chart_style <- function(e, pal, value_fmt, crosshair, legend,
-                                x_title, y_title, has_marks, yaxis = "always",
+                                x_title, y_title, has_marks,
+                                chart_type = "line", yaxis = "always",
                                 y_max = NULL, y_min = NULL,
                                 end_label = FALSE, legend_pos = "top",
                                 legend_nudge = c(0, 0), grid_top = 30,
                                 digits = NULL, tooltip_count = NULL,
                                 tooltip_count_suffix = "",
                                 tooltip_total = NULL,
-                                tooltip_trigger = "axis") {
+                                tooltip_trigger = "axis",
+                                stacked = FALSE) {
   axis_label <- list(color = .ern_brand$muted, fontFamily = .ern_font, fontSize = 11)
   # y-axis labels start hidden for "hover" (revealed on hover via onRender) and
   # for "none"; always shown for "always".
@@ -476,8 +485,10 @@ nt_spark <- function(values, type = c("line", "bar"),
     } else {
       echarts4r::e_axis_formatter(.nt_fmt_style(value_fmt), digits = digits)
     }
-    # format the boxed value the crosshair prints on the value axis
-    y_args$axisPointer <- list(label = list(formatter = .nt_pointer_js(value_fmt, digits)))
+    # format the boxed value the crosshair prints on the value axis — only the
+    # opt-in crosshair draws to the value axis, so the label rides with it
+    if (isTRUE(crosshair))
+      y_args$axisPointer <- list(label = list(formatter = .nt_pointer_js(value_fmt, digits)))
   }
   if (!is.null(y_max)) y_args$max <- y_max
   if (!is.null(y_min)) y_args$min <- y_min
@@ -487,22 +498,46 @@ nt_spark <- function(values, type = c("line", "bar"),
   # "item" trigger fires only on the hovered series (no crosshair).
   tip_args <- list(
     e, trigger = tooltip_trigger,
+    # confine keeps the tooltip inside the chart's own box: these widgets ship
+    # as iframes, and a tooltip past an iframe edge is clipped mid-word (seen
+    # 2026-09-06 on the two-panel overcrowding figure)
+    confine = TRUE,
     backgroundColor = .ern_brand$navy, borderWidth = 0,
     textStyle = list(color = "#ffffff", fontSize = 12, fontFamily = .ern_font),
     formatter = if (identical(tooltip_trigger, "item")) {
       .nt_tooltip_item_js(value_fmt, digits)
     } else {
+      # `stacked` is the argument, threaded from the caller's real stack
+      # state — the old `!is.null(stack)` here resolved to base::stack
+      # lexically (never NULL), which reversed EVERY axis tooltip as if
+      # stacked (caught 2026-09-06, the rents-chart row-order report)
       .nt_tooltip_js(value_fmt, digits, tooltip_count, tooltip_count_suffix,
-                     tooltip_total, stacked = !is.null(stack))
+                     tooltip_total, stacked = stacked)
     }
   )
-  if (isTRUE(crosshair) && identical(tooltip_trigger, "axis")) {
-    tip_args$axisPointer <- list(
-      type = "cross",
-      lineStyle = list(color = .ern_brand$accent, width = 1, type = "dashed"),
-      crossStyle = list(color = .ern_brand$accent, width = 1, type = "dashed"),
-      label = list(backgroundColor = .ern_brand$navy)
-    )
+  if (identical(tooltip_trigger, "axis")) {
+    tip_args$axisPointer <- if (isTRUE(crosshair)) {
+      # the opt-in crosshair: dashed accent lines to both axes, boxed values
+      list(
+        type = "cross",
+        lineStyle = list(color = .ern_brand$accent, width = 1, type = "dashed"),
+        crossStyle = list(color = .ern_brand$accent, width = 1, type = "dashed"),
+        label = list(backgroundColor = .ern_brand$navy)
+      )
+    } else if (identical(chart_type, "bar")) {
+      # the whole hovered bar (or bar cluster) is shaded, and the axis tooltip
+      # lists every value in it — works flipped or not, since ECharts hangs the
+      # shadow on the category axis either way
+      list(type = "shadow",
+           shadowStyle = list(color = "rgba(25,34,44,0.07)"),
+           label = list(show = FALSE))
+    } else {
+      # line/area: a quiet vertical guide marks the hovered x; the values live
+      # in the tooltip, with no boxed on-axis readouts
+      list(type = "line",
+           lineStyle = list(color = .ern_brand$muted, width = 1, type = "dashed"),
+           label = list(show = FALSE))
+    }
   }
   e <- do.call(echarts4r::e_tooltip, tip_args)
 
@@ -601,7 +636,14 @@ nt_spark <- function(values, type = c("line", "bar"),
       "function(params){",
       "  if(!params || !params.length){ return ''; }",
       "  var head = params[0].axisValueLabel || params[0].name || '';",
-      "  var rows = ", if (stacked) "params.slice().reverse()" else "params",
+      "  function __v(p){ var val = ", .nt_js_value_pick(), ";",
+      "    return (val === null || val === undefined || isNaN(+val)) ? -Infinity : +val; }",
+      # rows mirror the chart's vertical order at the hovered point: a stacked
+      # bar reads top segment first (series order reversed), everything else
+      # sorts by value so who's on top in the plot is on top in the tip
+      "  var rows = ",
+      if (stacked) "params.slice().reverse()"
+      else "params.slice().sort(function(a, b){ return __v(b) - __v(a); })",
       ".map(function(p){",
       "    var val = ", .nt_js_value_pick(), ";",
       "    if(val === null || val === undefined){ val = NaN; }",
