@@ -124,6 +124,14 @@ reference:
     desc: Pull external datasets used in ERN work, cached locally.
     contents:
       - nt_apartmentlist_rents
+  - title: File conversion
+    desc: >
+      Migrate legacy serialized data onto the house standard. Parquet is the
+      on-disk format for analytic data because it is columnar, compressed, and
+      readable from Python, Julia, and DuckDB, so a published number's data file
+      outlives the R session that wrote it; .qs/.qs2 is fast but R-only.
+    contents:
+      - nt_qs_convert
   - title: Datasets
     contents:
       - us_nt_tracts2024

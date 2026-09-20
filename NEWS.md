@@ -1,5 +1,24 @@
 # neighborhood 1.1.0 (development version)
 
+## Data conversion
+
+* New `nt_qs_convert()`: rewrites legacy `.qs`/`.qs2` files into durable
+  formats, Parquet by default, one file or a whole directory at a time.
+  `to` takes any number of formats in one pass (`c("parquet", "csv")` reads
+  the source once and writes both), filenames keep their producing-script
+  prefix, and `sf` objects land as GeoParquet with their CRS intact.
+  This is the migrate-on-touch tool the serialization convention asks for:
+  Parquet is columnar, compressed, and readable from Python/Julia/DuckDB, so
+  a published number's data file outlives the R session that wrote it, while
+  `.qs`/`.qs2` is R-only and pinned to the writing package's version.
+
+  Objects Parquet cannot hold — BART fits, nested lists — are reported per
+  file with the reason rather than written as a broken table, so a mixed
+  directory converts in one call: the tables become Parquet and the model
+  fits say why they did not (`to = "rds"` keeps those in the family). Read
+  and write failures warn and land in the returned log with
+  `status = "error"` instead of aborting the batch.
+
 ## Affordability
 
 * The afford family now carries its uncertainty. `afford_index()` returns a

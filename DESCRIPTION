@@ -53,7 +53,13 @@ Suggests:
     hudr,
     bartMachine,
     arrow,
-    forecast
+    forecast,
+    qs,
+    qs2,
+    sfarrow,
+    fst,
+    writexl,
+    haven
 SystemRequirements: tippecanoe (optional, for building PMTiles vector tiles)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
