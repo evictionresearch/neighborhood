@@ -7,7 +7,8 @@
 nt_profile_county_trend_data(
   county_agg,
   record_window = 2,
-  global = "__waCountyTrendData"
+  global = "__waCountyTrendData",
+  projection = NULL
 )
 }
 \arguments{
@@ -20,6 +21,12 @@ two complete years for a partial current year).}
 
 \item{global}{Name of the \code{window.} global to assign (default
 \code{"__waCountyTrendData"}, the name the shipped profile JS reads).}
+
+\item{projection}{Optional county year-end projections for a partial latest
+year, from \code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}}. Each county then carries
+\code{proj}, and the payload \code{projYear} and \code{projThrough} (the last observed
+month's name), which the yearly view draws as a dashed final segment.
+\code{NULL} (default) leaves the output unchanged.}
 }
 \value{
 Character scalar: a \verb{<script>…</script>} tag.
@@ -40,7 +47,10 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_news]{nt_profile_news()}},
+\code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}},
+\code{\link[=nt_profile_project_months]{nt_profile_project_months()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}},
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
@@ -48,6 +58,8 @@ Other state profile:
 \code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_scatter_svg]{nt_profile_scatter_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
+\code{\link[=nt_profile_yearly_counties]{nt_profile_yearly_counties()}},
+\code{\link[=nt_profile_yearly_picker]{nt_profile_yearly_picker()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }

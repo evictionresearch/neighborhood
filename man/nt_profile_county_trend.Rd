@@ -9,7 +9,9 @@ nt_profile_county_trend(
   caption_num,
   caption_desc,
   caption_src,
-  id = "plate-counties-rising"
+  id = "plate-counties-rising",
+  projection_toggle = FALSE,
+  through_label = "To date"
 )
 }
 \arguments{
@@ -23,6 +25,14 @@ the granularity toggles, so seed it with the monthly variant.}
 \item{caption_src}{Caption source line (e.g. \code{"source · wa ocla"}).}
 
 \item{id}{Shell element id.}
+
+\item{projection_toggle}{Add the yearly view's latest-year control:
+"Projected year-end" (the default state) or the count to date, labelled
+\code{through_label}. The page JS shows it only in the yearly view and only
+when \code{\link[=nt_profile_county_trend_data]{nt_profile_county_trend_data()}} carries county projections. \code{FALSE}
+(default) leaves the output byte-identical.}
+
+\item{through_label}{Label of the to-date button (e.g. \code{"Through September"}).}
 }
 \value{
 Character scalar: the \verb{<div class="plate-rising-chart">…</div>}
@@ -43,7 +53,10 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_news]{nt_profile_news()}},
+\code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}},
+\code{\link[=nt_profile_project_months]{nt_profile_project_months()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}},
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
@@ -51,6 +64,8 @@ Other state profile:
 \code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_scatter_svg]{nt_profile_scatter_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
+\code{\link[=nt_profile_yearly_counties]{nt_profile_yearly_counties()}},
+\code{\link[=nt_profile_yearly_picker]{nt_profile_yearly_picker()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }

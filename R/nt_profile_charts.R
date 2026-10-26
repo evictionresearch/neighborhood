@@ -55,6 +55,11 @@
 #' @param svg_id,indicator_id Element ids the page JS looks up.
 #' @param source_note Provenance comment for the data path (names the source
 #'   table).
+#' @param projection Emit the projection layer: styles plus two empty paths
+#'   (`.proj-band`, `.proj-line`) that the page JS fills when a reader picks a
+#'   horizon from [nt_profile_projection_toggle()], using the forecast that
+#'   [nt_profile_monthly_js()] carries. `FALSE` (default) leaves the output
+#'   byte-identical for pages without the control.
 #' @return Character scalar: the complete `<svg>...</svg>` block.
 #' @family state profile
 #' @export
@@ -64,7 +69,8 @@ nt_profile_trend_svg <- function(dates, values, baseline,
                                  y_step = 500,
                                  svg_id = "chart-monthly-svg",
                                  indicator_id = "chart-monthly-indicator",
-                                 source_note = "d3_state_agg") {
+                                 source_note = "d3_state_agg",
+                                 projection = FALSE) {
   stopifnot(length(dates) == length(values), length(dates) >= 2)
   mN <- length(values)
   mX0 <- 40; mX1 <- 970; mY0 <- 78; mY1 <- 298
@@ -131,6 +137,9 @@ nt_profile_trend_svg <- function(dates, values, baseline,
     '          .data { fill: none; stroke: #19222C; stroke-width: 1.5; stroke-linejoin: round; }\n',
     '          .focal { fill: #F9322B; }\n',
     '          .moratoria-band { fill: #19222C; opacity: 0.05; }\n',
+    if (projection) paste0(
+      '          .proj-band { fill: rgba(249, 50, 43, 0.08); stroke: none; }\n',
+      '          .proj-line { fill: none; stroke: #F9322B; stroke-width: 1.5; stroke-dasharray: 4 3; }\n'),
     '        </style>\n',
     band_svg,
     sprintf(paste0(
@@ -147,6 +156,10 @@ nt_profile_trend_svg <- function(dates, values, baseline,
             mX0, y_of(baseline), mX1, y_of(baseline)),
     sprintf('        <!-- Real monthly filings (%d months from %s). -->\n', mN, source_note),
     '        <path class="data" d="', path_d, '" />\n',
+    if (projection) paste0(
+      '        <!-- Projection layer: empty until the page JS draws a horizon. -->\n',
+      '        <path class="proj-band" d=""/>\n',
+      '        <path class="proj-line" d=""/>\n'),
     sprintf('        <circle class="focal" cx="%.1f" cy="%.1f" r="3.5"/>\n', focal_x, focal_y),
     sprintf('        <text class="annot" x="%.1f" y="%.1f" text-anchor="end">%s</text>\n',
             focal_x - 5, focal_y - 26, annot_label),
@@ -178,7 +191,9 @@ nt_profile_trend_svg <- function(dates, values, baseline,
 #'   values < 12 mark that year partial (accent + "(Jan–Mon)" label).
 #' @param projection Optional list with `total`, `lo`, `hi` (e.g. from
 #'   [nt_profile_project_year()]) drawn as the projection overlay on the
-#'   partial year.
+#'   partial year. `lo` and `hi` may be omitted for a point projection (a
+#'   county's share of the state's, say): the dashed extension and tick draw,
+#'   the range band and the tooltip's range line do not.
 #' @param y_ceiling_step Step the y ceiling rounds up to (default 2500);
 #'   gridlines draw every `y_grid_step` (default 5000).
 #' @param y_grid_step Gridline interval (default 5000, labeled "5k", "10k", …).
@@ -218,7 +233,8 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   months_short <- c("Jan","Feb","Mar","Apr","May","Jun",
                     "Jul","Aug","Sep","Oct","Nov","Dec")
 
-  proj_hi <- if (!is.null(projection)) projection$hi else 0
+  has_pi  <- !is.null(projection) && !is.null(projection$lo) && !is.null(projection$hi)
+  proj_hi <- if (has_pi) projection$hi else if (!is.null(projection)) projection$total else 0
   y_max  <- max(y_grid_step,
                 ceiling(max(c(values, baseline, proj_hi), na.rm = TRUE) / y_ceiling_step) * y_ceiling_step)
   y_unit <- 220 / y_max
@@ -236,8 +252,10 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   # holds its pixel size and only the bars render wider.
   x_right  <- if (fit_width) max(y_x) + ybW + 10 else max(970, max(y_x) + ybW + 10)
   vb_width <- if (fit_width) x_right + 30        else max(1000, x_right + 30)
+  # Thousands read as "5k"; a step under 1,000 (a small county) prints whole.
+  grid_lab <- if (y_grid_step >= 1000) function(v) paste0(v / 1000, "k") else .nt_fmt_int
   grid_svg <- .nt_grid_lines_svg(seq(y_grid_step, y_max, by = y_grid_step), 40, x_right, 36,
-                                 y_of, function(v) paste0(v / 1000, "k"))
+                                 y_of, grid_lab)
   y_height <- values * y_unit
   y_y <- y_floor - y_height
 
@@ -263,10 +281,14 @@ nt_profile_yearly_svg <- function(years, values, baseline,
   val_class <- ifelse(is_focal, "yval focal", "yval")
   has_proj <- is_partial & !is.null(projection)
   proj_attr <- ifelse(has_proj,
-    sprintf(' data-proj-total="%s" data-proj-lo="%s" data-proj-hi="%s"',
-            .nt_fmt_int(round(if (!is.null(projection)) projection$total else 0)),
-            .nt_fmt_int(round(if (!is.null(projection)) projection$lo    else 0)),
-            .nt_fmt_int(round(if (!is.null(projection)) projection$hi    else 0))),
+    if (has_pi)
+      sprintf(' data-proj-total="%s" data-proj-lo="%s" data-proj-hi="%s"',
+              .nt_fmt_int(round(projection$total)),
+              .nt_fmt_int(round(projection$lo)),
+              .nt_fmt_int(round(projection$hi)))
+    else if (!is.null(projection))
+      sprintf(' data-proj-total="%s"', .nt_fmt_int(round(projection$total)))
+    else "",
     "")
 
   bars_svg <- paste(
@@ -287,19 +309,20 @@ nt_profile_yearly_svg <- function(years, values, baseline,
       .px <- y_x[.pi]
       .actual_y  <- y_y[.pi]
       .proj_y    <- y_floor - projection$total * y_unit
-      .proj_y_lo <- y_floor - projection$lo * y_unit
-      .proj_y_hi <- y_floor - projection$hi * y_unit
+      .proj_y_lo <- y_floor - (if (has_pi) projection$lo else projection$total) * y_unit
+      .proj_y_hi <- y_floor - (if (has_pi) projection$hi else projection$total) * y_unit
       proj_svg <- paste0(
         '        <!-- Projection for partial latest year (ARIMA on monthly 2023+). -->\n',
-        sprintf(paste0(
+        if (has_pi) sprintf(paste0(
           '        <!-- 80%% PI band: pale fill from PI-low to PI-high -->\n',
-          '        <rect class="yproj-pi" x="%.0f" y="%.1f" width="%d" height="%.1f"/>\n',
+          '        <rect class="yproj-pi" x="%.0f" y="%.1f" width="%d" height="%.1f"/>\n'),
+          .px, .proj_y_hi, ybW, .proj_y_lo - .proj_y_hi),
+        sprintf(paste0(
           '        <!-- Dashed outline from top-of-actual up to projected mean -->\n',
           '        <rect class="yproj-bar" x="%.0f" y="%.1f" width="%d" height="%.1f"/>\n',
           '        <!-- Point-estimate tick + label -->\n',
           '        <line class="yproj-tick" x1="%.0f" y1="%.1f" x2="%.0f" y2="%.1f"/>\n',
           '        <text class="yproj-label" x="%.0f" y="%.1f" text-anchor="middle">~%s projected</text>\n'),
-          .px, .proj_y_hi, ybW, .proj_y_lo - .proj_y_hi,
           .px, .proj_y, ybW, .actual_y - .proj_y,
           .px - 4, .proj_y, .px + ybW + 4, .proj_y,
           .px + ybW/2, .proj_y - 8, .nt_fmt_int(round(projection$total))))
@@ -350,6 +373,109 @@ nt_profile_yearly_svg <- function(years, values, baseline,
     axis_svg, '\n',
     '      </svg>'
   )
+}
+
+#' Month-by-month filings projection (SARIMA)
+#'
+#' The monthly companion to [nt_profile_project_year()]: the same seasonal
+#' ARIMA, fit on the same window with the same settings, forecast `h` months
+#' past the last observed month. Because the two fit an identical model, the
+#' first months here plus the year-to-date actual sum to the year-end total
+#' [nt_profile_project_year()] reports, so a Figure 1 projection and the
+#' Figure 2 dashed bar cannot disagree. Feeds [nt_profile_monthly_js()].
+#'
+#' @inheritParams nt_profile_project_year
+#' @param h Months to forecast past the last observed month (default 12).
+#' @return `NULL` when the window is too short or the fit fails; otherwise a
+#'   data frame with `date` (first of each forecast month), `mean`, `lo`, and
+#'   `hi`, carrying the fitted model in attribute `"order"`.
+#' @family state profile
+#' @export
+nt_profile_project_months <- function(dates, values, h = 12L,
+                                      fit_start = "2023-01-01",
+                                      level = 80, min_months = 24) {
+  if (!requireNamespace("forecast", quietly = TRUE)) {
+    stop("nt_profile_project_months() needs the 'forecast' package: install.packages(\"forecast\")")
+  }
+  stopifnot(length(dates) == length(values), h >= 1)
+  ord <- order(dates)
+  dates <- dates[ord]; values <- values[ord]
+
+  keep <- dates >= as.Date(fit_start)
+  if (sum(keep) < min_months) return(NULL)
+  d_fit <- dates[keep]; v_fit <- values[keep]
+  ts_fit <- stats::ts(v_fit,
+                      start = c(as.integer(format(d_fit[1], "%Y")),
+                                as.integer(format(d_fit[1], "%m"))),
+                      frequency = 12)
+  tryCatch({
+    fit <- forecast::auto.arima(ts_fit, seasonal = TRUE,
+                                stepwise = TRUE, approximation = FALSE)
+    fc  <- forecast::forecast(fit, h = h, level = level)
+    first <- as.Date(format(dates[length(dates)], "%Y-%m-01"))
+    out <- data.frame(date = seq(first, by = "month", length.out = h + 1L)[-1],
+                      mean = as.numeric(fc$mean),
+                      lo   = as.numeric(fc$lower),
+                      hi   = as.numeric(fc$upper))
+    .arma <- fit$arma
+    attr(out, "order") <- sprintf("SARIMA(%d,%d,%d)(%d,%d,%d)[%d]",
+                                  .arma[1], .arma[6], .arma[2],
+                                  .arma[3], .arma[7], .arma[4], .arma[5])
+    out
+  }, error = function(e) NULL)
+}
+
+#' Per-county yearly bar charts behind Figure 2's county picker
+#'
+#' Draws one [nt_profile_yearly_svg()] per county, hidden, for the page JS to
+#' swap in when a reader picks a county from [nt_profile_yearly_picker()].
+#' Each chart is the statewide one at county scale: the county's own
+#' pre-pandemic 12-month-equivalent baseline, a y-scale stepped to its size,
+#' and, for a partial latest year, its projected year-end from
+#' [nt_profile_project_counties()] drawn as a point projection (no range,
+#' since an allocated share has no interval of its own).
+#'
+#' @param county_agg Data frame of county-month filings: `county_code`,
+#'   `county`, `year`, `month`, `filings`.
+#' @param projection Optional output of [nt_profile_project_counties()].
+#' @param baseline_start,baseline_end First and last month of the
+#'   pre-pandemic baseline (default Jan 2017 to Feb 2020, as statewide).
+#' @param svg_prefix Each chart's id is this plus the county code.
+#' @return Character scalar: the hidden `<svg>` blocks, one per county, each
+#'   carrying `data-county` and `data-baseline` for the page JS.
+#' @family state profile
+#' @export
+nt_profile_yearly_counties <- function(county_agg, projection = NULL,
+                                       baseline_start = "2017-01-01",
+                                       baseline_end = "2020-02-01",
+                                       svg_prefix = "chart-yearly-svg-") {
+  stopifnot(all(c("county_code", "county", "year", "month", "filings") %in% names(county_agg)))
+  d <- as.Date(sprintf("%d-%02d-01", county_agg$year, county_agg$month))
+  latest_year  <- max(county_agg$year)
+  latest_month <- max(county_agg$month[county_agg$year == latest_year])
+  years <- sort(unique(county_agg$year))
+  in_base <- d >= as.Date(baseline_start) & d <= as.Date(baseline_end)
+  codes <- unique(county_agg$county_code[order(county_agg$county)])
+
+  vapply(codes, function(code) {
+    k <- county_agg$county_code == code
+    vals <- vapply(years, function(y) sum(county_agg$filings[k & county_agg$year == y], na.rm = TRUE),
+                   numeric(1))
+    base <- 12 * mean(county_agg$filings[k & in_base], na.rm = TRUE)
+    proj <- NULL
+    if (!is.null(projection) && latest_month < 12) {
+      proj <- list(total = projection$total[match(code, projection$county_code)])
+    }
+    top  <- max(c(vals, base, if (!is.null(proj)) proj$total), na.rm = TRUE)
+    grid <- max(1, diff(pretty(c(0, top), n = 4))[1])
+    svg <- nt_profile_yearly_svg(years, vals, baseline = base,
+                                 latest_month = latest_month, projection = proj,
+                                 y_ceiling_step = max(1, grid / 2), y_grid_step = grid,
+                                 svg_id = paste0(svg_prefix, code))
+    sub('<svg id="', sprintf('<svg style="display:none" data-county="%s" data-baseline="%s" id="',
+                             county_agg$county[k][1], .nt_fmt_int(base)),
+        svg, fixed = TRUE)
+  }, character(1), USE.NAMES = FALSE) |> paste(collapse = "\n")
 }
 
 #' Year-end filings projection for the partial latest year (SARIMA)

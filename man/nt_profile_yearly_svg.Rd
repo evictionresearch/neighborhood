@@ -30,7 +30,9 @@ values < 12 mark that year partial (accent + "(Jan–Mon)" label).}
 
 \item{projection}{Optional list with \code{total}, \code{lo}, \code{hi} (e.g. from
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}}) drawn as the projection overlay on the
-partial year.}
+partial year. \code{lo} and \code{hi} may be omitted for a point projection (a
+county's share of the state's, say): the dashed extension and tick draw,
+the range band and the tooltip's range line do not.}
 
 \item{y_ceiling_step}{Step the y ceiling rounds up to (default 2500);
 gridlines draw every \code{y_grid_step} (default 5000).}
@@ -76,7 +78,10 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_news]{nt_profile_news()}},
+\code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}},
+\code{\link[=nt_profile_project_months]{nt_profile_project_months()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}},
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
@@ -84,6 +89,8 @@ Other state profile:
 \code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_scatter_svg]{nt_profile_scatter_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
+\code{\link[=nt_profile_yearly_counties]{nt_profile_yearly_counties()}},
+\code{\link[=nt_profile_yearly_picker]{nt_profile_yearly_picker()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }
 \concept{state profile}

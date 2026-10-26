@@ -32,6 +32,7 @@ nt_chart(
   highlight_last = FALSE,
   end_label = FALSE,
   line_styles = NULL,
+  series_opacity = NULL,
   source = NULL,
   legend = !is.null(group),
   legend_pos = c("top", "bottom"),
@@ -96,8 +97,10 @@ hovering a line or bar itself — the right choice for line charts with
 many series.}
 
 \item{isolate}{Logical; when \code{TRUE}, double-clicking a series — its line
-or its end-of-line label — isolates it and dims the rest. Double-click
-it again (or empty space) to restore. Line charts with a \code{group}.}
+or its end-of-line label — isolates it and dims the rest. The isolated
+series pops to full opacity even if \code{series_opacity} mutes it by
+default; double-click it again (or empty space) to restore every series
+to its default opacity. Line charts with a \code{group}.}
 
 \item{bar_labels}{Logical; print each bar segment's value inside the bar
 (\code{value_fmt}/\code{digits} formatting). A label that doesn't fit its segment
@@ -148,6 +151,13 @@ default when \code{end_label = TRUE}. Line/area charts only.}
 series — any of \code{"solid"}, \code{"dashed"}, \code{"dotted"} — for print- and
 grayscale-friendly differentiation. If the vector is named, names are matched
 to series (group) names; otherwise styles are applied in series order.}
+
+\item{series_opacity}{Optional named numeric vector (series name → 0–1)
+setting each named series' default line opacity; unnamed series stay at
+full ink. The editorial move for a one-versus-the-region line chart:
+mute the context series so the highlighted one carries the chart, and
+pair with \code{isolate = TRUE}, which pops a double-clicked series to full
+opacity and restores these defaults on release. Line charts only.}
 
 \item{source}{Optional attribution shown small in the lower-right corner
 (e.g. a data-source credit line). A credit too long for one line is wrapped

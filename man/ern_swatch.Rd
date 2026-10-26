@@ -49,6 +49,7 @@ Other ern_charts:
 \code{\link[=nt_lollipop]{nt_lollipop()}},
 \code{\link[=nt_pd_bart]{nt_pd_bart()}},
 \code{\link[=nt_pd_plot]{nt_pd_plot()}},
+\code{\link[=nt_pd_spark]{nt_pd_spark()}},
 \code{\link[=nt_range]{nt_range()}},
 \code{\link[=nt_scatter]{nt_scatter()}},
 \code{\link[=nt_slope]{nt_slope()}},

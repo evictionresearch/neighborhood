@@ -9,7 +9,9 @@ nt_profile_monthly_js(
   year_base,
   month_base = 0,
   y_div,
-  global = "__waMonthly"
+  global = "__waMonthly",
+  projection = NULL,
+  y_step = 500
 )
 }
 \arguments{
@@ -22,6 +24,15 @@ its zero-based month (January = 0).}
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}} derived (series max rounded up to \code{y_step}).}
 
 \item{global}{Name of the \code{window.} global to assign.}
+
+\item{projection}{Optional forecast from \code{\link[=nt_profile_project_months]{nt_profile_project_months()}}. When
+given, the payload also carries the rounded \code{mean}, \code{lo}, and \code{hi} series
+and \code{y_step}, which the page JS needs to draw a projection horizon and
+re-ceiling the y-axis to fit its band. \code{NULL} (default) leaves the output
+unchanged.}
+
+\item{y_step}{Gridline interval of the chart, as passed to
+\code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}} (default 500). Emitted only with \code{projection}.}
 }
 \value{
 Character scalar: a \verb{<script>…</script>} tag.
@@ -39,7 +50,10 @@ Other state profile:
 \code{\link[=nt_profile_fourps_svg]{nt_profile_fourps_svg()}},
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_news]{nt_profile_news()}},
+\code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}},
+\code{\link[=nt_profile_project_months]{nt_profile_project_months()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}},
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
@@ -47,6 +61,8 @@ Other state profile:
 \code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_scatter_svg]{nt_profile_scatter_svg()}},
 \code{\link[=nt_profile_trend_svg]{nt_profile_trend_svg()}},
+\code{\link[=nt_profile_yearly_counties]{nt_profile_yearly_counties()}},
+\code{\link[=nt_profile_yearly_picker]{nt_profile_yearly_picker()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }

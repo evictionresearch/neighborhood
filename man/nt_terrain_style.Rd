@@ -4,7 +4,11 @@
 \alias{nt_terrain_style}
 \title{The ERN terrain basemap style (light and dark)}
 \usage{
-nt_terrain_style(mode = c("light", "dark"), hillshade = TRUE)
+nt_terrain_style(
+  mode = c("light", "dark"),
+  hillshade = TRUE,
+  streets = c("ink", "soft")
+)
 }
 \arguments{
 \item{mode}{\code{"light"} (default) or \code{"dark"}.}
@@ -15,6 +19,14 @@ hillshade layer, so the map makes no terrain-tile requests at all --
 useful under an opaque choropleth. (With the default choropleth pipeline
 you rarely need this: \code{\link[=nt_declutter_basemap]{nt_declutter_basemap()}} already hides the
 hillshade and land tints under the fills.)}
+
+\item{streets}{\code{"ink"} (default) draws the roads in the full navy road
+inks; \code{"soft"} pulls every road ink halfway toward the ground tone and
+drops the route shields ("I-5", "US 101") to the faint label color, so
+dense urban grids recede and a choropleth carries the pane. Born on the
+San Mateo rental-vacancy figure (2026-09-15), where the full-ink grid
+read as too heavy beside the data. Also available through
+\code{\link[=nt_maplibre]{nt_maplibre()}} as \code{style = "terrain-light-soft"} / \code{"terrain-dark-soft"}.}
 }
 \value{
 A MapLibre style specification as a plain R list, for the \code{style}
@@ -44,6 +56,8 @@ style needs no sprite sheet at all.
 # The two variants, and a flat (no-hillshade) light map
 nt_maplibre(style = "terrain-dark", center = c(-122.33, 47.6), zoom = 9)
 nt_maplibre(style = nt_terrain_style("light", hillshade = FALSE))
+# Soft streets: the road grid recedes under a choropleth
+nt_maplibre(style = "terrain-light-soft")
 \dontshow{\}) # examplesIf}
 }
 \seealso{

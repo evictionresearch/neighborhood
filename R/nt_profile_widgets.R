@@ -42,6 +42,13 @@ nt_raw_html <- function(...) {
 #'   the granularity toggles, so seed it with the monthly variant.
 #' @param caption_src Caption source line (e.g. `"source · wa ocla"`).
 #' @param id Shell element id.
+#' @param projection_toggle Add the yearly view's latest-year control:
+#'   "Projected year-end" (the default state) or the count to date, labelled
+#'   `through_label`. The page JS shows it only in the yearly view and only
+#'   when [nt_profile_county_trend_data()] carries county projections. `FALSE`
+#'   (default) leaves the output byte-identical.
+#' @param through_label Label of the to-date button (e.g. `"Through
+#'   September"`).
 #' @return Character scalar: the `<div class="plate-rising-chart">…</div>`
 #'   block.
 #' @family state profile
@@ -50,7 +57,19 @@ nt_profile_county_trend <- function(label,
                                     caption_num,
                                     caption_desc,
                                     caption_src,
-                                    id = "plate-counties-rising") {
+                                    id = "plate-counties-rising",
+                                    projection_toggle = FALSE,
+                                    through_label = "To date") {
+  # Its own button class: the granularity handler binds every .ct-toggle-btn.
+  proj_toggle <- if (projection_toggle) paste0(
+    '          <div class="ct-toggle ct-proj-toggle" role="group" aria-label="Latest year" hidden>\n',
+    '            <button type="button" class="ct-proj-btn ct-active"\n',
+    '                    data-proj="on"\n',
+    '                    aria-pressed="true">Projected year-end</button>\n',
+    '            <button type="button" class="ct-proj-btn"\n',
+    '                    data-proj="off"\n',
+    '                    aria-pressed="false">', through_label, '</button>\n',
+    '          </div>\n') else ""
   paste0(
     '      <div class="plate-rising-chart" id="', id, '">\n',
     '        <span class="plate-num">', label, '</span>\n',
@@ -63,6 +82,7 @@ nt_profile_county_trend <- function(label,
     '                    data-granularity="monthly"\n',
     '                    aria-pressed="true">Monthly</button>\n',
     '          </div>\n',
+    proj_toggle,
     '          <label class="ct-select-wrap">\n',
     '            <span class="ct-select-label">Highlight:</span>\n',
     '            <select id="ct-county-select" class="ct-select">\n',
@@ -97,11 +117,17 @@ nt_profile_county_trend <- function(label,
 #'   two complete years for a partial current year).
 #' @param global Name of the `window.` global to assign (default
 #'   `"__waCountyTrendData"`, the name the shipped profile JS reads).
+#' @param projection Optional county year-end projections for a partial latest
+#'   year, from [nt_profile_project_counties()]. Each county then carries
+#'   `proj`, and the payload `projYear` and `projThrough` (the last observed
+#'   month's name), which the yearly view draws as a dashed final segment.
+#'   `NULL` (default) leaves the output unchanged.
 #' @return Character scalar: a `<script>…</script>` tag.
 #' @family state profile
 #' @export
 nt_profile_county_trend_data <- function(county_agg, record_window = 2,
-                                         global = "__waCountyTrendData") {
+                                         global = "__waCountyTrendData",
+                                         projection = NULL) {
   stopifnot(all(c("county_code", "county", "year", "month", "filings") %in% names(county_agg)))
 
   latest_year <- max(county_agg$year)
@@ -150,22 +176,74 @@ nt_profile_county_trend_data <- function(county_agg, record_window = 2,
     out
   }
 
+  if (!is.null(projection)) {
+    stopifnot(all(c("county_code", "total") %in% names(projection)),
+              all(ct_county_list$code %in% projection$county_code))
+  }
   counties_json <- jsonlite::toJSON(
     lapply(seq_len(nrow(ct_county_list)), function(i) {
-      list(code    = jsonlite::unbox(ct_county_list$code[i]),
-           name    = jsonlite::unbox(ct_county_list$name[i]),
-           rec     = jsonlite::unbox(ct_county_list$rec[i]),
-           yearly  = to_yearly_vec(ct_county_list$code[i]),
-           monthly = to_monthly_vec(ct_county_list$code[i]))
+      out <- list(code    = jsonlite::unbox(ct_county_list$code[i]),
+                  name    = jsonlite::unbox(ct_county_list$name[i]),
+                  rec     = jsonlite::unbox(ct_county_list$rec[i]),
+                  yearly  = to_yearly_vec(ct_county_list$code[i]),
+                  monthly = to_monthly_vec(ct_county_list$code[i]))
+      if (!is.null(projection)) {
+        out$proj <- jsonlite::unbox(as.integer(round(
+          projection$total[match(ct_county_list$code[i], projection$county_code)])))
+      }
+      out
     }),
     auto_unbox = FALSE
   )
 
-  sprintf('    <script>window.%s = { years: %s, months: %s, counties: %s };</script>',
+  proj <- if (is.null(projection)) "" else
+    sprintf(', projYear: %d, projThrough: "%s"', as.integer(latest_year), month.name[latest_mo])
+  sprintf('    <script>window.%s = { years: %s, months: %s, counties: %s%s };</script>',
           global,
           jsonlite::toJSON(ct_years),
           jsonlite::toJSON(ct_months),
-          counties_json)
+          counties_json, proj)
+}
+
+#' County year-end projections that sum to the state's (Figure 3)
+#'
+#' Splits the statewide forecast for the rest of a partial year (from
+#' [nt_profile_project_year()]) across counties by each county's share of
+#' statewide filings over the last `window` months, and adds each county's
+#' count to date. The county totals therefore add up exactly to the state's
+#' year-end projection, and a small county never gets a forecast of its own
+#' from a handful of filings. It assumes each county keeps its recent share
+#' through year-end; it is an allocation, not a county-level model.
+#'
+#' @param county_agg Data frame of county-month filings: `county_code`,
+#'   `year`, `month`, `filings`.
+#' @param projection The state's year-end projection, a list with `total` and
+#'   `ytd` as [nt_profile_project_year()] returns. `NULL` returns `NULL`.
+#' @param window Months of recent filings that set each county's share
+#'   (default 12).
+#' @return `NULL`, or a data frame with `county_code`, `ytd`, `share`, and
+#'   `total` (the projected year-end count).
+#' @family state profile
+#' @export
+nt_profile_project_counties <- function(county_agg, projection, window = 12L) {
+  if (is.null(projection)) return(NULL)
+  stopifnot(all(c("county_code", "year", "month", "filings") %in% names(county_agg)))
+  d <- as.Date(sprintf("%d-%02d-01", county_agg$year, county_agg$month))
+  latest <- max(d)
+  latest_year <- as.integer(format(latest, "%Y"))
+  recent <- d > seq(latest, by = "-1 month", length.out = window + 1L)[window + 1L]
+  in_year <- county_agg$year == latest_year
+
+  codes <- sort(unique(county_agg$county_code))
+  sum_by <- function(keep) {
+    v <- tapply(county_agg$filings[keep], county_agg$county_code[keep], sum, na.rm = TRUE)
+    out <- as.numeric(v[codes]); out[is.na(out)] <- 0; out
+  }
+  recent_n <- sum_by(recent)
+  ytd      <- sum_by(in_year)
+  share    <- recent_n / sum(recent_n)
+  data.frame(county_code = codes, ytd = ytd, share = share,
+             total = ytd + share * (projection$total - projection$ytd))
 }
 
 #' Monthly-series data payload (state-profile Figure 1)
@@ -180,14 +258,95 @@ nt_profile_county_trend_data <- function(county_agg, record_window = 2,
 #' @param y_div The chart's y-axis ceiling — must equal the `y_max` that
 #'   [nt_profile_trend_svg()] derived (series max rounded up to `y_step`).
 #' @param global Name of the `window.` global to assign.
+#' @param projection Optional forecast from [nt_profile_project_months()]. When
+#'   given, the payload also carries the rounded `mean`, `lo`, and `hi` series
+#'   and `y_step`, which the page JS needs to draw a projection horizon and
+#'   re-ceiling the y-axis to fit its band. `NULL` (default) leaves the output
+#'   unchanged.
+#' @param y_step Gridline interval of the chart, as passed to
+#'   [nt_profile_trend_svg()] (default 500). Emitted only with `projection`.
 #' @return Character scalar: a `<script>…</script>` tag.
 #' @family state profile
 #' @export
 nt_profile_monthly_js <- function(values, year_base, month_base = 0,
-                                  y_div, global = "__waMonthly") {
-  sprintf('    <script>window.%s = { filings: [%s], yearBase: %d, monthBase: %d, yDiv: %d };</script>',
+                                  y_div, global = "__waMonthly",
+                                  projection = NULL, y_step = 500) {
+  proj <- ""
+  if (!is.null(projection)) {
+    stopifnot(all(c("mean", "lo", "hi") %in% names(projection)))
+    arr <- function(x) paste(round(x), collapse = ", ")
+    proj <- sprintf(", yStep: %d, proj: { mean: [%s], lo: [%s], hi: [%s] }",
+                    as.integer(y_step), arr(projection$mean),
+                    arr(pmax(projection$lo, 0)), arr(projection$hi))
+  }
+  sprintf('    <script>window.%s = { filings: [%s], yearBase: %d, monthBase: %d, yDiv: %d%s };</script>',
           global, paste(values, collapse = ", "),
-          as.integer(year_base), as.integer(month_base), as.integer(y_div))
+          as.integer(year_base), as.integer(month_base), as.integer(y_div), proj)
+}
+
+#' County picker for the yearly bars (Figure 2)
+#'
+#' A dropdown ("Show: Washington (statewide)" plus every county, alphabetical)
+#' that the page JS binds to, swapping the statewide chart for the county
+#' chart [nt_profile_yearly_counties()] drew.
+#'
+#' @param county_agg Data frame with `county_code` and `county`.
+#' @param state_name Name of the statewide option and of the state in the
+#'   caption, which the JS rewrites to the picked county.
+#' @return Character scalar of HTML.
+#' @family state profile
+#' @export
+nt_profile_yearly_picker <- function(county_agg, state_name) {
+  co <- unique(county_agg[c("county_code", "county")])
+  co <- co[order(co$county), ]
+  paste0(
+    '      <div class="ct-controls yearly-controls">\n',
+    '        <label class="ct-select-wrap">\n',
+    '          <span class="ct-select-label">Show:</span>\n',
+    '          <select id="yearly-county-select" class="ct-select" data-state="', state_name, '">\n',
+    '            <option value="">', state_name, ' (statewide)</option>\n',
+    paste(sprintf('            <option value="%s">%s County</option>', co$county_code, co$county),
+          collapse = "\n"), '\n',
+    '          </select>\n',
+    '        </label>\n',
+    '      </div>'
+  )
+}
+
+#' Projection-horizon buttons for the monthly trend chart (Figure 1)
+#'
+#' A segmented control the page JS binds to: "Off" plus one button per
+#' horizon. Picking a horizon extends Figure 1 by that many forecast months
+#' (dashed expected count and the prediction band), using the forecast carried
+#' by [nt_profile_monthly_js()]. Pair with `projection = TRUE` in
+#' [nt_profile_trend_svg()]. The buttons take their own class,
+#' `proj-toggle-btn`, so the county-trend toggle handler never binds to them.
+#'
+#' @param horizons Integer months, one button each (default 3, 6, 12).
+#' @param label Visible label before the buttons.
+#' @param selected Horizon the chart opens on: 0 (default) for "Off", or one
+#'   of `horizons`. The page JS draws that horizon on load.
+#' @return Character scalar of HTML.
+#' @family state profile
+#' @export
+nt_profile_projection_toggle <- function(horizons = c(3L, 6L, 12L),
+                                         label = "Projection",
+                                         selected = 0L) {
+  stopifnot(selected %in% c(0L, horizons))
+  btn <- function(h, text, on) {
+    sprintf('            <button type="button" class="proj-toggle-btn%s" data-h="%d" aria-pressed="%s">%s</button>',
+            if (on) " ct-active" else "", as.integer(h), if (on) "true" else "false", text)
+  }
+  paste0(
+    '      <div class="ct-controls proj-controls">\n',
+    '          <span class="ct-select-label">', label, ':</span>\n',
+    '          <div class="ct-toggle" role="group" aria-label="', label, ' horizon">\n',
+    btn(0L, "Off", selected == 0), '\n',
+    paste(vapply(horizons, function(h) btn(h, sprintf("%d months", as.integer(h)), h == selected),
+                 character(1)), collapse = "\n"), '\n',
+    '          </div>\n',
+    '      </div>'
+  )
 }
 
 #' Searchable county table (state-profile Table 1)

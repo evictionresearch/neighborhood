@@ -16,6 +16,7 @@ nt_hprm_map(
   popup_note = NULL,
   opacity = 0.8,
   height = NULL,
+  style = "terrain-light",
   ...
 )
 }

@@ -14,7 +14,8 @@ nt_profile_trend_svg(
   y_step = 500,
   svg_id = "chart-monthly-svg",
   indicator_id = "chart-monthly-indicator",
-  source_note = "d3_state_agg"
+  source_note = "d3_state_agg",
+  projection = FALSE
 )
 }
 \arguments{
@@ -39,6 +40,12 @@ this step (default 500).}
 
 \item{source_note}{Provenance comment for the data path (names the source
 table).}
+
+\item{projection}{Emit the projection layer: styles plus two empty paths
+(\code{.proj-band}, \code{.proj-line}) that the page JS fills when a reader picks a
+horizon from \code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}}, using the forecast that
+\code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}} carries. \code{FALSE} (default) leaves the output
+byte-identical for pages without the control.}
 }
 \value{
 Character scalar: the complete \verb{<svg>...</svg>} block.
@@ -61,13 +68,18 @@ Other state profile:
 \code{\link[=nt_profile_map_explorer]{nt_profile_map_explorer()}},
 \code{\link[=nt_profile_monthly_js]{nt_profile_monthly_js()}},
 \code{\link[=nt_profile_news]{nt_profile_news()}},
+\code{\link[=nt_profile_project_counties]{nt_profile_project_counties()}},
+\code{\link[=nt_profile_project_months]{nt_profile_project_months()}},
 \code{\link[=nt_profile_project_year]{nt_profile_project_year()}},
+\code{\link[=nt_profile_projection_toggle]{nt_profile_projection_toggle()}},
 \code{\link[=nt_profile_race_bars_svg]{nt_profile_race_bars_svg()}},
 \code{\link[=nt_profile_race_ratio_svg]{nt_profile_race_ratio_svg()}},
 \code{\link[=nt_profile_race_trend_svg]{nt_profile_race_trend_svg()}},
 \code{\link[=nt_profile_rent_dumbbell_svg]{nt_profile_rent_dumbbell_svg()}},
 \code{\link[=nt_profile_rent_trend_svg]{nt_profile_rent_trend_svg()}},
 \code{\link[=nt_profile_scatter_svg]{nt_profile_scatter_svg()}},
+\code{\link[=nt_profile_yearly_counties]{nt_profile_yearly_counties()}},
+\code{\link[=nt_profile_yearly_picker]{nt_profile_yearly_picker()}},
 \code{\link[=nt_profile_yearly_svg]{nt_profile_yearly_svg()}},
 \code{\link[=nt_raw_html]{nt_raw_html()}}
 }

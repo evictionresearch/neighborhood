@@ -50,6 +50,41 @@ test_that("nt_profile_yearly_svg accents the partial year and overlays a project
   expect_no_match(svg2, "projected")
 })
 
+test_that("nt_profile_yearly_svg draws a point projection without a range", {
+  yrs <- 2016:2022
+  vals <- c(180, 176, 169, 151, 47, 39, 62)
+  svg <- nt_profile_yearly_svg(yrs, vals, baseline = 165, latest_month = 4,
+                               projection = list(total = 195),
+                               y_ceiling_step = 25, y_grid_step = 50)
+  expect_match(svg, 'data-proj-total="195"', fixed = TRUE)
+  expect_no_match(svg, "data-proj-lo")
+  expect_no_match(svg, '<rect class="yproj-pi"')
+  expect_match(svg, '<rect class="yproj-bar"')
+  expect_match(svg, ">150</text>", fixed = TRUE)   # small steps print whole, not "0.15k"
+  # the statewide form is unchanged
+  full <- nt_profile_yearly_svg(yrs, vals * 100, baseline = 16532, latest_month = 4,
+                                projection = list(total = 19500, lo = 17000, hi = 22000))
+  expect_match(full, '<rect class="yproj-pi"')
+  expect_match(full, ">5k</text>", fixed = TRUE)
+})
+
+test_that("nt_profile_yearly_counties and its picker cover every county", {
+  ca <- expand.grid(month = 1:12, year = 2017:2026, county_code = c("01", "02"),
+                    stringsAsFactors = FALSE)
+  ca <- ca[!(ca$year == 2026 & ca$month > 9), ]
+  ca$county <- ifelse(ca$county_code == "01", "Beta", "Alpha")
+  ca$filings <- ifelse(ca$county_code == "01", 30, 2)
+  pc <- data.frame(county_code = c("01", "02"), total = c(360, 24))
+  svgs <- nt_profile_yearly_counties(ca, projection = pc)
+  expect_match(svgs, '<svg style="display:none" data-county="Beta" data-baseline="360" id="chart-yearly-svg-01"',
+               fixed = TRUE)
+  expect_match(svgs, 'id="chart-yearly-svg-02"', fixed = TRUE)
+  expect_match(svgs, "~360 projected", fixed = TRUE)
+  pick <- nt_profile_yearly_picker(ca, "Washington")
+  expect_match(pick, '<option value="">Washington (statewide)</option>', fixed = TRUE)
+  expect_lt(regexpr("Alpha County", pick), regexpr("Beta County", pick))
+})
+
 test_that("nt_profile_project_year returns NULL when there is nothing to project", {
   m <- monthly_demo(48, "2020-01-01")   # ends December -> year complete
   expect_null(nt_profile_project_year(m$date, m$filings))
@@ -66,6 +101,85 @@ test_that("nt_profile_project_year fits and sums a partial year", {
   expect_equal(p$ytd, sum(tail(m$filings, 4)))
   expect_gt(p$hi, p$total); expect_lt(p$lo, p$total)
   expect_match(p$order, "^SARIMA")
+})
+
+test_that("nt_profile_trend_svg adds the projection layer only on request", {
+  m <- monthly_demo()
+  plain <- nt_profile_trend_svg(m$date, m$filings, baseline = 1378)
+  expect_no_match(plain, "proj-")
+  svg <- nt_profile_trend_svg(m$date, m$filings, baseline = 1378, projection = TRUE)
+  expect_match(svg, '<path class="proj-band" d=""/>', fixed = TRUE)
+  expect_match(svg, '<path class="proj-line" d=""/>', fixed = TRUE)
+  # the layer sits under the focal dot so the latest month stays on top
+  expect_lt(regexpr("proj-line\" d", svg), regexpr('<circle class="focal"', svg, fixed = TRUE))
+})
+
+test_that("nt_profile_monthly_js carries a projection when given one", {
+  pr <- data.frame(mean = c(100.4, 110.6), lo = c(-5, 90), hi = c(130, 140))
+  js <- nt_profile_monthly_js(c(10L, 20L), year_base = 2019, y_div = 2500, projection = pr)
+  expect_match(js, "yDiv: 2500, yStep: 500, proj: { mean: [100, 111], lo: [0, 90], hi: [130, 140] } };",
+               fixed = TRUE)
+})
+
+test_that("nt_profile_projection_toggle emits Off plus one button per horizon", {
+  html <- nt_profile_projection_toggle()
+  expect_match(html, 'class="proj-toggle-btn ct-active" data-h="0" aria-pressed="true">Off<', fixed = TRUE)
+  for (h in c(3, 6, 12))
+    expect_match(html, sprintf('data-h="%d" aria-pressed="false">%d months<', h, h), fixed = TRUE)
+  # never the county-trend class, whose handler binds every match on the page
+  expect_no_match(html, "ct-toggle-btn")
+})
+
+test_that("nt_profile_project_months agrees with nt_profile_project_year", {
+  skip_if_not_installed("forecast")
+  m <- monthly_demo(52, "2022-01-01")   # ends April of year 5
+  pm <- nt_profile_project_months(m$date, m$filings, h = 12, fit_start = "2022-01-01")
+  py <- nt_profile_project_year(m$date, m$filings, fit_start = "2022-01-01")
+  expect_equal(nrow(pm), 12L)
+  expect_equal(pm$date[1], as.Date("2026-05-01"))
+  expect_true(all(pm$lo <= pm$mean & pm$mean <= pm$hi))
+  expect_equal(py$ytd + sum(pm$mean[seq_len(py$h)]), py$total)
+  expect_equal(attr(pm, "order"), py$order)
+  short <- monthly_demo(10, "2025-01-01")
+  expect_null(nt_profile_project_months(short$date, short$filings, fit_start = "2025-01-01"))
+})
+
+test_that("nt_profile_project_counties splits the state's remainder by recent share", {
+  ca <- expand.grid(month = 1:12, year = 2025:2026, county_code = c("01", "02"),
+                    stringsAsFactors = FALSE)
+  ca <- ca[!(ca$year == 2026 & ca$month > 9), ]
+  ca$filings <- ifelse(ca$county_code == "01", 30, 10)
+  ytd <- sum(ca$filings[ca$year == 2026])
+  pc <- nt_profile_project_counties(ca, list(total = ytd + 400, ytd = ytd))
+  expect_equal(sum(pc$total), ytd + 400)
+  expect_equal(pc$share, c(0.75, 0.25))
+  expect_equal(pc$total, c(270 + 300, 90 + 100))
+  expect_null(nt_profile_project_counties(ca, NULL))
+})
+
+test_that("nt_profile_county_trend_data carries county projections when given", {
+  ca <- expand.grid(month = 1:12, year = 2025:2026, county_code = c("01", "02"),
+                    stringsAsFactors = FALSE)
+  ca <- ca[!(ca$year == 2026 & ca$month > 9), ]
+  ca$county <- ifelse(ca$county_code == "01", "Alpha", "Beta")
+  ca$filings <- ifelse(ca$county_code == "01", 30, 10)
+  plain <- nt_profile_county_trend_data(ca)
+  expect_no_match(plain, "projYear")
+  pc <- data.frame(county_code = c("01", "02"), total = c(370.4, 129.6))
+  js <- nt_profile_county_trend_data(ca, projection = pc)
+  expect_match(js, '"proj":370', fixed = TRUE)
+  expect_match(js, '"proj":130', fixed = TRUE)
+  expect_match(js, ', projYear: 2026, projThrough: "September" };', fixed = TRUE)
+})
+
+test_that("county trend projection pieces are opt-in", {
+  shell <- nt_profile_county_trend("x", "Figure 3", "d", "s")
+  expect_no_match(shell, "ct-proj")
+  shell <- nt_profile_county_trend("x", "Figure 3", "d", "s", projection_toggle = TRUE,
+                                   through_label = "Through September")
+  expect_match(shell, 'class="ct-proj-btn ct-active"', fixed = TRUE)
+  expect_match(shell, ">Through September</button>", fixed = TRUE)
+  expect_no_match(sub(".*ct-proj-toggle", "", shell), 'data-granularity')
 })
 
 test_that("nt_profile_county_trend_data flags record counties and orders by record size", {

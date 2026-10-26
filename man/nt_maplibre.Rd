@@ -24,9 +24,11 @@ supplied and \code{fit = TRUE}, the map opens framed to its bounds. (Data is not
 drawn here — add it with \code{\link[=nt_add_choropleth]{nt_add_choropleth()}}.)}
 
 \item{style}{Basemap. \code{"terrain-light"} (default) or \code{"terrain-dark"} for
-the house terrain style (\code{\link[=nt_terrain_style]{nt_terrain_style()}}); one of the OpenFreeMap
-style names \code{"positron"}, \code{"bright"}, \code{"liberty"}, \code{"dark"}, or
-\code{"fiord"}; \strong{or} any value \code{mapgl} accepts (a style URL, a style list
+the house terrain style (\code{\link[=nt_terrain_style]{nt_terrain_style()}}), or \code{"terrain-light-soft"}
+/ \code{"terrain-dark-soft"} for its soft-streets variant (road inks pulled
+toward the ground so the grid recedes under a choropleth); one of the
+OpenFreeMap style names \code{"positron"}, \code{"bright"}, \code{"liberty"}, \code{"dark"},
+or \code{"fiord"}; \strong{or} any value \code{mapgl} accepts (a style URL, a style list
 such as \code{nt_terrain_style(hillshade = FALSE)}, or the result of
 \code{\link[mapgl:carto_style]{mapgl::carto_style()}}, \code{\link[mapgl:maptiler_style]{mapgl::maptiler_style()}}, etc.).}
 

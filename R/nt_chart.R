@@ -72,8 +72,10 @@
 #'   hovering a line or bar itself — the right choice for line charts with
 #'   many series.
 #' @param isolate Logical; when `TRUE`, double-clicking a series — its line
-#'   or its end-of-line label — isolates it and dims the rest. Double-click
-#'   it again (or empty space) to restore. Line charts with a `group`.
+#'   or its end-of-line label — isolates it and dims the rest. The isolated
+#'   series pops to full opacity even if `series_opacity` mutes it by
+#'   default; double-click it again (or empty space) to restore every series
+#'   to its default opacity. Line charts with a `group`.
 #' @param bar_labels Logical; print each bar segment's value inside the bar
 #'   (`value_fmt`/`digits` formatting). A label that doesn't fit its segment
 #'   is hidden — except on the stack's LAST series (the right end of a
@@ -114,6 +116,12 @@
 #'   series — any of `"solid"`, `"dashed"`, `"dotted"` — for print- and
 #'   grayscale-friendly differentiation. If the vector is named, names are matched
 #'   to series (group) names; otherwise styles are applied in series order.
+#' @param series_opacity Optional named numeric vector (series name → 0–1)
+#'   setting each named series' default line opacity; unnamed series stay at
+#'   full ink. The editorial move for a one-versus-the-region line chart:
+#'   mute the context series so the highlighted one carries the chart, and
+#'   pair with `isolate = TRUE`, which pops a double-clicked series to full
+#'   opacity and restores these defaults on release. Line charts only.
 #' @param source Optional attribution shown small in the lower-right corner
 #'   (e.g. a data-source credit line). A credit too long for one line is wrapped
 #'   to the chart width when the page renders, and the plot area gives up the
@@ -174,6 +182,7 @@ nt_chart <- function(data, x, y, group = NULL,
                      highlight_last = FALSE,
                      end_label = FALSE,
                      line_styles = NULL,
+                     series_opacity = NULL,
                      source = NULL,
                      legend = !is.null(group),
                      legend_pos = c("top", "bottom"),
@@ -371,9 +380,10 @@ nt_chart <- function(data, x, y, group = NULL,
   # and direct end-of-line labels. Applied last so the mark functions above
   # don't clobber them.
   if (type %in% c("line", "area") &&
-      (!is.null(line_styles) || isTRUE(end_label) ||
+      (!is.null(line_styles) || !is.null(series_opacity) || isTRUE(end_label) ||
        (!is.null(names(pal)) && any(nzchar(names(pal)))))) {
-    e <- .nt_style_series(e, line_styles, pal, isTRUE(end_label), value_fmt)
+    e <- .nt_style_series(e, line_styles, pal, isTRUE(end_label), value_fmt,
+                          series_opacity)
   }
   # "hover" y-axis: reveal the labels + dashed gridlines only while the cursor is
   # over the chart (the ERN newspaper-graphic style).
@@ -699,25 +709,29 @@ nt_spark <- function(values, type = c("line", "bar"),
 }
 
 # JS (htmlwidgets::onRender) for isolate = TRUE: double-click a series (its
-# line or its end label) to dim every other series; double-click it again —
-# or empty canvas — to restore. Original end-label colors are stashed on the
-# first use so restore is exact.
+# line or its end label) to pop it to full ink and dim every other series;
+# double-click it again — or empty canvas — to restore. Original end-label
+# colors AND line opacities are stashed on the first use, so a chart whose
+# context series start muted (series_opacity) returns to exactly that state
+# rather than everything snapping to full ink.
 .nt_isolate_js <- function() {
   paste0(
     "function(el, x){\n",
     "  var inst = (window.echarts && echarts.getInstanceByDom) ? echarts.getInstanceByDom(el) : null;\n",
     "  if(!inst){ var c = el.querySelector('div'); if(c && window.echarts) inst = echarts.getInstanceByDom(c); }\n",
     "  if(!inst) return;\n",
-    "  var isolated = null, elColors = null;\n",
+    "  var isolated = null, elColors = null, baseOp = null;\n",
     "  function apply(){\n",
     "    var series = (inst.getOption().series || []);\n",
     "    if(!elColors) elColors = series.map(function(s){ return s.endLabel ? (s.endLabel.color || null) : null; });\n",
+    "    if(!baseOp) baseOp = series.map(function(s){ return (s.lineStyle && s.lineStyle.opacity != null) ? s.lineStyle.opacity : 1; });\n",
     "    series.forEach(function(s, i){\n",
     "      var dim = isolated !== null && s.name !== isolated;\n",
+    "      var op = isolated === null ? baseOp[i] : (dim ? 0.12 : 1);\n",
     "      s.lineStyle = s.lineStyle || {};\n",
-    "      s.lineStyle.opacity = dim ? 0.12 : 1;\n",
+    "      s.lineStyle.opacity = op;\n",
     "      s.itemStyle = s.itemStyle || {};\n",
-    "      s.itemStyle.opacity = dim ? 0.12 : 1;\n",
+    "      s.itemStyle.opacity = op;\n",
     "      if(s.endLabel){ s.endLabel.color = dim ? 'rgba(25,34,44,0.18)' : elColors[i]; }\n",
     "    });\n",
     "    inst.setOption({series: series});\n",
@@ -910,7 +924,8 @@ nt_spark <- function(values, type = c("line", "bar"),
 #   * line_styles  -> the dash pattern (recycled, or matched by series name)
 #   * a named palette -> the line/marker color for that group
 #   * end_label    -> a direct "<name> · <value>" label at the line end
-.nt_style_series <- function(e, line_styles, palette, end_label, value_fmt) {
+.nt_style_series <- function(e, line_styles, palette, end_label, value_fmt,
+                             series_opacity = NULL) {
   series <- e$x$opts$series
   if (is.null(series) || !length(series)) return(e)
   styles    <- if (is.null(line_styles)) NULL else as.character(line_styles)
@@ -941,10 +956,19 @@ nt_spark <- function(values, type = c("line", "bar"),
       ls$type <- key
     }
     if (!is.null(col)) ls$color <- col
+    # default per-series muting (series_opacity); the isolate JS stashes and
+    # restores these, so an isolate cycle can never strand a series at the
+    # wrong ink
+    op <- if (!is.null(series_opacity) && nzchar(nm) &&
+              nm %in% names(series_opacity)) {
+      as.numeric(series_opacity[[nm]])
+    } else NULL
+    if (!is.null(op)) ls$opacity <- op
     if (length(ls)) s$lineStyle <- ls
-    if (!is.null(col)) {
+    if (!is.null(col) || !is.null(op)) {
       it <- s$itemStyle %nt||% list()
-      it$color <- col
+      if (!is.null(col)) it$color <- col
+      if (!is.null(op))  it$opacity <- op
       s$itemStyle <- it
     }
     if (isTRUE(end_label)) {
